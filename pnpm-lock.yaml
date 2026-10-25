@@ -1936,12 +1936,6 @@ packages:
     engines: {node: '>= 20'}
     hasBin: true
 
-<<<<<<< HEAD
-  marked@18.1.1:
-    resolution: {integrity: sha512-zEGgrtUG8crk+TrMacJSVABU4DYDDkS8uqgU3ohrn/2fW9C2AEfUrO3m6IhpIpQpl7YcVpiXXC9cSMWDANT3dg==}
-    engines: {node: '>= 20'}
-    hasBin: true
-
   mdast-util-from-markdown@2.1.0:
     resolution: {integrity: sha512-KRLgmPaP2H1ul2bpoJkOS+9pAcDAAj9Nu1mqLnh8NLeJG5tlvj42TH80PIGBpROWlRXLk0lDrWNuZCFy/tsB4A==}
 
@@ -2038,8 +2032,6 @@ packages:
   micromark@4.0.3:
     resolution: {integrity: sha512-oGYfQzHSG5dOMovQcJ3fyTmZlWAWpi0XA0sJwJs+i6OT88o1+Jtw/8z0CmdowSLxGhhFK89rQ/oXph/wN02PNw==}
 
-=======
->>>>>>> contracts-reading
   mlly@1.8.2:
     resolution: {integrity: sha512-d+ObxMQFmbt10sretNDytwt85VrbkhhUA/JBGm1MPaWJ65Cl4wOgLaB1NYvJSZ0Ef03MMEU/0xpPMXUIQ29UfA==}
 
@@ -4329,9 +4321,6 @@ snapshots:
 
   marked@17.0.6: {}
 
-<<<<<<< HEAD
-  marked@18.1.1: {}
-
   mdast-util-from-markdown@2.1.0:
     dependencies:
       '@types/mdast': 4.0.4
@@ -4584,8 +4573,6 @@ snapshots:
     transitivePeerDependencies:
       - supports-color
 
-=======
->>>>>>> contracts-reading
   mlly@1.8.2:
     dependencies:
       acorn: 8.19.0
