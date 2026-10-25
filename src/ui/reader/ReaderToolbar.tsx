@@ -128,7 +128,7 @@ export function ReaderToolbar({
         onClick={onToggleSidebar}
       />
       {titleVisible ? (
-        <Tooltip label={fullTitle}>
+        <Tooltip label={fullTitle} className="pp-toolbar__title-wrap">
           <span className="pp-toolbar__title">{header.title}</span>
         </Tooltip>
       ) : (

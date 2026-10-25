@@ -16,6 +16,8 @@ interface TooltipProps {
    */
   labelsChild?: boolean;
   disabled?: boolean;
+  /** Class for the wrapper span, which is the element its parent lays out. */
+  className?: string;
   children: ReactNode;
 }
 
@@ -25,7 +27,7 @@ const WARM_WINDOW = 500;
 let warmUntil = 0;
 
 /** A small glass label for controls, replacing the browser's own title tooltip. */
-export function Tooltip({ label, shortcut, placement = 'bottom', labelsChild, disabled, children }: TooltipProps) {
+export function Tooltip({ label, shortcut, placement = 'bottom', labelsChild, disabled, className, children }: TooltipProps) {
   const anchorRef = useRef<HTMLSpanElement>(null);
   const tipRef = useRef<HTMLDivElement>(null);
   const [open, setOpen] = useState(false);
@@ -58,7 +60,7 @@ export function Tooltip({ label, shortcut, placement = 'bottom', labelsChild, di
   return (
     <span
       ref={anchorRef}
-      className="pp-tooltip-anchor"
+      className={className ? `pp-tooltip-anchor ${className}` : 'pp-tooltip-anchor'}
       aria-describedby={!labelsChild && open ? id : undefined}
       onPointerEnter={(event) => event.pointerType === 'mouse' && show(false)}
       onPointerLeave={hide}
