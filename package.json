@@ -21,6 +21,8 @@
     "postinstall": "wxt prepare"
   },
   "dependencies": {
+    "@assistant-ui/react": "0.15.31",
+    "@assistant-ui/react-markdown": "0.14.24",
     "@tiptap/core": "3.32.0",
     "@tiptap/extension-mathematics": "3.32.0",
     "@tiptap/markdown": "3.32.0",
@@ -30,7 +32,9 @@
     "dompurify": "3.4.17",
     "katex": "0.16.47",
     "react": "19.3.1",
-    "react-dom": "19.3.1"
+    "react-dom": "19.3.1",
+    "rehype-katex": "7.0.1",
+    "remark-math": "6.0.0"
   },
   "devDependencies": {
     "@types/react": "19.3.0",
