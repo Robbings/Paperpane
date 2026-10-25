@@ -2,4 +2,4 @@ export * from './store';
 export * from './documents';
 export * from './anchors';
 export * from './annotations';
-export * from './notes';
+// Notes load their editor schema. Import './notes' only inside the lazy note panel.

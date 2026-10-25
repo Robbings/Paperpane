@@ -3,7 +3,7 @@
 Status: proposed, pending review. These interfaces are an integration boundary, not a claim that PDF processing, durable storage or synchronization has shipped.
 
 - `src/contracts/`: portable project DTOs and service interfaces. No UI or third-party message types.
-- `src/contracts/demo/`: explicitly disposable, in-memory services. Never used as production storage.
+- `src/contracts/demo/`: explicitly disposable, in-memory services. Never used as production storage. The barrel deliberately excludes notes so document/annotation consumers do not load the editor. Import `demo/notes` only from a lazy-loaded note panel, or use `await import('@/contracts/demo/notes')` when opening it.
 - `src/runtime/use-contract.ts`: React subscription bridge.
 - `src/domain/notes/codec.ts`: lazily loaded, shared note schema and Markdown export.
 
