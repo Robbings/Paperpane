@@ -6,9 +6,12 @@ export { Icon, iconNames, type IconName } from './Icon';
 export { IconButton } from './IconButton';
 export { Kbd } from './Kbd';
 export { Menu, type MenuEntry } from './Menu';
+export { Pagination, type PageSize } from './Pagination';
 export { Popover } from './Popover';
 export { SaveStatus, type LocalSaveState, type SyncState } from './SaveStatus';
 export { Segmented, type SegmentedOption } from './Segmented';
+export { StarToggle } from './StarToggle';
+export { TagInput, type TagOption } from './TagInput';
 export {
   SelectionMenu,
   highlightColors,
@@ -19,4 +22,5 @@ export { TextArea, TextField } from './TextField';
 export { Toaster, toast, type ToastOptions, type ToastTone } from './Toast';
 export { Checkbox, Switch } from './Toggle';
 export { Tooltip } from './Tooltip';
+export { Tree, TREE_DRAG_TYPE, type TreeNode } from './Tree';
 export { useAnchoredPosition, type Placement } from './useAnchoredPosition';

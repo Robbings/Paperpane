@@ -38,6 +38,20 @@ const paths = {
   chevronDown: 'M7 10l5 5 5-5',
   chevronRight: 'M10 7l5 5-5 5',
   more: 'M6 12h.01 M12 12h.01 M18 12h.01',
+  folder: 'M3.5 7.5A1.5 1.5 0 0 1 5 6h4l2 2h8a1.5 1.5 0 0 1 1.5 1.5V17A1.5 1.5 0 0 1 19 18.5H5A1.5 1.5 0 0 1 3.5 17z',
+  folderPlus: 'M3.5 7.5A1.5 1.5 0 0 1 5 6h4l2 2h8a1.5 1.5 0 0 1 1.5 1.5V17A1.5 1.5 0 0 1 19 18.5H5A1.5 1.5 0 0 1 3.5 17z M12 10.5v5 M9.5 13h5',
+  library: 'M5.5 4.5v15 M9.5 4.5v15 M13.5 5.5l4.5 13.5',
+  clock: 'M12 20a8 8 0 1 0 0-16 8 8 0 0 0 0 16z M12 8v4.5l3 2',
+  inbox: 'M4 13l2.5-7.5h11L20 13v6H4z M4 13h4.5l1 2h5l1-2H20',
+  tag: 'M4.5 12.5V5h7.5l7.5 7.5-7.5 7.5z M8.5 8.5h.01',
+  star: 'M12 4.2l2.4 4.9 5.4.8-3.9 3.8.9 5.4-4.8-2.5-4.8 2.5.9-5.4-3.9-3.8 5.4-.8z',
+  columns: 'M4 5h16v14H4z M10 5v14 M15 5v14',
+  listCompact: 'M5 7h14 M5 12h14 M5 17h14',
+  listDetailed: 'M5 6h14 M5 9.5h9 M5 14h14 M5 17.5h9',
+  openExternal: 'M14 5h5v5 M19 5l-8 8 M17 13.5V19H5V7h5.5',
+  bookmark: 'M7 4.5h10v15l-5-3.5-5 3.5z',
+  bookmarkFilled: { d: 'M7 4.5h10v15l-5-3.5-5 3.5z', fill: 'M7 4.5h10v15l-5-3.5-5 3.5z' },
+  quote: 'M5 7h14 M5 11h14 M5 15h9 M16 15v4l3-2z',
 } satisfies Record<string, IconPath>;
 
 export type IconName = keyof typeof paths;

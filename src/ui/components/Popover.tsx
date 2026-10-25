@@ -29,8 +29,11 @@ export function Popover({ anchorRef, open, onClose, label, placement = 'bottom',
   useEffect(() => {
     if (!open) return;
     const onPointerDown = (event: PointerEvent) => {
-      const target = event.target as Node;
-      if (!ref.current?.contains(target) && !anchorRef.current?.contains(target)) onClose();
+      const target = event.target as Element;
+      // Menus and suggestion lists opened from inside the popover live in
+      // their own layers; using them is not an outside click.
+      if (ref.current?.contains(target) || anchorRef.current?.contains(target) || target.closest?.('[data-pp-floating]')) return;
+      onClose();
     };
     const onKey = (event: KeyboardEvent) => {
       if (event.key !== 'Escape') return;

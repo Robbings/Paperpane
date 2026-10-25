@@ -83,6 +83,7 @@ export function Menu({ label, entries, anchor, align = 'start', triggerRef, onSe
       ref={ref}
       role="menu"
       aria-label={label}
+      data-pp-floating=""
       className="pp-glass pp-menu"
       data-tone="float"
       style={position ?? { visibility: 'hidden', top: anchor.y, left: anchor.x }}
