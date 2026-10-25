@@ -1,5 +1,5 @@
 import { ImportFault, abortIfNeeded } from './errors';
-/** A bounded first import implementation: avoids multiple unbounded in-memory copies. */
+/** Per-file input limit. Full-buffer parsing/hashing still require additional memory. */
 export const MAX_PDF_BYTES = 256 * 1024 * 1024;
 export function parseSourceUrl(raw: string): URL {
   let url: URL;
@@ -16,11 +16,11 @@ function filenameFromUrl(url: string): string {
   catch { return '论文.pdf'; }
 }
 export interface TransferProgress { completed: number; total?: number; unit: 'bytes' }
-export async function readPdfBytes(blob: Blob, signal: AbortSignal, progress: (value: TransferProgress) => void): Promise<Uint8Array> {
+export async function readPdfBytes(blob: Blob, signal: AbortSignal, progress: (value: TransferProgress) => void): Promise<Uint8Array<ArrayBuffer>> {
   if (!blob.size || blob.size > MAX_PDF_BYTES) throw new ImportFault({ code: 'UNSUPPORTED_FILE', message: '请选择非空且不超过 256 MiB 的 PDF', recovery: ['choose-file'] });
   return readStream(blob.stream(), blob.size, signal, progress);
 }
-async function readStream(stream: ReadableStream<Uint8Array>, total: number | undefined, signal: AbortSignal, progress: (value: TransferProgress) => void): Promise<Uint8Array> {
+async function readStream(stream: ReadableStream<Uint8Array>, total: number | undefined, signal: AbortSignal, progress: (value: TransferProgress) => void): Promise<Uint8Array<ArrayBuffer>> {
   abortIfNeeded(signal);
   const reader = stream.getReader(); const chunks: Uint8Array[] = []; let completed = 0;
   const cancel = () => { void reader.cancel().catch(() => {}); };
@@ -41,7 +41,7 @@ async function readStream(stream: ReadableStream<Uint8Array>, total: number | un
     return data;
   } finally { signal.removeEventListener('abort', cancel); await reader.cancel().catch(() => {}); reader.releaseLock(); }
 }
-export async function downloadPdf(url: URL, signal: AbortSignal, progress: (value: TransferProgress) => void): Promise<{ bytes: Uint8Array; filename: string; sourceUrl: string }> {
+export async function downloadPdf(url: URL, signal: AbortSignal, progress: (value: TransferProgress) => void): Promise<{ bytes: Uint8Array<ArrayBuffer>; filename: string; sourceUrl: string }> {
   const timeout = new AbortController();
   const timer = setTimeout(() => timeout.abort(), 120_000);
   const combined = AbortSignal.any([signal, timeout.signal]);

@@ -7,8 +7,8 @@ import { safeFilename } from '@/document/download';
 import type { Result } from '@/contracts/common';
 import type { DocumentRecord, ImportJob } from '@/contracts/document';
 
-// Temporary integration surface using existing components; the designed library
-// will replace this page without changing the import/storage service.
+// Temporary standalone import surface. The library keeps its own entrypoint
+// and can reuse the service when its designed UI is integrated.
 const owner = createDocumentService();
 window.addEventListener('pagehide', (event) => { if (!event.persisted) owner.dispose(); });
 const phases: Record<ImportJob['phase'], string> = {

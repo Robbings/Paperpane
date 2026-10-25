@@ -1,4 +1,4 @@
 import { mountPage } from '@/runtime/mount-page';
-import { ImportPage } from './import-page';
+import { LibraryPage } from '@/ui/pages/LibraryPage';
 
-mountPage(<ImportPage />);
+mountPage(<LibraryPage />);

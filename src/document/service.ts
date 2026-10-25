@@ -58,7 +58,7 @@ export function createDocumentService(database = new PaperDatabase()): LiveDocum
     const active = () => !disposed && runs.get(id) === run && run.epoch === epoch;
     try {
       const progress = (value: NonNullable<ImportJob['progress']>) => { if (active()) patchJob(id, { progress: value }); };
-      let bytes: Uint8Array; let filename: string; let sourceUrl: string | undefined;
+      let bytes: Uint8Array<ArrayBuffer>; let filename: string; let sourceUrl: string | undefined;
       if (run.source.kind === 'local') {
         filename = safeFilename(run.source.file.name);
         bytes = await readPdfBytes(run.source.file, signal, progress);
@@ -80,13 +80,13 @@ export function createDocumentService(database = new PaperDatabase()): LiveDocum
       run.password = undefined;
       abortIfNeeded(signal);
       patchJob(id, { phase: 'validating', passwordRequest: undefined, error: undefined });
-      const hashBytes = new Uint8Array(await crypto.subtle.digest('SHA-256', bytes.slice().buffer));
+      const hashBytes = new Uint8Array(await crypto.subtle.digest('SHA-256', bytes));
       const sha256 = Array.from(hashBytes, (value) => value.toString(16).padStart(2, '0')).join('');
       abortIfNeeded(signal);
       if (!active()) return;
       // Cancellation ends before this short atomic commit. Never report cancelled after saving.
       run.saving = true;
-      const receipt = await database.commitImport({ blob: new Blob([bytes.slice().buffer], { type: 'application/pdf' }), sha256, filename, pageCount, sourceUrl,
+      const receipt = await database.commitImport({ blob: run.source.kind === 'local' ? run.source.file : new Blob([bytes], { type: 'application/pdf' }), sha256, filename, pageCount, sourceUrl,
         syncScope: run.source.kind === 'url' && run.source.intent === 'browse' ? 'record-only' : 'record-and-file' });
       receipts.set(id, receipt);
       if (active()) patchJob(id, { phase: 'readable', document: { documentId: receipt.document.id, fileVersion: receipt.document.fileVersion }, progress: undefined, error: undefined });
@@ -116,7 +116,8 @@ export function createDocumentService(database = new PaperDatabase()): LiveDocum
       if (disposed) return failure('CANCELLED', '导入页面已关闭');
       if (snapshot.data.jobs.some((job) => ['reading', 'validating', 'extracting', 'password-required'].includes(job.phase))) return failure('BUSY', '请先完成或取消当前导入');
       const id = crypto.randomUUID();
-      const run: Run = { source, controller: new AbortController(), saving: false, epoch: 0 };
+      // Capture the source so caller mutation cannot pair one file hash with another File.
+      const run: Run = { source: { ...source }, controller: new AbortController(), saving: false, epoch: 0 };
       runs.set(id, run);
       const title = source.kind === 'local' ? source.file.name : new URL(source.url).hostname;
       publish({ ...snapshot, data: { ...snapshot.data, jobs: [...snapshot.data.jobs, { id, title, phase: 'reading' }] } });
