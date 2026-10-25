@@ -16,3 +16,9 @@ The UI should lazy-load the editor/Markdown/math renderer. Current production pa
 Model/PDF/user Markdown is untrusted. Disable raw HTML and remote image loading by default. If producing HTML with marked, sanitize before insertion with a narrow tag/attribute allowlist; sanitization alone does not prevent remote image tracking. Validate link protocols, do not execute scripts or model-generated commands. Rendering components and their CSS belong to the UI integration PR, not these DTOs. DOMPurify requires a DOM and must not be imported into a service worker as though it provides one.
 
 Sources: [TipTap Markdown](https://tiptap.dev/docs/editor/markdown), [mathematics](https://tiptap.dev/docs/editor/extensions/nodes/mathematics), [DOMPurify](https://github.com/cure53/DOMPurify), [KaTeX security](https://katex.org/docs/security).
+
+## Conversation adapter
+
+The second proposal adds the versions from the earlier isolated integration: `@assistant-ui/react 0.15.31`, `@assistant-ui/react-markdown 0.14.24`, `remark-math 6.0.0`, `rehype-katex 7.0.1` (MIT). It reuses `katex 0.16.47`. SDK types were checked against the installed source, including ExternalStoreRuntime, AppendMessage.sourceId, MessageNotSentError and composer textChange origins. These adapter APIs stay confined to `src/ai/`; changing the pinned SDK requires rechecking that boundary. No assistant-cloud or AI SDK dependency is added directly.
+
+[ExternalStoreRuntime documentation](https://www.assistant-ui.com/docs/runtimes/custom/external-store) describes its externally owned state model. Production pages still do not mount this runtime, so ordinary builds alone do not verify the UI adapter. Demo checks exercise mapping and callbacks; the actual discussion UI is a separate integration step.
