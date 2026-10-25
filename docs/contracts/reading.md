@@ -14,7 +14,14 @@ Demo: `controls.nextImport({ password: 'paper', outcome: 'partial', pageCount: 3
 
 `DocumentAnchor` stores document ID, file version and one or more page anchors. Rectangles are PDF points relative to the **unrotated crop-box bottom-left**, not CSS pixels. Each page may include exact quote plus prefix/suffix context. The document engine creates the selection snapshot; the current reader's text plus screen rectangle alone is insufficient to create a durable anchor. Actual capture and PDF projection are delivered with the reading engine.
 
-`AnchorService.locate` navigates and reports exact/approximate/unavailable. `project` never navigates: it returns current viewport CSS pixel rectangles for fixed overlays, a viewport revision, pending page indexes, or a failure. A page not yet rendered is pending, not a broken anchor. Subscribe to viewport invalidation on scrolling, zoom, rotation, resize and page virtualization, then project again. Consumers must discard old projected rectangles. Text across multiple lines/pages produces multiple rectangles. The demo provides explicit `setProjection` and `setAccuracy`; it deliberately does not invent a PDF renderer.
+`AnchorService.locate` navigates and reports exact/approximate/unavailable. `project(anchor, space)` never navigates. Callers explicitly choose a coordinate space:
+
+- `page`: CSS pixel rectangles relative to the **rendered page content's top-left**, after zoom and rotation, excluding padding/border. Put the highlight layer inside that page with the same origin and dimensions. These rectangles scroll naturally with the page; pure scrolling does not require reprojection.
+- `viewport`: CSS pixel rectangles relative to the window viewport's top-left, for `position: fixed` selection menus and annotation bubbles. These must be reprojected when scrolling or when the page moves.
+
+Every result names its space. A ready result carries its projection revision and page-indexed rectangles; a page not yet rendered returns pending page indexes, not a broken anchor. Subscribe with `subscribeProjection(space, listener)`: page-space subscriptions invalidate on zoom, rotation, page geometry changes or page mount/unmount; viewport subscriptions additionally invalidate on scroll and page movement. Consumers discard stale rectangles on invalidation and project again. Pure scrolling may still mount/unmount a virtualized page, which does invalidate its page projection. Text across multiple lines/pages produces multiple rectangles, each attached to its own page. Neither CSS coordinate form is persisted; the PDF anchor remains authoritative.
+
+The demo provides separate fixtures/subscriptions for each space via `setProjection({ space, ... })` and `setAccuracy`; it deliberately does not invent a PDF renderer.
 
 ## Annotations
 
@@ -39,3 +46,7 @@ Markdown export uses the same schema and exports the current draft, including `$
 3. Conversation drafts will be local durable business drafts in the live service; demo drafts last only for the instance.
 4. Future schema cards retain original JSON + Schema + validation result. Field display is derived, including nested arrays/objects; never discard raw output.
 5. Reading contracts first, conversation/explanation immediately next; library, then overview/citations before their implementation.
+
+## Library integration follow-up
+
+Design the library contract from the existing `PaperView`, `FolderView`, `TagView`, `LibraryQuery` and `LibraryViewPreferences` view requirements. Keep portable business DTOs independent of UI types and map them at integration. Include a command to retain an already browsed document in the library, with title/authors/folder/tags, reusing its local asset and promoting its sync scope without downloading/importing it again. This is a follow-up contract, not an implemented operation in this proposal.

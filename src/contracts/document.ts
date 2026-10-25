@@ -11,16 +11,21 @@ export interface DocumentAnchor extends DocumentRef { pages: readonly PageAnchor
 /** Captured by the document engine, NOT synthesized from screen coordinates by UI. */
 export interface SelectionSnapshot { anchor: DocumentAnchor; text: string }
 export interface ViewRect { left: number; top: number; width: number; height: number }
-export type Projection =
-  | { state: 'ready'; accuracy: 'exact' | 'approximate'; viewportRevision: string; rects: readonly { pageIndex: number; rect: ViewRect }[] }
+export type ProjectionSpace = 'page' | 'viewport';
+export type Projection = { space: ProjectionSpace } & (
+  | { state: 'ready'; accuracy: 'exact' | 'approximate'; revision: string; rects: readonly { pageIndex: number; rect: ViewRect }[] }
   | { state: 'pending'; pageIndexes: readonly number[] }
-  | { state: 'unavailable'; error: AppError };
+  | { state: 'unavailable'; error: AppError }
+);
 export type LocateResult = { state: 'exact' | 'approximate'; anchor: DocumentAnchor } | { state: 'unavailable'; error: AppError };
 export interface AnchorService {
   locate(anchor: DocumentAnchor): Promise<LocateResult>;
-  /** CSS viewport pixels, suitable for position:fixed; never persist these rects. */
-  project(anchor: DocumentAnchor): Projection;
-  subscribeViewport(listener: () => void): () => void;
+  /** CSS pixels, never persisted. Page: rendered page content's top-left (after zoom/rotation),
+   * excluding border/padding. Viewport: window top-left, for position:fixed overlays. */
+  project(anchor: DocumentAnchor, space: ProjectionSpace): Projection;
+  /** Page space invalidates on geometry/render changes, not pure scrolling.
+   * Viewport space additionally invalidates on scrolling/page movement. */
+  subscribeProjection(space: ProjectionSpace, listener: () => void): () => void;
 }
 export interface ReadingPosition { pageIndex: number; offset: number; zoom: number; rotation: 0 | 90 | 180 | 270 }
 export type FileAvailability = 'local' | 'uploading' | 'uploaded' | 'remote-missing' | 'local-missing';
