@@ -141,7 +141,7 @@
 .pp-toolbar__title-wrap {
   /* The flex item is the tooltip wrapper: it must be allowed to shrink. */
   flex: 0 1 auto;
-  min-width: 0;
+  min-width: 96px;
   max-width: 320px;
   margin-right: 6px;
 }

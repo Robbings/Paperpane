@@ -8,6 +8,8 @@ import {
   type SyncState,
 } from '@/ui/components';
 import { FunctionRail, researchPanels } from './FunctionRail';
+import { ReaderLibraryNav, type ReaderLibraryData } from './library/ReaderLibraryNav';
+import { SaveToLibraryPopover, type LibraryEntryDraft } from './library/SaveToLibraryPopover';
 import { OverlayScrollbar } from './OverlayScrollbar';
 import {
   GAP,
@@ -40,6 +42,7 @@ import type {
   TextSelectionSnapshot,
 } from './types';
 import { useViewport } from './useViewport';
+import type { TagView } from '@/ui/library/types';
 import './reader.css';
 
 export interface ReaderLayout {
@@ -71,6 +74,21 @@ interface ReaderShellProps {
   onSelectionAction: (action: string, selection: TextSelectionSnapshot) => void;
   onLocateAnnotation: (id: string) => void;
   onTool: (tool: string) => void;
+  /** Library features inside the reader: bookmark popover and the sidebar tab. */
+  library?: ReaderLibraryProps;
+}
+
+export interface ReaderLibraryProps extends ReaderLibraryData {
+  /** Whether the open paper is in the library. */
+  saved: boolean;
+  /** Prefilled entry (saved values, or metadata extracted from the paper). */
+  entry: LibraryEntryDraft;
+  tags: readonly TagView[];
+  onSave: (draft: LibraryEntryDraft) => void;
+  onRemove: () => void;
+  onOpenPaper: (id: string, newTab: boolean) => void;
+  onImport: (files: File[]) => void;
+  onOpenLibrary: () => void;
 }
 
 const selectionActions: readonly SelectionMenuAction[] = [
@@ -178,6 +196,10 @@ export function ReaderShell(props: ReaderShellProps) {
   };
 
   // Window resizes follow the pointer directly instead of tweening behind it.
+  const [saveOpen, setSaveOpen] = useState(false);
+  const saveRef = useRef<HTMLButtonElement>(null);
+  const { library } = props;
+
   const [windowResizing, setWindowResizing] = useState(false);
   const firstViewport = useRef(true);
   useEffect(() => {
@@ -339,6 +361,19 @@ export function ReaderShell(props: ReaderShellProps) {
           props.onNavigate(index);
           if (overlayOpen) setSidebarPref(false);
         }}
+        library={
+          library && (
+            <ReaderLibraryNav
+              currentPaperId={library.currentPaperId}
+              folders={library.folders}
+              papers={library.papers}
+              recent={library.recent}
+              onOpenPaper={library.onOpenPaper}
+              onImport={library.onImport}
+              onOpenLibrary={library.onOpenLibrary}
+            />
+          )
+        }
       />
 
       <ReaderToolbar
@@ -353,6 +388,10 @@ export function ReaderShell(props: ReaderShellProps) {
         canDockRight={!compact}
         autoHighlight={autoHighlight}
         onToggleSidebar={() => setSidebarPref(!sidebarOpen)}
+        saved={library?.saved}
+        saveRef={saveRef}
+        saveOpen={saveOpen}
+        onSave={library ? () => setSaveOpen((open) => !open) : undefined}
         onPageSubmit={props.onNavigate}
         onZoom={props.onZoom}
         onTogglePlacement={togglePlacement}
@@ -410,6 +449,20 @@ export function ReaderShell(props: ReaderShellProps) {
         </div>
         <FunctionRail placement={effectivePlacement} active={panel} panelOpen={panelOpen} onSelect={selectPanel} />
       </GlassSurface>
+
+      {library && (
+        <SaveToLibraryPopover
+          anchorRef={saveRef}
+          open={saveOpen}
+          onClose={() => setSaveOpen(false)}
+          saved={library.saved}
+          initial={library.entry}
+          folders={library.folders}
+          tags={library.tags}
+          onSave={library.onSave}
+          onRemove={library.onRemove}
+        />
+      )}
 
       {selection && (
         <div

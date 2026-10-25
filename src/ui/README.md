@@ -39,6 +39,10 @@
 | `SaveStatus` | 本地保存与同步状态 | `local`、`sync`、`simulated`（示例数据，显示"演示内容，不会保存"） |
 | `SelectionMenu` | 选区菜单 | `actions`、`currentColor`（已有高亮时）、`onColor`、`onAction`、`onDelete` |
 | `GlassSurface` | 玻璃材质容器 | `as`、`tone`: float / bar / panel、`radius` |
+| `Tree` | 可展开、可拖动的层级列表（文件夹） | `nodes`、`selectedId`、`expandedIds`、`onToggle`；改名用 `renamingId` / `onRename`；拖动用 `onMove`、`canMove`；接收外部拖入用 `acceptsExternal`、`onExternalDrop` |
+| `TagInput` | 标签输入：已选标签 + 联想 | `selected`、`options`、`onAdd({ id?, label })`（没有 id 表示新建）、`onRemove(id)` |
+| `StarToggle` | 星标开关 | `starred`、`onChange`（不传则只显示） |
+| `Pagination` | 分页与每页条数 | `page`（从 1 开始）、`pageSize`: 10 / 20 / 50 / 100、`total`、`onPage`、`onPageSize` |
 
 ## 需要逻辑层配合的几个组件
 
@@ -99,8 +103,18 @@ toast.show({ message: '翻译失败：请求超时', tone: 'error', action: { la
 | `onNavigate`、`onZoom` | 跳页、缩放 |
 | `onHighlight(color, selection)`、`onSelectionAction(action, selection)` | 选区菜单的操作；`selection` 是选中时的快照，锚点由逻辑层生成 |
 | `onLocateAnnotation(id)`、`onTool(tool)` | 定位批注、工具栏按钮 |
+| `library` | 可选。传入后工具栏标题旁出现收藏按钮，侧栏多一个「文献」页：`currentPaperId`、`folders`、`papers`、`recent`、`saved`、`entry`、`tags`，以及 `onSave(draft)`、`onRemove`、`onOpenPaper(id, newTab)`、`onImport(files)`、`onOpenLibrary` |
 
 论文区的滚动容器是 `.pp-reader__paper`；外壳在它上面监听选区并显示选区菜单、绘制浮动滚动条。
+
+## 文献库 `LibraryView`
+
+位于 `src/ui/library/LibraryView.tsx`，当前由 `src/ui/library/sample/SampleLibrary.tsx` 用示例数据驱动（`library.html`）。视图模型在 `src/ui/library/types.ts`。
+
+- 查询状态是一个 `LibraryQuery`（集合、搜索文字与范围、只看星标、标签、排序、分页），界面通过 `onQuery(patch)` 修改，逻辑层查询后传回当前页 `papers` 和 `total`。
+- 列表显示方式（简洁 / 详细、显示哪些列、列宽）是 `LibraryViewPreferences`，通过 `onPrefs(patch)` 由逻辑层保存为偏好。
+- 其余都是动作回调：标星、改字段、标签、移动、移出、文件夹增改删、导入（PDF / CSL JSON / BibTeX）、导出引用。`onCreateFolder` 需要同步返回新文件夹的 id，界面随即进入改名。
+- 拖动论文时 `dataTransfer` 里是 `application/x-paperpane-papers`（id 数组的 JSON），见 `src/ui/library/dragTypes.ts`。
 
 ## 修改与扩展
 
