@@ -1,0 +1,295 @@
+import { useMemo, useRef, useState, type DragEvent } from 'react';
+import { Button, Dialog, EmptyState, GlassSurface, Icon, IconButton, Menu, Pagination, type MenuEntry, type PageSize } from '@/ui/components';
+import { defaultVisibleColumns } from './columns';
+import { LibrarySidebar, type CollectionCounts } from './LibrarySidebar';
+import { LibraryTable } from './LibraryTable';
+import { LibraryToolbar, type ImportKind } from './LibraryToolbar';
+import { folderEntries, folderPath, PaperDetail } from './PaperDetail';
+import type { ColumnId, FolderView, LibraryQuery, LibraryViewPreferences, PaperView, TagView } from './types';
+import './library.css';
+
+export interface LibraryViewProps {
+  /** The current page of results. */
+  papers: readonly PaperView[];
+  total: number;
+  /** Looks up any paper by id (for the detail pane across pages). */
+  paperById: (id: string) => PaperView | undefined;
+  folders: readonly FolderView[];
+  tags: readonly TagView[];
+  counts: CollectionCounts;
+  query: LibraryQuery;
+  onQuery: (patch: Partial<LibraryQuery>) => void;
+  prefs: LibraryViewPreferences;
+  onPrefs: (patch: Partial<LibraryViewPreferences>) => void;
+  onOpen: (id: string, newTab: boolean) => void;
+  onToggleStar: (ids: string[], starred: boolean) => void;
+  onUpdate: (id: string, patch: Partial<PaperView>) => void;
+  onAddTag: (ids: string[], tag: { id?: string; label: string }) => void;
+  onRemoveTag: (id: string, tagId: string) => void;
+  onMovePapers: (ids: string[], folderId: string | null) => void;
+  onRemoveFromLibrary: (ids: string[]) => void;
+  /** Creates a folder and returns its id so it can be named inline. */
+  onCreateFolder: (parentId: string | null) => string;
+  onRenameFolder: (id: string, name: string) => void;
+  onMoveFolder: (id: string, parentId: string | null) => void;
+  onDeleteFolder: (id: string) => void;
+  onImport: (kind: ImportKind, files: File[], folderId: string | null) => void;
+  onExportCitations: (ids: string[], format: 'bibtex' | 'apa' | 'csv') => void;
+}
+
+type BatchMenu = 'tag' | 'move' | 'export' | null;
+
+export function LibraryView(props: LibraryViewProps) {
+  const { papers, total, folders, tags, counts, query, prefs } = props;
+  const [selectedIds, setSelectedIds] = useState<string[]>([]);
+  const [activeId, setActiveId] = useState<string | null>(papers[0]?.id ?? null);
+  const [renamingId, setRenamingId] = useState<string | null>(null);
+  const [confirmRemove, setConfirmRemove] = useState<string[] | null>(null);
+  const [batchMenu, setBatchMenu] = useState<BatchMenu>(null);
+  const [dropping, setDropping] = useState(false);
+  const dragDepth = useRef(0);
+  const batchRefs = { tag: useRef<HTMLButtonElement>(null), move: useRef<HTMLButtonElement>(null), export: useRef<HTMLButtonElement>(null) };
+
+  const tagsById = useMemo(() => new Map(tags.map((tag) => [tag.id, tag])), [tags]);
+  const active = activeId ? (props.paperById(activeId) ?? null) : null;
+  const currentFolder = query.collection.kind === 'folder' ? query.collection.folderId : null;
+
+  // Changing what is listed clears the selection.
+  const changeQuery = (patch: Partial<LibraryQuery>) => {
+    setSelectedIds([]);
+    props.onQuery({ ...patch, page: patch.page ?? 1 });
+  };
+
+  const heading =
+    query.collection.kind === 'all' ? '全部论文'
+    : query.collection.kind === 'recent' ? '最近阅读'
+    : query.collection.kind === 'unfiled' ? '未分类'
+    : folderPath(folders, query.collection.folderId);
+
+  const filtering = query.text.trim() !== '' || query.starredOnly || query.tagIds.length > 0;
+  const empty = filtering ? (
+    <EmptyState
+      icon="search"
+      title="没有找到符合条件的论文"
+      description="换个关键词，扩大搜索范围，或清除筛选条件。"
+      actions={
+        <Button size="sm" onClick={() => changeQuery({ text: '', starredOnly: false, tagIds: [] })}>
+          清除筛选
+        </Button>
+      }
+    />
+  ) : query.collection.kind === 'folder' ? (
+    <EmptyState icon="folder" title="这个文件夹还是空的" description="把论文从列表拖到左侧文件夹，或在详情里选择文件夹。" />
+  ) : query.collection.kind === 'recent' ? (
+    <EmptyState icon="clock" title="还没有阅读记录" description="打开过的论文会出现在这里。" />
+  ) : (
+    <EmptyState icon="library" title="文献库还是空的" description="导入 PDF 或书目文件，或在阅读器里点「收藏」把正在读的论文加进来。" />
+  );
+
+  const isFileDrag = (event: DragEvent) => Array.from(event.dataTransfer.types).includes('Files');
+
+  const batchEntries: Record<Exclude<BatchMenu, null>, MenuEntry[]> = {
+    tag: [...tags].sort((a, b) => a.label.localeCompare(b.label, 'zh-CN')).map((tag) => ({ id: tag.id, label: tag.label, icon: 'tag' as const })),
+    move: folderEntries(folders, null).map((entry) => ('checked' in entry ? { ...entry, checked: undefined } : entry)),
+    export: [
+      { id: 'bibtex', label: '复制为 BibTeX' },
+      { id: 'apa', label: '复制为 APA 格式' },
+      { id: 'csv', label: '下载 CSV' },
+    ],
+  };
+  const anchorOf = (menu: Exclude<BatchMenu, null>) => {
+    const box = batchRefs[menu].current?.getBoundingClientRect();
+    return box ? { x: box.left, y: box.top - 6 } : { x: 0, y: 0 };
+  };
+
+  return (
+    <div
+      className="pp-library"
+      onDragEnter={(event) => {
+        if (!isFileDrag(event)) return;
+        dragDepth.current += 1;
+        setDropping(true);
+      }}
+      onDragOver={(event) => {
+        if (isFileDrag(event)) event.preventDefault();
+      }}
+      onDragLeave={(event) => {
+        if (!isFileDrag(event)) return;
+        dragDepth.current -= 1;
+        if (dragDepth.current <= 0) setDropping(false);
+      }}
+      onDrop={(event) => {
+        if (!isFileDrag(event)) return;
+        event.preventDefault();
+        dragDepth.current = 0;
+        setDropping(false);
+        const files = Array.from(event.dataTransfer.files).filter((file) => file.type === 'application/pdf' || file.name.toLowerCase().endsWith('.pdf'));
+        props.onImport('pdf', files, currentFolder);
+      }}
+    >
+      <LibrarySidebar
+        collection={query.collection}
+        onCollection={(collection) => changeQuery({ collection })}
+        folders={folders}
+        counts={counts}
+        tags={tags}
+        activeTagIds={query.tagIds}
+        onTags={(tagIds) => changeQuery({ tagIds })}
+        onCreateFolder={(parentId) => setRenamingId(props.onCreateFolder(parentId))}
+        renamingId={renamingId}
+        onRenameStart={setRenamingId}
+        onRename={(id, name) => {
+          setRenamingId(null);
+          props.onRenameFolder(id, name);
+        }}
+        onRenameCancel={() => setRenamingId(null)}
+        onMoveFolder={props.onMoveFolder}
+        onDeleteFolder={(id) => {
+          if (currentFolder === id) changeQuery({ collection: { kind: 'all' } });
+          props.onDeleteFolder(id);
+        }}
+        onMovePapers={props.onMovePapers}
+      />
+
+      <main className="pp-lib-main">
+        <LibraryToolbar
+          text={query.text}
+          onText={(text) => changeQuery({ text })}
+          fields={query.fields}
+          onFields={(fields) => changeQuery({ fields })}
+          starredOnly={query.starredOnly}
+          onStarredOnly={(starredOnly) => changeQuery({ starredOnly })}
+          prefs={prefs}
+          onPrefs={props.onPrefs}
+          onResetColumns={() => props.onPrefs({ visibleColumns: defaultVisibleColumns, columnWidths: {} })}
+          onImport={(kind, files) => props.onImport(kind, files, currentFolder)}
+        />
+
+        <section className="pp-lib-list" aria-label={heading}>
+          <header className="pp-lib-list__head">
+            <h1>{heading}</h1>
+            <span className="pp-lib-list__count">{total} 篇</span>
+          </header>
+          <LibraryTable
+            papers={papers}
+            tagsById={tagsById}
+            columns={prefs.visibleColumns}
+            widths={prefs.columnWidths}
+            onWidth={(column: ColumnId, width) => props.onPrefs({ columnWidths: { ...prefs.columnWidths, [column]: width } })}
+            sort={query.sort}
+            onSort={(column) =>
+              changeQuery({
+                sort: { column, direction: query.sort.column === column && query.sort.direction === 'asc' ? 'desc' : 'asc' },
+                page: query.page,
+              })
+            }
+            mode={prefs.mode}
+            selectedIds={selectedIds}
+            activeId={activeId}
+            onSelection={(ids, id) => {
+              setSelectedIds(ids);
+              setActiveId(id);
+            }}
+            onOpen={props.onOpen}
+            onToggleStar={(id, on) => props.onToggleStar([id], on)}
+            empty={empty}
+          />
+          {total > 0 && (
+            <footer className="pp-lib-list__foot">
+              <Pagination
+                page={query.page}
+                pageSize={query.pageSize}
+                total={total}
+                onPage={(page) => changeQuery({ page })}
+                onPageSize={(pageSize: PageSize) => changeQuery({ pageSize })}
+              />
+            </footer>
+          )}
+
+          {selectedIds.length > 1 && (
+            <GlassSurface tone="bar" radius="pill" className="pp-lib-batch" role="toolbar" aria-label="批量操作">
+              <span className="pp-lib-batch__count">已选 {selectedIds.length} 篇</span>
+              <Button size="sm" variant="quiet" icon="star" onClick={() => props.onToggleStar(selectedIds, true)}>
+                标星
+              </Button>
+              <Button ref={batchRefs.tag} size="sm" variant="quiet" icon="tag" aria-haspopup="menu" onClick={() => setBatchMenu(batchMenu === 'tag' ? null : 'tag')}>
+                加标签
+              </Button>
+              <Button ref={batchRefs.move} size="sm" variant="quiet" icon="folder" aria-haspopup="menu" onClick={() => setBatchMenu(batchMenu === 'move' ? null : 'move')}>
+                移动到
+              </Button>
+              <Button ref={batchRefs.export} size="sm" variant="quiet" icon="quote" aria-haspopup="menu" onClick={() => setBatchMenu(batchMenu === 'export' ? null : 'export')}>
+                导出引用
+              </Button>
+              <Button size="sm" variant="danger" icon="trash" onClick={() => setConfirmRemove(selectedIds)}>
+                移出
+              </Button>
+              <IconButton icon="close" label="取消选择" size="md" shape="pill" onClick={() => setSelectedIds([])} />
+            </GlassSurface>
+          )}
+        </section>
+      </main>
+
+      <PaperDetail
+        paper={active}
+        selectionCount={selectedIds.length}
+        folders={folders}
+        tags={tags}
+        onUpdate={props.onUpdate}
+        onToggleStar={(id, on) => props.onToggleStar([id], on)}
+        onAddTag={(id, tag) => props.onAddTag([id], tag)}
+        onRemoveTag={props.onRemoveTag}
+        onMove={(id, folderId) => props.onMovePapers([id], folderId)}
+        onOpen={props.onOpen}
+        onRemove={(id) => setConfirmRemove([id])}
+      />
+
+      {batchMenu && (
+        <Menu
+          label={batchMenu === 'tag' ? '加标签' : batchMenu === 'move' ? '移动到文件夹' : '导出引用'}
+          entries={batchEntries[batchMenu]}
+          anchor={anchorOf(batchMenu)}
+          triggerRef={batchRefs[batchMenu]}
+          onSelect={(id) => {
+            if (batchMenu === 'tag') props.onAddTag(selectedIds, { id, label: tagsById.get(id)?.label ?? id });
+            else if (batchMenu === 'move') props.onMovePapers(selectedIds, id === '__root' ? null : id);
+            else props.onExportCitations(selectedIds, id as 'bibtex' | 'apa' | 'csv');
+          }}
+          onClose={() => setBatchMenu(null)}
+        />
+      )}
+
+      <Dialog
+        open={confirmRemove !== null}
+        onClose={() => setConfirmRemove(null)}
+        title={confirmRemove && confirmRemove.length > 1 ? `把 ${confirmRemove.length} 篇论文移出文献库？` : '把这篇论文移出文献库？'}
+        description="只是不再出现在文献库里。PDF 文件、批注和笔记都会保留，再次收藏即可恢复。"
+        footer={
+          <>
+            <Button onClick={() => setConfirmRemove(null)}>取消</Button>
+            <Button
+              variant="primary"
+              onClick={() => {
+                if (confirmRemove) props.onRemoveFromLibrary(confirmRemove);
+                setSelectedIds([]);
+                setConfirmRemove(null);
+              }}
+            >
+              移出
+            </Button>
+          </>
+        }
+      />
+
+      {dropping && (
+        <div className="pp-lib-drop" aria-hidden="true">
+          <GlassSurface tone="float" radius="panel" className="pp-lib-drop__card">
+            <Icon name="upload" size={28} strokeWidth={1.5} />
+            <strong>松开以导入 PDF</strong>
+            <span>{currentFolder ? `放入「${folderPath(folders, currentFolder)}」` : '放入文献库根目录'}</span>
+          </GlassSurface>
+        </div>
+      )}
+    </div>
+  );
+}
