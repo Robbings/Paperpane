@@ -5,7 +5,7 @@
   position: relative;
   height: 100%;
   overflow: hidden;
-  background: var(--pp-ground);
+  background: var(--pp-backdrop);
 }
 
 /* ---- Paper scroll area: scrolls underneath the floating chrome ---------- */

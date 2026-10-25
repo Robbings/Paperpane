@@ -58,11 +58,14 @@ button:disabled {
   --pp-glass-bg-solid: var(--pp-glass-float-solid);
   --pp-glass-shadow: var(--pp-shadow-float);
 
-  background: var(--pp-glass-bg);
+  background:
+    linear-gradient(180deg, var(--pp-glass-sheen), transparent 96px),
+    var(--pp-glass-bg);
   -webkit-backdrop-filter: var(--pp-glass-filter);
   backdrop-filter: var(--pp-glass-filter);
   box-shadow:
     inset 0 0.5px 0 var(--pp-glass-hi),
+    inset 0 0 0 0.5px var(--pp-glass-rim),
     0 0 0 0.5px var(--pp-hairline),
     var(--pp-glass-shadow);
 }

@@ -6,7 +6,7 @@
   height: 100%;
   padding: var(--pp-gap-float);
   overflow: hidden;
-  background: var(--pp-ground);
+  background: var(--pp-backdrop);
 }
 
 /* ---- Side panes: docked beside the list, floating over it when narrow, or closed. */
