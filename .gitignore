@@ -1,0 +1,40 @@
+# Local planning and contributor notes.
+/*[A-Z].md
+!/README.md
+!/CONTRIBUTING.md
+!/CHANGELOG.md
+!/SECURITY.md
+!/CODE_OF_CONDUCT.md
+!/LICENSE.md
+/docs/plan/
+/docs/development/
+/docs/local/
+/reference/
+/worktrees/
+
+# Local system and editor files.
+.DS_Store
+._*
+.idea/
+.vscode/
+*.log
+
+# Dependencies and generated extension output.
+node_modules/
+.pnpm-store/
+.wxt/
+.output/
+dist/
+coverage/
+*.tsbuildinfo
+web-ext.config.ts
+
+# Local credentials and private runtime data.
+.env
+.env.*
+!.env.example
+*.pem
+*.key
+/local-data/
+/backups/
+/browser-profiles/

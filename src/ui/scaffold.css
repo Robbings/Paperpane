@@ -1,0 +1,25 @@
+/* Placeholder pages only; removed as each page gets its real design. */
+.scaffold {
+  padding: var(--pp-space-6);
+}
+
+.scaffold nav {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--pp-space-4);
+}
+
+.scaffold a {
+  color: var(--pp-accent);
+}
+
+/* The popup sizes itself to its content, so it must not inherit 100% heights. */
+html:has(body[data-page='popup']),
+body[data-page='popup'],
+body[data-page='popup'] #root {
+  height: auto;
+}
+
+body[data-page='popup'] {
+  width: 320px;
+}

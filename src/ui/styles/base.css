@@ -1,0 +1,130 @@
+*,
+*::before,
+*::after {
+  box-sizing: border-box;
+}
+
+html,
+body,
+#root {
+  height: 100%;
+}
+
+body {
+  margin: 0;
+  background: var(--pp-window);
+  color: var(--pp-text);
+  font-family: var(--pp-font-ui);
+  font-size: var(--pp-text-md);
+  line-height: var(--pp-leading-body);
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+  text-rendering: optimizeLegibility;
+}
+
+button,
+input,
+select,
+textarea {
+  font: inherit;
+  color: inherit;
+}
+
+button {
+  cursor: pointer;
+}
+
+/* Component display rules must not override the hidden attribute. */
+[hidden] {
+  display: none !important;
+}
+
+button:disabled {
+  cursor: default;
+}
+
+:focus-visible {
+  outline: 2px solid var(--pp-focus);
+  outline-offset: 2px;
+}
+
+::selection {
+  background: var(--pp-selection);
+}
+
+/* Glass material. Fixed chrome only: never put it over long text. */
+.pp-glass {
+  --pp-glass-bg: var(--pp-glass-float);
+  --pp-glass-bg-solid: var(--pp-glass-float-solid);
+  --pp-glass-shadow: var(--pp-shadow-float);
+
+  background: var(--pp-glass-bg);
+  -webkit-backdrop-filter: var(--pp-glass-filter);
+  backdrop-filter: var(--pp-glass-filter);
+  box-shadow:
+    inset 0 0.5px 0 var(--pp-glass-hi),
+    0 0 0 0.5px var(--pp-hairline),
+    var(--pp-glass-shadow);
+}
+
+.pp-glass[data-tone='bar'] {
+  --pp-glass-shadow: var(--pp-shadow-bar);
+}
+
+.pp-glass[data-tone='panel'] {
+  --pp-glass-bg: var(--pp-glass-panel);
+  --pp-glass-bg-solid: var(--pp-glass-panel-solid);
+  --pp-glass-shadow: var(--pp-shadow-panel);
+}
+
+.pp-glass[data-radius='control'] {
+  border-radius: var(--pp-radius-control);
+}
+
+.pp-glass[data-radius='float'] {
+  border-radius: var(--pp-radius-float);
+}
+
+.pp-glass[data-radius='panel'] {
+  border-radius: var(--pp-radius-panel);
+}
+
+.pp-glass[data-radius='pill'] {
+  border-radius: var(--pp-radius-pill);
+}
+
+@supports not ((backdrop-filter: blur(1px)) or (-webkit-backdrop-filter: blur(1px))) {
+  .pp-glass {
+    background: var(--pp-glass-bg-solid);
+  }
+}
+
+@media (prefers-reduced-transparency: reduce) {
+  .pp-glass {
+    background: var(--pp-glass-bg-solid);
+    -webkit-backdrop-filter: none;
+    backdrop-filter: none;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+  }
+}
+
+.pp-visually-hidden {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  margin: -1px;
+  padding: 0;
+  overflow: hidden;
+  clip: rect(0 0 0 0);
+  white-space: nowrap;
+  border: 0;
+}

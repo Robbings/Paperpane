@@ -1,0 +1,116 @@
+.pp-selmenu {
+  display: flex;
+  align-items: center;
+  width: max-content;
+  height: 38px;
+  padding: 0 5px;
+  border-radius: 19px;
+  color: var(--pp-text);
+  font-size: var(--pp-text-sm);
+  white-space: nowrap;
+  animation: pp-selmenu-in var(--pp-dur-med) var(--pp-ease-spring);
+  transform-origin: 50% 100%;
+}
+
+@keyframes pp-selmenu-in {
+  from {
+    opacity: 0;
+    transform: translateY(2px) scale(0.97);
+  }
+}
+
+.pp-selmenu__colors {
+  display: flex;
+  align-items: center;
+  padding: 0 3px;
+}
+
+.pp-selmenu__swatch {
+  display: flex;
+  flex-shrink: 0;
+  align-items: center;
+  justify-content: center;
+  width: 24px;
+  height: 28px;
+  padding: 0;
+  border: 0;
+  border-radius: 14px;
+  background: transparent;
+}
+
+.pp-selmenu__dot {
+  width: 13px;
+  height: 13px;
+  border-radius: 50%;
+  background: var(--pp-dot);
+  box-shadow: inset 0 0 0 0.5px rgba(0, 0, 0, 0.16);
+  transition: transform var(--pp-dur-fast) var(--pp-ease-spring);
+}
+
+.pp-selmenu__swatch:hover .pp-selmenu__dot {
+  transform: scale(1.15);
+}
+
+.pp-selmenu__swatch[aria-pressed='true'] .pp-selmenu__dot {
+  box-shadow:
+    0 0 0 2px var(--pp-glass-float-solid),
+    0 0 0 3.5px var(--pp-dot);
+}
+
+.pp-selmenu__sep {
+  flex-shrink: 0;
+  width: 0.5px;
+  height: 18px;
+  margin: 0 5px;
+  background: var(--pp-hairline-strong);
+}
+
+.pp-selmenu__action {
+  display: flex;
+  flex-shrink: 0;
+  align-items: center;
+  gap: 5px;
+  height: 28px;
+  padding: 0 10px 0 8px;
+  border: 0;
+  border-radius: 14px;
+  background: transparent;
+  color: var(--pp-text);
+  font-size: var(--pp-text-sm);
+  font-weight: var(--pp-weight-medium);
+  line-height: 1;
+  transition: background-color var(--pp-dur-fast) var(--pp-ease-out);
+}
+
+.pp-selmenu__action svg {
+  flex-shrink: 0;
+  color: var(--pp-text-2);
+}
+
+.pp-selmenu__action:hover,
+.pp-selmenu__delete:hover {
+  background: var(--pp-fill-hover);
+}
+
+.pp-selmenu__action:active,
+.pp-selmenu__delete:active {
+  background: var(--pp-fill-press);
+}
+
+.pp-selmenu__delete {
+  display: flex;
+  flex-shrink: 0;
+  align-items: center;
+  justify-content: center;
+  width: 30px;
+  height: 28px;
+  padding: 0;
+  border: 0;
+  border-radius: 14px;
+  background: transparent;
+  color: var(--pp-danger);
+}
+
+.pp-selmenu__delete:hover {
+  background: var(--pp-danger-soft);
+}

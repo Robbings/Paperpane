@@ -1,0 +1,5 @@
+# pnpm 11 reads project settings from this file, not from .npmrc.
+engineStrict: true
+saveExact: true
+allowBuilds:
+  esbuild: true

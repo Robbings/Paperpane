@@ -1,0 +1,35 @@
+{
+  "name": "paperpane",
+  "description": "Paperpane（纸窗）论文阅读扩展",
+  "private": true,
+  "version": "0.0.1",
+  "license": "UNLICENSED",
+  "type": "module",
+  "packageManager": "pnpm@11.25.0",
+  "engines": {
+    "node": ">=22.13.0",
+    "pnpm": "11.25.0"
+  },
+  "scripts": {
+    "dev": "wxt -b chrome --mv3",
+    "dev:edge": "wxt -b edge --mv3",
+    "build": "wxt build -b chrome --mv3",
+    "build:edge": "wxt build -b edge --mv3",
+    "zip": "wxt zip -b chrome --mv3",
+    "zip:edge": "wxt zip -b edge --mv3",
+    "typecheck": "wxt prepare && tsc --noEmit",
+    "postinstall": "wxt prepare"
+  },
+  "dependencies": {
+    "react": "19.3.1",
+    "react-dom": "19.3.1"
+  },
+  "devDependencies": {
+    "@types/react": "19.3.0",
+    "@types/react-dom": "19.3.0",
+    "@wxt-dev/module-react": "1.2.2",
+    "typescript": "7.0.2",
+    "vite": "8.3.5",
+    "wxt": "0.21.4"
+  }
+}

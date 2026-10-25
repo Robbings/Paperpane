@@ -1,0 +1,814 @@
+/* Floating reader layout. Edges come from ReaderShell as CSS variables:
+ * --pp-edge-left/right/bottom mark where the paper area ends. */
+
+.pp-reader {
+  position: relative;
+  height: 100%;
+  overflow: hidden;
+  background: var(--pp-ground);
+}
+
+/* ---- Paper scroll area: scrolls underneath the floating chrome ---------- */
+
+/* Spans the space between the side chrome, so its scrollbar sits beside the
+ * research area; it starts at the window top so pages slide under the toolbar. */
+.pp-reader__paper {
+  position: absolute;
+  top: 0;
+  left: var(--pp-edge-left);
+  right: var(--pp-edge-right);
+  bottom: var(--pp-edge-bottom);
+  overflow: auto;
+  padding: calc(var(--pp-gap) + var(--pp-bar-height) + 18px) 16px 24px;
+  overscroll-behavior: contain;
+  /* Native bars are replaced by OverlayScrollbar. */
+  scrollbar-width: none;
+  transition:
+    left var(--pp-dur-layout) var(--pp-ease-layout),
+    right var(--pp-dur-layout) var(--pp-ease-layout),
+    bottom var(--pp-dur-layout) var(--pp-ease-layout);
+}
+
+.pp-reader__paper::-webkit-scrollbar {
+  display: none;
+}
+
+/* ---- Overlay scrollbars ------------------------------------------------------ */
+
+.pp-scroll {
+  position: absolute;
+  z-index: calc(var(--pp-z-bar) - 1);
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity var(--pp-dur-med) var(--pp-ease-out);
+}
+
+.pp-scroll[data-visible='true'] {
+  opacity: 1;
+  pointer-events: auto;
+}
+
+.pp-scroll[data-axis='y'] {
+  top: calc(var(--pp-gap) + var(--pp-bar-height) + 12px);
+  bottom: calc(var(--pp-edge-bottom) + 12px);
+  right: calc(var(--pp-edge-right) + 2px);
+  width: 14px;
+}
+
+.pp-scroll[data-axis='x'] {
+  left: calc(var(--pp-edge-left) + 12px);
+  right: calc(var(--pp-edge-right) + 12px);
+  bottom: calc(var(--pp-edge-bottom) + 2px);
+  height: 14px;
+}
+
+.pp-scroll__thumb {
+  position: absolute;
+  border-radius: var(--pp-radius-pill);
+  background: var(--pp-scroll-thumb);
+  box-shadow: 0 0 0 1px var(--pp-scroll-ring);
+  transition:
+    width var(--pp-dur-fast) var(--pp-ease-out),
+    height var(--pp-dur-fast) var(--pp-ease-out),
+    background-color var(--pp-dur-fast) var(--pp-ease-out);
+}
+
+.pp-scroll[data-axis='y'] .pp-scroll__thumb {
+  top: 0;
+  right: 3px;
+  width: 6px;
+}
+
+.pp-scroll[data-axis='x'] .pp-scroll__thumb {
+  left: 0;
+  bottom: 3px;
+  height: 6px;
+}
+
+.pp-scroll:hover .pp-scroll__thumb,
+.pp-scroll[data-dragging='true'] .pp-scroll__thumb {
+  background: var(--pp-scroll-thumb-active);
+}
+
+.pp-scroll[data-axis='y']:hover .pp-scroll__thumb,
+.pp-scroll[data-axis='y'][data-dragging='true'] .pp-scroll__thumb {
+  width: 9px;
+}
+
+.pp-scroll[data-axis='x']:hover .pp-scroll__thumb,
+.pp-scroll[data-axis='x'][data-dragging='true'] .pp-scroll__thumb {
+  height: 9px;
+}
+
+.pp-scroll__label {
+  position: absolute;
+  top: 50%;
+  right: calc(100% + 10px);
+  padding: 5px 10px;
+  border-radius: var(--pp-radius-pill);
+  color: var(--pp-text);
+  font-size: var(--pp-text-sm);
+  font-weight: var(--pp-weight-medium);
+  white-space: nowrap;
+  transform: translateY(-50%);
+  pointer-events: none;
+}
+
+/* ---- Toolbar ------------------------------------------------------------
+ * Sized to its content up to 820px and centred over the paper area, so the
+ * title and the tools stay together on wide windows. */
+
+.pp-toolbar {
+  position: absolute;
+  top: var(--pp-gap);
+  left: calc((var(--pp-edge-left) + 100% - var(--pp-edge-right)) / 2);
+  z-index: var(--pp-z-bar);
+  display: flex;
+  align-items: center;
+  gap: var(--pp-space-2);
+  width: max-content;
+  max-width: min(820px, calc(100% - var(--pp-edge-left) - var(--pp-edge-right)));
+  height: var(--pp-bar-height);
+  padding: 0 6px;
+  transform: translateX(-50%);
+  transition: left var(--pp-dur-layout) var(--pp-ease-layout);
+}
+
+.pp-toolbar[data-title='hidden'] {
+  gap: 6px;
+}
+
+.pp-toolbar__title {
+  flex: 0 1 auto;
+  min-width: 0;
+  max-width: 320px;
+  margin-right: 6px;
+  overflow: hidden;
+  font-size: var(--pp-text-md);
+  font-weight: var(--pp-weight-semibold);
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.pp-toolbar__group {
+  display: flex;
+  flex-shrink: 0;
+  align-items: center;
+  gap: 6px;
+}
+
+.pp-toolbar__tools {
+  gap: 0;
+  margin-left: 4px;
+}
+
+.pp-toolbar__pill {
+  display: flex;
+  align-items: center;
+  height: 30px;
+  border-radius: var(--pp-radius-pill);
+  background: var(--pp-fill);
+  font-size: var(--pp-text-sm);
+  font-variant-numeric: tabular-nums;
+}
+
+.pp-toolbar__page {
+  gap: 6px;
+  margin: 0;
+  padding: 0 10px 0 4px;
+}
+
+.pp-toolbar__page-input {
+  width: 34px;
+  height: 22px;
+  padding: 0;
+  border: 0;
+  border-radius: var(--pp-radius-pill);
+  background: var(--pp-surface);
+  box-shadow: 0 0 0 0.5px var(--pp-hairline);
+  text-align: center;
+  font-variant-numeric: tabular-nums;
+}
+
+.pp-toolbar__page-total {
+  color: var(--pp-text-2);
+}
+
+.pp-toolbar__zoom > span {
+  min-width: 40px;
+  text-align: center;
+}
+
+.pp-toolbar__zoom button {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 28px;
+  height: 30px;
+  padding: 0;
+  border: 0;
+  border-radius: var(--pp-radius-pill);
+  background: transparent;
+  color: var(--pp-text-2);
+}
+
+.pp-toolbar__zoom button:hover {
+  color: var(--pp-text);
+  background: var(--pp-fill-hover);
+}
+
+.pp-toolbar__sep {
+  flex-shrink: 0;
+  width: 0.5px;
+  height: 18px;
+  margin: 0 4px;
+  background: var(--pp-hairline-strong);
+}
+
+/* ---- Left sidebar --------------------------------------------------------- */
+
+.pp-sidebar {
+  position: absolute;
+  top: var(--pp-gap);
+  bottom: var(--pp-gap);
+  left: var(--pp-gap);
+  z-index: var(--pp-z-panel);
+  display: flex;
+  flex-direction: column;
+  gap: var(--pp-space-3);
+  width: 240px;
+  padding: var(--pp-space-3);
+  transition:
+    transform var(--pp-dur-layout) var(--pp-ease-layout),
+    opacity var(--pp-dur-layout) var(--pp-ease-layout),
+    visibility 0s linear 0s;
+}
+
+/* Hidden: slides out past the window edge, then stops being visible. */
+.pp-sidebar[data-open='false'] {
+  opacity: 0;
+  visibility: hidden;
+  transform: translateX(calc(-100% - var(--pp-gap)));
+  transition:
+    transform var(--pp-dur-layout) var(--pp-ease-layout),
+    opacity 220ms var(--pp-ease-out),
+    visibility 0s linear var(--pp-dur-layout);
+}
+
+/* On narrow windows the sidebar floats below the toolbar, so its toggle stays reachable. */
+.pp-sidebar[data-overlay='true'] {
+  top: calc(var(--pp-gap) * 2 + var(--pp-bar-height));
+  z-index: calc(var(--pp-z-panel) + 1);
+  --pp-glass-bg: var(--pp-glass-panel-solid);
+  --pp-glass-shadow: var(--pp-shadow-float);
+}
+
+.pp-sidebar__scroll {
+  flex: 1;
+  min-height: 0;
+  overflow: auto;
+  margin: 0 -4px;
+  padding: 0 4px;
+}
+
+.pp-sidebar__empty {
+  margin: var(--pp-space-4) 0;
+  color: var(--pp-text-2);
+  font-size: var(--pp-text-sm);
+  text-align: center;
+}
+
+.pp-outline {
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+}
+
+.pp-outline__item {
+  display: flex;
+  flex-shrink: 0;
+  align-items: center;
+  gap: var(--pp-space-2);
+  height: 30px;
+  padding-right: 10px;
+  border: 0;
+  border-radius: var(--pp-radius-control);
+  background: transparent;
+  color: var(--pp-text);
+  text-align: left;
+}
+
+.pp-outline__item:hover {
+  background: var(--pp-fill-hover);
+}
+
+.pp-outline__item[aria-current='location'] {
+  background: var(--pp-accent-soft);
+  color: var(--pp-accent);
+  font-weight: var(--pp-weight-semibold);
+}
+
+.pp-outline__label {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.pp-outline__page {
+  color: var(--pp-text-2);
+  font-size: var(--pp-text-xs);
+  font-variant-numeric: tabular-nums;
+}
+
+.pp-outline__item[aria-current='location'] .pp-outline__page {
+  color: inherit;
+}
+
+.pp-thumbs {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: var(--pp-space-4);
+  padding-top: 4px;
+  padding-bottom: var(--pp-space-3);
+}
+
+.pp-thumb {
+  display: flex;
+  flex-shrink: 0;
+  flex-direction: column;
+  align-items: center;
+  gap: 6px;
+  padding: 0;
+  border: 0;
+  background: transparent;
+}
+
+.pp-thumb__page {
+  display: flex;
+  flex-direction: column;
+  gap: 5px;
+  width: 112px;
+  height: 145px;
+  padding: 16px 12px;
+  border-radius: 3px;
+  background: #ffffff;
+  box-shadow:
+    0 0 0 0.5px var(--pp-hairline),
+    0 2px 6px rgba(0, 0, 0, 0.08);
+  filter: var(--pp-paper-filter);
+}
+
+.pp-thumb__page span {
+  height: 3px;
+  border-radius: 2px;
+  background: rgba(0, 0, 0, 0.13);
+}
+
+.pp-thumb__page span:first-child {
+  width: 70%;
+  height: 5px;
+  align-self: center;
+  background: rgba(0, 0, 0, 0.4);
+}
+
+.pp-thumb__page span:nth-child(4) {
+  width: 86%;
+}
+
+.pp-thumb__page span:last-child {
+  width: 64%;
+}
+
+.pp-thumb[aria-current='page'] .pp-thumb__page {
+  box-shadow: 0 0 0 2px var(--pp-accent);
+}
+
+.pp-thumb__label {
+  color: var(--pp-text-2);
+  font-size: var(--pp-text-xs);
+}
+
+.pp-thumb[aria-current='page'] .pp-thumb__label {
+  color: var(--pp-accent);
+  font-weight: var(--pp-weight-semibold);
+}
+
+/* ---- Research card ---------------------------------------------------------
+ * The panel body and the function rail form one card. Docked right, the rail
+ * is the card's right-hand column; docked at the bottom, its bottom row.
+ * Collapsing shrinks the card to the rail alone, a capsule in the same place. */
+
+.pp-research {
+  position: absolute;
+  top: var(--pp-card-y);
+  left: var(--pp-card-x);
+  z-index: var(--pp-z-panel);
+  display: flex;
+  justify-content: flex-end;
+  width: var(--pp-card-w);
+  height: var(--pp-card-h);
+  overflow: hidden;
+  transition:
+    top var(--pp-dur-layout) var(--pp-ease-layout),
+    left var(--pp-dur-layout) var(--pp-ease-layout),
+    width var(--pp-dur-layout) var(--pp-ease-layout),
+    height var(--pp-dur-layout) var(--pp-ease-layout),
+    border-radius var(--pp-dur-layout) var(--pp-ease-layout);
+}
+
+.pp-reader[data-placement='right'] .pp-research {
+  flex-direction: row;
+}
+
+.pp-reader[data-placement='bottom'] .pp-research {
+  flex-direction: column;
+}
+
+.pp-research[data-open='false'] {
+  border-radius: calc(var(--pp-rail) / 2);
+}
+
+.pp-research__body {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+  min-height: 0;
+  /* Opening: fade in as the card finishes growing. */
+  transition: opacity 160ms var(--pp-ease-out) 100ms;
+}
+
+.pp-reader[data-placement='right'] .pp-research__body {
+  flex: 0 0 var(--pp-research-w);
+}
+
+.pp-reader[data-placement='bottom'] .pp-research__body {
+  flex: 0 0 var(--pp-research-h);
+  /* Keep the open width while the card narrows to the centred capsule. */
+  align-self: center;
+  width: calc(100vw - var(--pp-edge-left) - var(--pp-gap));
+}
+
+.pp-research[data-open='false'] .pp-research__body {
+  opacity: 0;
+  /* Closing: fade out before the card shrinks. */
+  transition: opacity 90ms var(--pp-ease-out);
+}
+
+.pp-research__view {
+  display: flex;
+  flex: 1;
+  flex-direction: column;
+  min-height: 0;
+}
+
+/* ---- Function rail (the card's edge) --------------------------------------- */
+
+.pp-rail {
+  display: flex;
+  flex-shrink: 0;
+  align-items: center;
+  gap: 4px;
+  padding: 6px;
+  transition: opacity 160ms var(--pp-ease-out);
+}
+
+.pp-reader[data-placement='right'] .pp-rail {
+  flex-direction: column;
+  width: var(--pp-rail);
+  box-shadow: inset 0.5px 0 0 var(--pp-hairline);
+}
+
+.pp-reader[data-placement='bottom'] .pp-rail {
+  flex-direction: row;
+  justify-content: center;
+  height: var(--pp-rail);
+  box-shadow: inset 0 0.5px 0 var(--pp-hairline);
+}
+
+.pp-research[data-open='false'] .pp-rail {
+  box-shadow: none;
+}
+
+.pp-rail__item {
+  display: flex;
+  flex-shrink: 0;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  width: 36px;
+  height: 36px;
+  padding: 0;
+  border: 0;
+  border-radius: var(--pp-radius-pill);
+  background: transparent;
+  color: var(--pp-text-2);
+  font-size: var(--pp-text-sm);
+  font-weight: var(--pp-weight-medium);
+  transition:
+    background-color var(--pp-dur-fast) var(--pp-ease-out),
+    color var(--pp-dur-fast) var(--pp-ease-out);
+}
+
+.pp-reader[data-placement='bottom'] .pp-rail__item {
+  width: 72px;
+}
+
+.pp-rail__label {
+  display: none;
+}
+
+.pp-reader[data-placement='bottom'] .pp-rail__label {
+  display: inline;
+}
+
+.pp-rail__item:hover {
+  background: var(--pp-fill-hover);
+  color: var(--pp-text);
+}
+
+.pp-rail__item[aria-pressed='true'] {
+  background: var(--pp-accent-soft);
+  color: var(--pp-accent);
+}
+
+/* ---- Splitter: on the card's edge that faces the paper ---------------------- */
+
+.pp-splitter {
+  position: absolute;
+  z-index: calc(var(--pp-z-panel) + 1);
+  touch-action: none;
+}
+
+.pp-splitter[data-placement='right'] {
+  top: calc(var(--pp-gap) + 18px);
+  bottom: calc(var(--pp-gap) + 18px);
+  right: calc(var(--pp-gap) + var(--pp-rail) + var(--pp-research-w) - 5px);
+  width: 10px;
+  cursor: col-resize;
+}
+
+.pp-splitter[data-placement='bottom'] {
+  bottom: calc(var(--pp-gap) + var(--pp-rail) + var(--pp-research-h) - 5px);
+  left: calc(var(--pp-edge-left) + 18px);
+  right: calc(var(--pp-gap) + 18px);
+  height: 10px;
+  cursor: row-resize;
+}
+
+.pp-splitter::after {
+  content: '';
+  position: absolute;
+  border-radius: var(--pp-radius-pill);
+  background: var(--pp-accent);
+  opacity: 0;
+  transition: opacity var(--pp-dur-fast) var(--pp-ease-out);
+}
+
+.pp-splitter[data-placement='right']::after {
+  top: 50%;
+  left: 4px;
+  width: 2px;
+  height: 40px;
+  transform: translateY(-50%);
+}
+
+.pp-splitter[data-placement='bottom']::after {
+  top: 4px;
+  left: 50%;
+  width: 40px;
+  height: 2px;
+  transform: translateX(-50%);
+}
+
+.pp-splitter:hover::after,
+.pp-splitter:focus-visible::after,
+.pp-splitter:active::after {
+  opacity: 0.7;
+}
+
+.pp-splitter:focus-visible {
+  outline: none;
+}
+
+/* ---- Panels ----------------------------------------------------------------- */
+
+.pp-panel {
+  display: flex;
+  flex: 1;
+  flex-direction: column;
+  min-height: 0;
+  padding: var(--pp-space-3) var(--pp-space-4) var(--pp-space-3) 18px;
+}
+
+.pp-reader[data-placement='bottom'] .pp-panel {
+  padding-inline: var(--pp-space-6);
+}
+
+.pp-panel__header {
+  display: flex;
+  flex-shrink: 0;
+  align-items: center;
+  gap: var(--pp-space-2);
+  min-height: 32px;
+}
+
+.pp-panel__title {
+  margin: 0;
+  font-size: var(--pp-text-lg);
+  font-weight: var(--pp-weight-semibold);
+  line-height: var(--pp-leading-tight);
+}
+
+.pp-panel__meta {
+  color: var(--pp-text-2);
+  font-size: var(--pp-text-sm);
+  font-variant-numeric: tabular-nums;
+}
+
+.pp-panel__spacer {
+  flex: 1;
+}
+
+.pp-panel__scroll {
+  flex: 1;
+  min-height: 0;
+  overflow: auto;
+  margin: var(--pp-space-2) -6px 0;
+  padding: 0 6px;
+}
+
+.pp-panel__footer {
+  flex-shrink: 0;
+  padding-top: var(--pp-space-2);
+}
+
+.pp-panel__empty {
+  margin: var(--pp-space-6) var(--pp-space-2);
+  color: var(--pp-text-2);
+  font-size: var(--pp-text-sm);
+  line-height: var(--pp-leading-body);
+  text-align: center;
+}
+
+.pp-panel__placeholder {
+  display: flex;
+  flex: 1;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: var(--pp-space-3);
+  color: var(--pp-text-2);
+  text-align: center;
+}
+
+.pp-panel__placeholder p {
+  max-width: 240px;
+  margin: 0;
+  font-size: var(--pp-text-sm);
+}
+
+/* Annotations */
+
+.pp-annotations__filters {
+  display: flex;
+  flex-shrink: 0;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--pp-space-2);
+  margin-top: var(--pp-space-2);
+}
+
+.pp-annotations__colors {
+  display: flex;
+  gap: 2px;
+}
+
+.pp-annotations__color {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 22px;
+  height: 22px;
+  padding: 0;
+  border: 0;
+  border-radius: var(--pp-radius-pill);
+  background: transparent;
+}
+
+.pp-annotations__color span {
+  width: 10px;
+  height: 10px;
+  border-radius: 50%;
+  background: var(--pp-dot);
+}
+
+.pp-annotations__color[aria-pressed='true'] span {
+  box-shadow:
+    0 0 0 2px var(--pp-glass-panel-solid),
+    0 0 0 3.5px var(--pp-dot);
+}
+
+.pp-annotations__list {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.pp-annotation {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  width: 100%;
+  padding: var(--pp-space-3) 4px;
+  border: 0;
+  border-bottom: 0.5px solid var(--pp-hairline);
+  background: transparent;
+  text-align: left;
+}
+
+.pp-annotation:hover {
+  background: linear-gradient(var(--pp-fill), var(--pp-fill));
+}
+
+.pp-annotation__meta {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  color: var(--pp-text-2);
+  font-size: var(--pp-text-xs);
+}
+
+.pp-annotation__dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: var(--pp-dot);
+}
+
+.pp-annotation__quote {
+  font-family: var(--pp-font-paper);
+  font-size: var(--pp-text-quote);
+  line-height: 1.45;
+}
+
+.pp-annotation__note {
+  font-size: var(--pp-text-md);
+  line-height: var(--pp-leading-body);
+}
+
+/* Notes */
+
+.pp-notes__editor {
+  flex: 1;
+  min-height: 0;
+  margin-top: var(--pp-space-2);
+  padding: var(--pp-space-3) 0;
+  border: 0;
+  background: transparent;
+  font-size: var(--pp-text-quote);
+  line-height: 1.65;
+  resize: none;
+}
+
+.pp-notes__editor:focus-visible {
+  outline: none;
+}
+
+.pp-notes__editor::placeholder {
+  color: var(--pp-text-3);
+}
+
+/* ---- Selection menu layer -------------------------------------------------- */
+
+.pp-reader__selmenu {
+  position: fixed;
+  z-index: var(--pp-z-float);
+}
+
+/* ---- Changing dock ---------------------------------------------------------------
+ * Content and rail fade out quickly, the card morphs from one dock to the
+ * other (position, size and corners), then they fade back in. */
+
+.pp-reader[data-switching='out'] .pp-research__body,
+.pp-reader[data-switching='out'] .pp-rail {
+  opacity: 0;
+  transition: opacity 80ms var(--pp-ease-out);
+}
+
+/* Settling: fade back in during the tail of the move, without the opening delay. */
+.pp-reader[data-switching='settling'] .pp-research__body,
+.pp-reader[data-switching='settling'] .pp-rail {
+  transition: opacity 160ms var(--pp-ease-out);
+}
+
+/* Dragging the splitter or the window edge must track the pointer exactly. */
+.pp-reader[data-resizing='true'] .pp-research,
+.pp-reader[data-resizing='true'] .pp-reader__paper,
+.pp-reader[data-resizing='true'] .pp-toolbar,
+.pp-reader[data-resizing='true'] .pp-sidebar {
+  transition: none;
+}

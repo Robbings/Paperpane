@@ -1,0 +1,124 @@
+/* 示例论文页面；PDF 渲染接入后删除。 */
+
+.pp-sample {
+  --pp-sample-scale: 1;
+  --pp-sample-width: calc(600px * var(--pp-sample-scale));
+
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 18px;
+  width: max-content;
+  min-width: 100%;
+}
+
+.pp-sample__page {
+  position: relative;
+  width: var(--pp-sample-width);
+  min-height: calc(var(--pp-sample-width) * 1.294);
+  padding: calc(52px * var(--pp-sample-scale)) calc(56px * var(--pp-sample-scale));
+  background: #ffffff;
+  color: #1a1a1a;
+  box-shadow:
+    0 1px 2px rgba(0, 0, 0, 0.06),
+    0 8px 28px rgba(0, 0, 0, 0.08);
+  font-family: var(--pp-font-paper);
+  font-size: calc(10px * var(--pp-sample-scale));
+  line-height: 1.5;
+  filter: var(--pp-paper-filter);
+}
+
+.pp-sample__page::selection,
+.pp-sample__page *::selection {
+  background: var(--pp-selection);
+}
+
+.pp-sample__page h1 {
+  margin: 0;
+  font-size: 2em;
+  font-weight: 600;
+  line-height: 1.3;
+  text-align: center;
+}
+
+.pp-sample__page p {
+  margin: 0;
+}
+
+.pp-sample__page mark {
+  color: inherit;
+  border-radius: 2px;
+}
+
+.pp-sample__authors {
+  margin-top: 1.1em !important;
+  font-size: 1.15em;
+  text-align: center;
+}
+
+.pp-sample__affil {
+  margin-top: 0.3em !important;
+  font-style: italic;
+  text-align: center;
+}
+
+.pp-sample__heading {
+  margin-bottom: 0.5em !important;
+  font-size: 1.15em;
+  font-weight: 600;
+}
+
+.pp-sample__heading--center {
+  margin-top: 2em !important;
+  text-align: center;
+}
+
+.pp-sample__heading--spaced {
+  margin-top: 1.1em !important;
+}
+
+.pp-sample__abstract {
+  margin: 0 2.6em !important;
+  text-align: justify;
+  hyphens: auto;
+}
+
+.pp-sample__columns {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  column-gap: 2.1em;
+  margin-top: 2.1em;
+  text-align: justify;
+  hyphens: auto;
+}
+
+.pp-sample__indent {
+  margin-top: 0.5em !important;
+  text-indent: 1.2em;
+}
+
+.pp-sample__lines {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  column-gap: 2.1em;
+}
+
+.pp-sample__lines div {
+  display: flex;
+  flex-direction: column;
+  gap: 0.9em;
+}
+
+.pp-sample__lines span {
+  height: 0.45em;
+  border-radius: 2px;
+  background: rgba(0, 0, 0, 0.1);
+}
+
+.pp-sample__folio {
+  position: absolute;
+  bottom: calc(28px * var(--pp-sample-scale));
+  left: 50%;
+  color: #6b6b6b;
+  transform: translateX(-50%);
+}

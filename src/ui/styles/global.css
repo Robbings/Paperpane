@@ -1,0 +1,3 @@
+/* Single global stylesheet entry, imported by src/runtime/mount-page.tsx. */
+@import './tokens.css';
+@import './base.css';

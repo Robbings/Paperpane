@@ -1,0 +1,44 @@
+.pp-icon-btn {
+  display: inline-flex;
+  flex-shrink: 0;
+  align-items: center;
+  justify-content: center;
+  width: var(--pp-control-lg);
+  height: var(--pp-control-lg);
+  padding: 0;
+  border: 0;
+  border-radius: var(--pp-radius-control);
+  background: transparent;
+  color: var(--pp-text-2);
+  transition:
+    background-color var(--pp-dur-fast) var(--pp-ease-out),
+    color var(--pp-dur-fast) var(--pp-ease-out);
+}
+
+.pp-icon-btn[data-size='md'] {
+  width: var(--pp-control-md);
+  height: var(--pp-control-md);
+}
+
+.pp-icon-btn[data-shape='pill'] {
+  border-radius: var(--pp-radius-pill);
+}
+
+.pp-icon-btn:hover:not(:disabled) {
+  background: var(--pp-fill-hover);
+  color: var(--pp-text);
+}
+
+.pp-icon-btn:active:not(:disabled) {
+  background: var(--pp-fill-press);
+}
+
+.pp-icon-btn[data-active='true'],
+.pp-icon-btn[data-active='true']:hover {
+  background: var(--pp-accent-soft);
+  color: var(--pp-accent);
+}
+
+.pp-icon-btn:disabled {
+  opacity: 0.4;
+}
