@@ -5,6 +5,7 @@ export { GlassSurface } from './GlassSurface';
 export { Icon, iconNames, type IconName } from './Icon';
 export { IconButton } from './IconButton';
 export { Kbd } from './Kbd';
+export { Markdown } from './Markdown';
 export { Menu, type MenuEntry } from './Menu';
 export { Popover } from './Popover';
 export { ScrollArea } from './ScrollArea';

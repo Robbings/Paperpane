@@ -42,6 +42,7 @@
 | `Tree` | 可展开、可拖动的层级列表（文件夹） | `nodes`、`selectedId`、`expandedIds`、`onToggle`；改名用 `renamingId` / `onRename`；拖动用 `onMove`、`canMove`；接收外部拖入用 `acceptsExternal`、`onExternalDrop` |
 | `TagInput` | 标签输入：已选标签 + 联想 | `selected`、`options`、`onAdd({ id?, label })`（没有 id 表示新建）、`onRemove(id)` |
 | `StarToggle` | 星标开关 | `starred`、`onChange`（不传则只显示） |
+| `Markdown` | 安全渲染模型输出的 Markdown 子集（段落、标题、列表、引用、代码、强调、http 链接），不产生 HTML | `text`、`renderCitation(label)`（渲染正文里的 `[^label]` 出处标记） |
 | `ScrollArea` | 纵向滚动区，用细的浮动滚动条代替系统滚动条 | `viewportClassName`（滚动元素的类名，如限高）、`viewportRef`、`onScroll`；其余属性加在滚动元素上 |
 
 ## 需要逻辑层配合的几个组件
@@ -103,9 +104,28 @@ toast.show({ message: '翻译失败：请求超时', tone: 'error', action: { la
 | `onNavigate`、`onZoom` | 跳页、缩放 |
 | `onHighlight(color, selection)`、`onSelectionAction(action, selection)` | 选区菜单的操作；`selection` 是选中时的快照，锚点由逻辑层生成 |
 | `onLocateAnnotation(id)`、`onTool(tool)` | 定位批注、工具栏按钮 |
+| `panels` | 可选。由页面提供的研究区面板内容，如 `{ discuss: <ChatPanel …/>, overview: <OverviewPanel …/> }`；没提供的面板显示占位 |
 | `library` | 可选。传入后工具栏标题旁出现收藏按钮，侧栏多一个「文献」页：`currentPaperId`、`folders`、`papers`、`recent`、`saved`、`entry`、`tags`，以及 `onSave(draft)`、`onRemove`、`onCreateFolder(parentId, name)`（返回新文件夹 id）、`onOpenPaper(id, newTab)`、`onImport(files)`、`onOpenLibrary` |
 
 论文区的滚动容器是 `.pp-reader__paper`；外壳在它上面监听选区并显示选区菜单、绘制浮动滚动条。
+
+## 讨论面板 `ChatPanel`
+
+位于 `src/ui/reader/chat/`，视图模型在 `chat/types.ts`，与 PR #7 的会话契约一一对应；示例接线是 `reader/sample/SampleChat.tsx`。解释面板以后复用同一组件（`title="解释"`，用 `source` 显示被解释的段落或截图）。
+
+- 逻辑层把 `visibleMessages(session)` 映射成 `messages`；每条消息的 `version` 来自 `messageVersions`（第几个 / 共几个），`onVersion(id, ±1)` 由逻辑层用 `latestLeaf` + `selectBranch` 切换。
+- 出处：`citations` 的 `pageLabel` 由逻辑层从锚点算出；回答正文里写 `[^label]` 会显示为可点的小标记，`onLocate(citation)` 交给 `AnchorService.locate`。
+- 生成状态 `generation` 决定界面：排队、生成中（输入框的发送按钮变成停止）、已停止、被中断、失败、保存失败，各自带恢复按钮，`onRecover(id, action)`。
+- 换到另一家供应商的模型：`onModel` 之后，逻辑层返回的确认信息传给 `modelChange`，界面弹出说明；用户点「换用」调用 `onConfirmModelChange`。
+- 演示数据传 `demo`，标题旁会显示「演示，不会调用模型」。
+
+## 概览面板 `OverviewPanel`
+
+位于 `src/ui/reader/overview/`，示例接线是 `reader/sample/SampleOverview.tsx`。
+
+- 卡片定义 `OverviewCardDef`（名称、提示词、输出形式：文本 / 列表 / 结构化，列表可显示为要点或短标签，结构化带 JSON Schema）是用户的全局设置；`results` 是当前论文每张卡片的结果。
+- 不会自动生成：首次打开时显示「生成概览」按钮，之后每张卡片可单独生成、停止、重新生成。修改卡片后，逻辑层把已有结果标为 `stale`。
+- 管理卡片在面板内完成：排序、显示 / 隐藏、编辑、添加、删除自定义卡片、内置卡片恢复默认。
 
 ## 文献库 `LibraryView`
 

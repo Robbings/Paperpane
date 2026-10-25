@@ -11,8 +11,23 @@ interface ToggleBaseProps {
 }
 
 /** An on/off setting that takes effect immediately (role="switch"). */
-export function Switch({ checked, onChange, label, description, disabled }: ToggleBaseProps) {
+export function Switch({ checked, onChange, label, description, disabled, hideLabel }: ToggleBaseProps & { /** Just the switch, e.g. in a list row that already names the item. */ hideLabel?: boolean }) {
   const id = useId();
+  if (hideLabel) {
+    return (
+      <button
+        type="button"
+        role="switch"
+        className="pp-switch"
+        aria-label={label}
+        aria-checked={checked}
+        disabled={disabled}
+        onClick={() => onChange(!checked)}
+      >
+        <span className="pp-switch__thumb" />
+      </button>
+    );
+  }
   return (
     <div className="pp-toggle" data-disabled={disabled ? 'true' : undefined}>
       <div className="pp-toggle__text">

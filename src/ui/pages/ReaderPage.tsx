@@ -5,6 +5,8 @@ import { sampleFolders, samplePapers, sampleTags } from '@/ui/library/sample/lib
 import type { FolderView, PaperView, TagView } from '@/ui/library/types';
 import type { LibraryEntryDraft } from '@/ui/reader/library/SaveToLibraryPopover';
 import { ReaderShell } from '@/ui/reader/ReaderShell';
+import { SampleChat } from '@/ui/reader/sample/SampleChat';
+import { SampleOverview } from '@/ui/reader/sample/SampleOverview';
 import { SamplePaper } from '@/ui/reader/sample/SamplePaper';
 import { sampleAnnotations, sampleHeader, sampleOutline } from '@/ui/reader/sample/sampleData';
 import type { AnnotationView } from '@/ui/reader/types';
@@ -99,6 +101,7 @@ function SampleReader() {
           if (target) navigate(target.pageIndex);
         }}
         onTool={() => undefined}
+        panels={{ discuss: <SampleChat onLocatePage={navigate} />, overview: <SampleOverview /> }}
         library={{
           currentPaperId: current.id,
           folders,

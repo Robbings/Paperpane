@@ -76,6 +76,8 @@ interface ReaderShellProps {
   onTool: (tool: string) => void;
   /** Library features inside the reader: bookmark popover and the sidebar tab. */
   library?: ReaderLibraryProps;
+  /** Content for research panels the page supplies itself (discussion, overview, …); the rest show a placeholder. */
+  panels?: Partial<Record<ResearchPanelId, ReactNode>>;
 }
 
 export interface ReaderLibraryProps extends ReaderLibraryData {
@@ -443,7 +445,7 @@ export function ReaderShell(props: ReaderShellProps) {
                 ) : id === 'notes' ? (
                   <NotesPanel value={notes.value} onChange={notes.onChange} local={notes.local} sync={notes.sync} simulated={notes.simulated} />
                 ) : (
-                  <PlaceholderPanel title={label} icon={icon} description={placeholderText[id] ?? ''} />
+                  (props.panels?.[id] ?? <PlaceholderPanel title={label} icon={icon} description={placeholderText[id] ?? ''} />)
                 )}
               </div>
             );

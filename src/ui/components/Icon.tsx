@@ -54,6 +54,12 @@ const paths = {
   bookmark: 'M7 4.5h10v15l-5-3.5-5 3.5z',
   bookmarkFilled: { d: 'M7 4.5h10v15l-5-3.5-5 3.5z', fill: 'M7 4.5h10v15l-5-3.5-5 3.5z' },
   quote: 'M5 7h14 M5 11h14 M5 15h9 M16 15v4l3-2z',
+  send: 'M12 18.5V6 M7 11l5-5 5 5',
+  stop: { d: 'M8 8h8v8H8z', fill: 'M8 8h8v8H8z' },
+  edit: 'M5 19l1-4 9.5-9.5 3 3L9 18z M13.5 7.5l3 3',
+  image: 'M4.5 5.5h15v13h-15z M4.5 15.5l4.5-4.5 4 4 2.5-2.5 4 4 M15 9.5h.01',
+  grip: 'M9.5 7h.01 M14.5 7h.01 M9.5 12h.01 M14.5 12h.01 M9.5 17h.01 M14.5 17h.01',
+  history: 'M4.5 12a7.5 7.5 0 1 0 2.2-5.3 M4.5 5v3.5H8 M12 8.5V12l2.5 1.5',
 } satisfies Record<string, IconPath>;
 
 export type IconName = keyof typeof paths;
