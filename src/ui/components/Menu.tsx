@@ -34,8 +34,11 @@ export function Menu({ label, entries, anchor, align = 'start', triggerRef, onSe
     const { width, height } = menu.getBoundingClientRect();
     const preferredLeft = align === 'end' ? anchor.x - width : anchor.x;
     const left = Math.min(Math.max(preferredLeft, EDGE), window.innerWidth - width - EDGE);
+    // Open downward if it fits, else upward; either way keep the whole menu
+    // on screen (its height is capped to the window in CSS).
     const fitsBelow = anchor.y + height + EDGE <= window.innerHeight;
-    const top = fitsBelow ? anchor.y : Math.max(anchor.y - height, EDGE);
+    const preferredTop = fitsBelow ? anchor.y : anchor.y - height;
+    const top = Math.min(Math.max(preferredTop, EDGE), window.innerHeight - height - EDGE);
     setPosition({ top, left });
     menu.querySelector<HTMLButtonElement>('[role^="menuitem"]:not(:disabled)')?.focus();
   }, [anchor.x, anchor.y, align]);

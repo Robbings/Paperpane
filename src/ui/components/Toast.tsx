@@ -65,22 +65,32 @@ function ToastItem({ entry }: { entry: ToastEntry }) {
   const timer = useRef<number | undefined>(undefined);
   const remaining = useRef(defaultDuration(entry));
   const startedAt = useRef(0);
+  const running = useRef(false);
+  // Hover and focus are tracked separately: the countdown only runs while
+  // the pointer is outside the toast *and* focus is outside it.
+  const hovered = useRef(false);
+  const focused = useRef(false);
 
-  const start = () => {
-    if (remaining.current === null) return;
+  const pause = () => {
+    if (!running.current || remaining.current === null) return;
+    window.clearTimeout(timer.current);
+    running.current = false;
+    remaining.current = Math.max(800, remaining.current - (performance.now() - startedAt.current));
+  };
+  const resume = () => {
+    if (running.current || remaining.current === null) return;
+    running.current = true;
     startedAt.current = performance.now();
     timer.current = window.setTimeout(() => toast.dismiss(entry.id), remaining.current);
   };
-  // Hovering or focusing a toast pauses its countdown.
-  const pause = () => {
-    if (remaining.current === null) return;
-    window.clearTimeout(timer.current);
-    remaining.current = Math.max(800, remaining.current - (performance.now() - startedAt.current));
-  };
+  const update = () => (hovered.current || focused.current ? pause() : resume());
 
   useEffect(() => {
-    start();
-    return () => window.clearTimeout(timer.current);
+    resume();
+    return () => {
+      window.clearTimeout(timer.current);
+      running.current = false;
+    };
   }, []); // once per toast
 
   const icon = toneIcon[entry.tone];
@@ -90,10 +100,23 @@ function ToastItem({ entry }: { entry: ToastEntry }) {
       data-tone-kind={entry.tone}
       data-tone="float"
       role={entry.tone === 'error' ? 'alert' : 'status'}
-      onPointerEnter={pause}
-      onPointerLeave={start}
-      onFocus={pause}
-      onBlur={start}
+      onPointerEnter={() => {
+        hovered.current = true;
+        update();
+      }}
+      onPointerLeave={() => {
+        hovered.current = false;
+        update();
+      }}
+      onFocus={() => {
+        focused.current = true;
+        update();
+      }}
+      onBlur={(event) => {
+        // Moving between the toast's own buttons keeps focus inside.
+        focused.current = event.currentTarget.contains(event.relatedTarget as Node | null);
+        update();
+      }}
     >
       {icon && (
         <span className="pp-toast__icon" aria-hidden="true">
