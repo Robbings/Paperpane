@@ -62,12 +62,19 @@ export function createDemoConversations() {
     if (parentId !== null && !parent) return failure('NOT_FOUND', '消息不存在');
     if (capturedInput ? (parent && parent.role !== 'assistant') : (!parent || parent.role !== 'user')) return failure('INVALID_INPUT', '消息角色顺序无效');
     if (!model(session.modelId)?.capabilities.vision && visibleMessages({ ...session, activeLeafId: parentId }).some((message) => message.attachments.length)) return failure('INVALID_INPUT', '当前历史包含图片，请选择视觉模型', ['change-model']);
-    const expectedRevision = session.revision;
+    // Drafts, title and suggestions may change while acceptance waits. Only the
+    // message context used for this request must remain unchanged.
+    const expectedLeafId = session.activeLeafId;
+    const expectedModelId = session.modelId;
     pending.add(id); const gate = await store.gate(); pending.delete(id);
     if (!gate.ok) return gate;
     if (disposed) return failure('CANCELLED', '演示服务已关闭');
     session = get(id); if (!session) return failure('NOT_FOUND', '会话已删除');
-    if (session.revision !== expectedRevision) return failure('CONFLICT', '会话已变化，请重新发送', ['retry']);
+    const currentParent = session.messages.find((item) => item.id === parentId);
+    if (session.activeLeafId !== expectedLeafId || session.modelId !== expectedModelId
+      || (parentId !== null && (!currentParent || currentParent.role !== parent?.role || currentParent.parentId !== parent?.parentId))) {
+      return failure('CONFLICT', '对话分支或模型已变化，请重新发送', ['retry']);
+    }
     const selectedModel = model(session.modelId)!;
     const messages: ChatMessage[] = [...session.messages];
     if (capturedInput) {
@@ -148,11 +155,12 @@ export function createDemoConversations() {
       return success({ state: 'confirmation-required', confirmation: structuredClone(confirmation) });
     },
     async confirmModelChange(id) {
-      const confirmation = confirmations.get(id); confirmations.delete(id);
+      const confirmation = confirmations.get(id);
       if (!confirmation) return failure('STALE_CONFIRMATION', '模型切换确认已失效', ['change-model']);
+      if (busy(confirmation.sessionId)) return failure('BUSY', '请先停止当前生成');
+      confirmations.delete(id);
       const session = get(confirmation.sessionId);
       if (!session || session.revision !== confirmation.sessionRevision || Date.parse(confirmation.expiresAt) < Date.now()) return failure('STALE_CONFIRMATION', '会话已变化，请重新确认发送范围', ['change-model']);
-      if (busy(session.id)) return failure('BUSY', '请先停止当前生成');
       update({ ...session, modelId: confirmation.target.id }); return success(undefined);
     },
     async suggest(id) {

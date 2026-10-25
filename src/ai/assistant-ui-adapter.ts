@@ -68,6 +68,6 @@ export function createConversationAdapter(
     },
     onCancel: async () => { accept(await service.stop(sessionId), 'stop'); },
     // No setMessages/onDelete: the SDK must not rewrite or discard our history tree.
-    // Version selection uses messageVersions + service.selectBranch in the host UI.
+    // Version selection uses messageVersions + latestLeaf + service.selectBranch in the host UI.
   };
 }

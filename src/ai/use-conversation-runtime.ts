@@ -15,8 +15,11 @@ export function useConversationRuntime(service: ConversationService, sessionId: 
   const draftText = session?.draft.text ?? '';
   useEffect(() => {
     const composer = runtime.thread.composer;
-    if (composer.getState().text !== draftText) composer.setText(draftText, { origin: 'external' });
-  }, [runtime, draftText]);
+    // An input event can publish a newer draft between render and this effect.
+    const current = service.getSnapshot().data.sessions.find((item) => item.id === sessionId && !item.deletedAt);
+    const text = current?.draft.text ?? '';
+    if (composer.getState().text !== text) composer.setText(text, { origin: 'external' });
+  }, [runtime, service, sessionId, draftText]);
   useEffect(() => runtime.thread.composer.unstable_on('textChange', ({ text, origin }) => {
     // Sending clears the SDK composer before acceptance. Keep our draft until the
     // service accepts the message; MessageNotSentError restores a rejected send.

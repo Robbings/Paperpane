@@ -38,8 +38,14 @@ export interface ConversationService extends Readable<ConversationState> {
   create(input: { title: string; documents: readonly DocumentRef[]; modelId: Id; explanation?: ExplanationSource }): Promise<Result<Conversation>>;
   rename(sessionId: Id, title: string): Promise<Result<void>>;
   remove(sessionId: Id): Promise<Result<void>>;
-  /** Live service persists drafts locally; cross-device draft merging is not required. */
+  /** Publish the draft to getSnapshot() and notify subscribers synchronously, before
+   * this call returns its Promise (never await persistence before publication).
+   * Live services debounce durable writes, preserve newer edits when a write completes,
+   * and expose editing/saving/saved/failed via draftSave. Flush at owner/navigation
+   * boundaries; a scheduled write is not saved. Cross-device draft merging is not required. */
   setDraft(sessionId: Id, draft: ChatDraft): Promise<Result<void>>;
+  /** Accept against the current branch/model and retained parent; draft/title/suggestion
+   * changes alone must not invalidate a pending send. Preserve a newer draft. */
   send(sessionId: Id, input: ChatDraft, parentId: Id | null): Promise<Result<Id>>;
   editQuestion(sessionId: Id, messageId: Id, input: ChatDraft): Promise<Result<Id>>;
   regenerate(sessionId: Id, assistantMessageId: Id): Promise<Result<Id>>;
@@ -67,6 +73,34 @@ export function visibleMessages(session: Conversation): ChatMessage[] {
 export function messageVersions(session: Conversation, messageId: Id): readonly ChatMessage[] {
   const message = session.messages.find((item) => item.id === messageId);
   return message ? session.messages.filter((item) => item.parentId === message.parentId && item.role === message.role) : [];
+}
+
+/** Newest retained leaf below a version (including itself). Null if the version is absent.
+ * Compare creation times; ties use later message-array order. Does not change the session.
+ * Throws on cyclic descendant graphs, matching visibleMessages' corruption policy. */
+export function latestLeaf(session: Conversation, messageId: Id): Id | null {
+  const root = session.messages.find((message) => message.id === messageId);
+  if (!root) return null;
+  const children = new Map<Id, ChatMessage[]>();
+  const order = new Map(session.messages.map((message, index) => [message.id, index]));
+  for (const message of session.messages) {
+    if (message.parentId === null) continue;
+    const siblings = children.get(message.parentId) ?? [];
+    siblings.push(message); children.set(message.parentId, siblings);
+  }
+  const pending = [root]; const visited = new Set<Id>();
+  let latest: ChatMessage | undefined;
+  while (pending.length) {
+    const message = pending.pop()!;
+    if (visited.has(message.id)) throw new Error('Cyclic conversation history');
+    visited.add(message.id);
+    const descendants = children.get(message.id);
+    if (descendants?.length) { pending.push(...descendants); continue; }
+    const time = Date.parse(message.createdAt);
+    const previous = latest ? Date.parse(latest.createdAt) : -Infinity;
+    if (!latest || time > previous || (time === previous && order.get(message.id)! > order.get(latest.id)!)) latest = message;
+  }
+  return latest?.id ?? null;
 }
 
 /** Ephemeral display URL, not part of persisted message/asset records. */
