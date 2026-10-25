@@ -16,4 +16,9 @@ Model/PDF/user Markdown is untrusted. Disable raw HTML and remote image loading 
 
 Sources: [TipTap Markdown](https://tiptap.dev/docs/editor/markdown), [mathematics](https://tiptap.dev/docs/editor/extensions/nodes/mathematics), [DOMPurify](https://github.com/cure53/DOMPurify), [KaTeX security](https://katex.org/docs/security).
 
+## Conversation adapter
+
+The second proposal adds the versions from the earlier isolated integration: `@assistant-ui/react 0.15.31`, `@assistant-ui/react-markdown 0.14.24`, `remark-math 6.0.0`, `rehype-katex 7.0.1` (MIT). It reuses `katex 0.16.47`. SDK types were checked against the installed source, including ExternalStoreRuntime, AppendMessage.sourceId, MessageNotSentError and composer textChange origins. These adapter APIs stay confined to `src/ai/`; changing the pinned SDK requires rechecking that boundary. No assistant-cloud or AI SDK dependency is added directly.
+
+[ExternalStoreRuntime documentation](https://www.assistant-ui.com/docs/runtimes/custom/external-store) describes its externally owned state model. Production pages still do not mount this runtime, so ordinary builds alone do not verify the UI adapter. Demo checks exercise mapping and callbacks; the actual discussion UI is a separate integration step.
 There is no direct `marked` dependency or standalone application parser. TipTap Markdown still uses it transitively for note conversion. Model output uses the conversation integration's react-markdown renderer; do not add a second rendering path.
