@@ -3,19 +3,79 @@
 .pp-library {
   position: relative;
   display: flex;
-  gap: var(--pp-gap-float);
   height: 100%;
-  min-width: 960px;
   padding: var(--pp-gap-float);
   overflow: hidden;
   background: var(--pp-ground);
+}
+
+/* ---- Side panes: docked beside the list, floating over it when narrow, or closed. */
+
+.pp-lib-pane {
+  position: relative;
+  display: flex;
+  flex: 0 0 auto;
+  width: var(--pp-pane-w);
+  min-height: 0;
+  transition:
+    width var(--pp-dur-layout) var(--pp-ease-layout),
+    margin var(--pp-dur-layout) var(--pp-ease-layout),
+    opacity var(--pp-dur-layout) var(--pp-ease-layout);
+}
+
+.pp-lib-pane > * {
+  flex: 0 0 var(--pp-pane-w);
+  width: var(--pp-pane-w);
+}
+
+.pp-lib-pane[data-side='left'] {
+  order: -1;
+  margin-right: var(--pp-gap-float);
+}
+
+.pp-lib-pane[data-side='right'] {
+  justify-content: flex-end;
+  margin-left: var(--pp-gap-float);
+}
+
+.pp-lib-pane[data-state='closed'] {
+  width: 0;
+  margin: 0;
+  overflow: hidden;
+  opacity: 0;
+}
+
+.pp-lib-pane[data-state='floating'] {
+  position: absolute;
+  /* Below the list header, so the toggle that closes it stays in reach. */
+  top: calc(var(--pp-gap-float) + 56px);
+  bottom: var(--pp-gap-float);
+  z-index: 4;
+  margin: 0;
+  border-radius: var(--pp-radius-panel);
+  box-shadow: var(--pp-shadow-float);
+  animation: pp-pane-in var(--pp-dur-med) var(--pp-ease-out);
+}
+
+.pp-lib-pane[data-state='floating'][data-side='left'] {
+  left: var(--pp-gap-float);
+}
+
+.pp-lib-pane[data-state='floating'][data-side='right'] {
+  right: var(--pp-gap-float);
+}
+
+@keyframes pp-pane-in {
+  from {
+    opacity: 0;
+    transform: translateY(6px);
+  }
 }
 
 /* ---- Sidebar ----------------------------------------------------------------- */
 
 .pp-lib-sidebar {
   display: flex;
-  flex: 0 0 232px;
   flex-direction: column;
   gap: var(--pp-space-2);
   min-height: 0;
@@ -156,36 +216,60 @@
   min-width: 0;
 }
 
-.pp-lib-toolbar {
+.pp-lib-head {
   display: flex;
   flex-shrink: 0;
   align-items: center;
-  gap: 6px;
-  height: var(--pp-bar-height);
-  padding: 0 7px 0 8px;
+  gap: 4px;
+  min-height: 52px;
+  padding: 8px 10px 4px;
 }
 
-.pp-lib-toolbar__sep {
+.pp-lib-head__title {
+  display: flex;
+  flex: 1;
+  align-items: baseline;
+  gap: var(--pp-space-2);
+  min-width: 0;
+  margin: 0 var(--pp-space-3) 0 4px;
+}
+
+.pp-lib-head__title h1 {
+  min-width: 0;
+  margin: 0;
+  overflow: hidden;
+  font-size: var(--pp-text-xl);
+  font-weight: var(--pp-weight-semibold);
+  line-height: var(--pp-leading-tight);
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.pp-lib-head__count {
   flex-shrink: 0;
-  width: 0.5px;
-  height: 18px;
+  color: var(--pp-text-2);
+  font-size: var(--pp-text-sm);
+}
+
+.pp-lib-head > .pp-btn {
   margin: 0 4px;
-  background: var(--pp-hairline-strong);
 }
 
 .pp-lib-search {
   display: flex;
-  flex: 1;
+  flex: 0 1 220px;
   align-items: center;
   gap: 6px;
-  min-width: 180px;
+  min-width: 120px;
   height: 30px;
-  padding: 0 4px 0 10px;
+  padding: 0 3px 0 10px;
+  transition: flex-basis var(--pp-dur-med) var(--pp-ease-out);
   border-radius: var(--pp-radius-pill);
   background: var(--pp-fill);
 }
 
 .pp-lib-search:focus-within {
+  flex-basis: 300px;
   background: var(--pp-surface);
   box-shadow:
     inset 0 0 0 1px var(--pp-accent),
@@ -218,15 +302,24 @@
   display: inline-flex;
   flex-shrink: 0;
   align-items: center;
-  gap: 4px;
+  justify-content: center;
+  gap: 3px;
+  min-width: 24px;
   height: 24px;
-  padding: 0 8px 0 10px;
+  padding: 0 6px;
   border: 0;
   border-radius: var(--pp-radius-pill);
-  background: var(--pp-fill);
-  color: var(--pp-text-2);
-  font-size: var(--pp-text-sm);
+  background: transparent;
+  color: var(--pp-text-3);
+  font-size: var(--pp-text-xs);
   white-space: nowrap;
+}
+
+/* Only shown as text when the search is narrowed to some fields. */
+.pp-lib-search__scope[data-narrowed='true'] {
+  padding: 0 6px 0 8px;
+  background: var(--pp-accent-soft);
+  color: var(--pp-accent);
 }
 
 .pp-lib-search__scope:hover {
@@ -250,37 +343,12 @@
   overflow: hidden;
 }
 
-.pp-lib-list__head {
-  display: flex;
-  flex-shrink: 0;
-  align-items: baseline;
-  gap: var(--pp-space-2);
-  padding: var(--pp-space-4) var(--pp-space-5) var(--pp-space-2);
-}
-
-.pp-lib-list__head h1 {
-  margin: 0;
-  font-size: var(--pp-text-xl);
-  font-weight: var(--pp-weight-semibold);
-  line-height: var(--pp-leading-tight);
-}
-
-.pp-lib-list__count {
-  color: var(--pp-text-2);
-  font-size: var(--pp-text-sm);
-}
-
-.pp-lib-list__foot {
-  flex-shrink: 0;
-  padding: var(--pp-space-2) var(--pp-space-4) var(--pp-space-3) var(--pp-space-5);
-  border-top: 0.5px solid var(--pp-hairline);
+.pp-lib-table__area {
+  flex: 1;
 }
 
 .pp-lib-table__scroll {
-  position: relative;
-  flex: 1;
-  min-height: 0;
-  overflow: auto;
+  overflow-x: auto;
   padding: 0 var(--pp-space-3) var(--pp-space-8);
 }
 
@@ -307,15 +375,10 @@
   white-space: nowrap;
 }
 
-.pp-lib-table th[data-align='end'],
-.pp-lib-table td[data-align='end'] {
-  text-align: right;
-}
-
 .pp-lib-table__sort {
   display: inline-flex;
   align-items: center;
-  gap: 4px;
+  gap: 3px;
   max-width: 100%;
   height: 24px;
   padding: 0 6px;
@@ -335,12 +398,28 @@
   color: var(--pp-text);
 }
 
-.pp-lib-table__asc {
+.pp-lib-table__label {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+/* The arrow sits after the label and never pushes it: every column is left-aligned. */
+.pp-lib-table__arrow {
+  flex-shrink: 0;
+  color: var(--pp-accent);
+}
+
+.pp-lib-table__arrow[data-dir='asc'] {
   transform: rotate(180deg);
 }
 
-.pp-lib-table thead th {
-  position: sticky;
+.pp-lib-table th[data-column='starred'] .pp-lib-table__sort {
+  padding: 0 4px;
+}
+
+.pp-lib-table th[data-column='starred'] svg {
+  flex-shrink: 0;
 }
 
 .pp-lib-table__resize {
@@ -382,7 +461,19 @@
 }
 
 .pp-lib-table tbody td[data-column='starred'] {
-  padding: 0 4px;
+  padding: 0 2px;
+}
+
+/* Checkbox and star cells: a block that centres its control, so they line up
+   with each other instead of sitting on the text baseline. */
+.pp-lib-cell-center {
+  display: flex;
+  align-items: center;
+  height: 24px;
+}
+
+td[data-column='starred'] .pp-lib-cell-center {
+  justify-content: center;
 }
 
 .pp-lib-table tbody td[data-column='title'] {
@@ -396,7 +487,6 @@
 
 .pp-lib-table__check .pp-checkbox {
   margin-top: 0;
-  vertical-align: middle;
 }
 
 .pp-lib-table tbody tr {
@@ -429,61 +519,92 @@
   border-radius: 0 var(--pp-radius-control) var(--pp-radius-control) 0;
 }
 
-/* Detailed rows: wrap and grow. */
+/* Detailed rows: wrap and grow; controls line up with the title's first line. */
 .pp-lib-table__scroll[data-mode='detailed'] tbody td {
   height: auto;
-  padding-top: 10px;
-  padding-bottom: 10px;
+  padding-top: 14px;
+  padding-bottom: 14px;
   vertical-align: top;
   white-space: normal;
 }
 
-.pp-lib-table__scroll[data-mode='detailed'] tbody td[data-column='starred'] {
-  padding-top: 7px;
+.pp-lib-table__scroll[data-mode='detailed'] .pp-lib-table__check {
+  padding-top: 14px !important;
 }
 
-.pp-lib-table__scroll[data-mode='detailed'] .pp-lib-table__check {
-  padding-top: 11px !important;
+.pp-lib-table__scroll[data-mode='detailed'] td[data-column='addedAt'],
+.pp-lib-table__scroll[data-mode='detailed'] td[data-column='lastReadAt'] {
+  padding-top: 16px;
+  color: var(--pp-text-2);
+  font-size: var(--pp-text-sm);
 }
 
 .pp-lib-title {
   display: flex;
-  flex-direction: column;
-  gap: 4px;
+  align-items: center;
+  gap: 6px;
   min-width: 0;
 }
 
 .pp-lib-title__text {
-  display: flex;
-  align-items: center;
-  gap: 6px;
   min-width: 0;
   overflow: hidden;
   text-overflow: ellipsis;
 }
 
-.pp-lib-table__scroll[data-mode='detailed'] .pp-lib-title__text {
-  font-family: var(--pp-font-paper);
-  font-size: var(--pp-text-quote);
-  font-weight: var(--pp-weight-semibold);
-  white-space: normal;
+.pp-lib-entry {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+  min-width: 0;
+  max-width: 76ch;
 }
 
-.pp-lib-title__meta {
-  color: var(--pp-text-2);
-  font-size: var(--pp-text-sm);
-  font-weight: var(--pp-weight-regular);
-}
-
-.pp-lib-title__abstract {
+.pp-lib-entry__title {
   display: -webkit-box;
+  overflow: hidden;
+  font-size: var(--pp-text-md);
+  font-weight: var(--pp-weight-semibold);
+  line-height: 24px;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 2;
+}
+
+.pp-lib-entry__meta {
+  display: flex;
+  align-items: center;
+  gap: 8px;
   overflow: hidden;
   color: var(--pp-text-2);
   font-size: var(--pp-text-sm);
   font-weight: var(--pp-weight-regular);
-  line-height: 1.5;
+  white-space: nowrap;
+}
+
+.pp-lib-entry__abstract {
+  display: -webkit-box;
+  margin-top: 3px;
+  overflow: hidden;
+  color: var(--pp-text-2);
+  font-size: var(--pp-text-sm);
+  font-weight: var(--pp-weight-regular);
+  line-height: 1.55;
   -webkit-box-orient: vertical;
-  -webkit-line-clamp: 2;
+  -webkit-line-clamp: 3;
+}
+
+.pp-lib-entry__foot {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px 10px;
+  margin-top: 5px;
+}
+
+.pp-lib-entry__facts {
+  color: var(--pp-text-3);
+  font-size: var(--pp-text-xs);
+  font-weight: var(--pp-weight-regular);
 }
 
 .pp-lib-chips {
@@ -516,7 +637,7 @@
 
 .pp-lib-batch {
   position: absolute;
-  bottom: 64px;
+  bottom: 16px;
   left: 50%;
   z-index: 3;
   display: flex;
@@ -546,7 +667,6 @@
 
 .pp-lib-detail {
   display: flex;
-  flex: 0 0 340px;
   flex-direction: column;
   min-height: 0;
 }
@@ -742,12 +862,35 @@
   font-size: var(--pp-text-lg);
 }
 
-@media (max-width: 1180px) {
-  .pp-lib-sidebar {
-    flex-basis: 208px;
-  }
+/* ---- View options popover ------------------------------------------------------------ */
 
-  .pp-lib-detail {
-    flex-basis: 300px;
-  }
+.pp-lib-view {
+  display: flex;
+  flex-direction: column;
+  gap: var(--pp-space-3);
+}
+
+.pp-lib-view__section {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.pp-lib-view__label {
+  margin: 0 0 4px;
+  color: var(--pp-text-2);
+  font-size: var(--pp-text-xs);
+  font-weight: var(--pp-weight-semibold);
+}
+
+.pp-lib-view__hint {
+  margin: 4px 0 0;
+  color: var(--pp-text-3);
+  font-size: var(--pp-text-xs);
+  line-height: 1.5;
+}
+
+.pp-lib-view__reset {
+  align-self: flex-start;
+  margin-left: -8px;
 }

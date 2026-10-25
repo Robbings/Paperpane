@@ -22,6 +22,13 @@
   font-size: var(--pp-text-md);
   pointer-events: auto;
   animation: pp-toast-in var(--pp-dur-med) var(--pp-ease-spring);
+  transition: opacity 180ms var(--pp-ease-out);
+}
+
+/* Keep in step with FADE in Toast.tsx. */
+.pp-toast[data-fading='true'] {
+  opacity: 0;
+  transition: opacity 900ms ease-in;
 }
 
 @keyframes pp-toast-in {

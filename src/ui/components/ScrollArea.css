@@ -1,0 +1,55 @@
+.pp-scrollarea {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+}
+
+.pp-scrollarea__viewport {
+  flex: 1;
+  min-height: 0;
+  overflow-x: hidden;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  scrollbar-width: none;
+}
+
+.pp-scrollarea__viewport::-webkit-scrollbar {
+  display: none;
+}
+
+.pp-scrollarea__bar {
+  position: absolute;
+  top: 4px;
+  right: 0;
+  bottom: 4px;
+  z-index: 2;
+  width: 12px;
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity var(--pp-dur-med) var(--pp-ease-out);
+}
+
+.pp-scrollarea__bar[data-visible='true'] {
+  opacity: 1;
+  pointer-events: auto;
+}
+
+.pp-scrollarea__thumb {
+  position: absolute;
+  top: 0;
+  right: 3px;
+  width: 5px;
+  border-radius: var(--pp-radius-pill);
+  background: var(--pp-scroll-thumb);
+  box-shadow: 0 0 0 1px var(--pp-scroll-ring);
+  transition:
+    width var(--pp-dur-fast) var(--pp-ease-out),
+    background-color var(--pp-dur-fast) var(--pp-ease-out);
+}
+
+.pp-scrollarea__bar:hover .pp-scrollarea__thumb,
+.pp-scrollarea__bar[data-dragging='true'] .pp-scrollarea__thumb {
+  width: 8px;
+  background: var(--pp-scroll-thumb-active);
+}

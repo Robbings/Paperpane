@@ -12,7 +12,7 @@ interface StarToggleProps {
 
 /** A "favourite" mark: one star that is either on or off. */
 export function StarToggle({ starred, onChange, size = 'md' }: StarToggleProps) {
-  const px = size === 'sm' ? 14 : 18;
+  const px = size === 'sm' ? 17 : 19;
   const icon = (
     <svg viewBox="0 0 24 24" width={px} height={px} aria-hidden="true" className="pp-star__icon">
       <path d={STAR} />

@@ -2,7 +2,7 @@ import { useEffect, useState } from 'react';
 import { Toaster, toast } from '@/ui/components';
 import { ComponentGallery } from '@/ui/gallery/ComponentGallery';
 import { sampleFolders, samplePapers, sampleTags } from '@/ui/library/sample/libraryData';
-import type { PaperView, TagView } from '@/ui/library/types';
+import type { FolderView, PaperView, TagView } from '@/ui/library/types';
 import type { LibraryEntryDraft } from '@/ui/reader/library/SaveToLibraryPopover';
 import { ReaderShell } from '@/ui/reader/ReaderShell';
 import { SamplePaper } from '@/ui/reader/sample/SamplePaper';
@@ -32,6 +32,7 @@ function SampleReader() {
   // 示例：文献库里的论文与标签，当前论文是第一篇。
   const [papers, setPapers] = useState<PaperView[]>(samplePapers);
   const [tags, setTags] = useState<TagView[]>(sampleTags);
+  const [folders, setFolders] = useState<FolderView[]>(sampleFolders);
   const [saved, setSaved] = useState(true);
   const current = papers[0]!;
   const entry: LibraryEntryDraft = {
@@ -100,7 +101,7 @@ function SampleReader() {
         onTool={() => undefined}
         library={{
           currentPaperId: current.id,
-          folders: sampleFolders,
+          folders,
           papers: saved ? papers : papers.slice(1),
           recent: papers.filter((p) => p.lastReadAt).sort((a, b) => (b.lastReadAt ?? '').localeCompare(a.lastReadAt ?? '')),
           saved,
@@ -120,6 +121,11 @@ function SampleReader() {
           onRemove: () => {
             setSaved(false);
             toast.show({ message: '已移出文献库，批注和笔记仍然保留', action: { label: '撤销', onAction: () => setSaved(true) } });
+          },
+          onCreateFolder: (parentId, name) => {
+            const id = `f-${Date.now()}`;
+            setFolders((all) => [...all, { id, name, parentId }]);
+            return id;
           },
           onOpenPaper: (id, newTab) => toast.show({ message: `示例：${newTab ? '在新标签页' : ''}打开「${papers.find((p) => p.id === id)?.title ?? id}」` }),
           onImport: (files) => toast.show({ message: `示例：收到 ${files.length} 个文件，演示中不会真正导入。` }),

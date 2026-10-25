@@ -83,7 +83,8 @@ export const samplePapers: PaperView[] = titles.map(([title, authors, year, venu
  * 示例：在界面里筛选、排序、分页。真实查询由逻辑层完成（含正文与 AI 摘要的索引）；
  * 这里"正文"和"AI 摘要"范围仅按摘要演示。
  */
-export function querySample(papers: PaperView[], folders: FolderView[], query: LibraryQuery) {
+/** Filters and sorts like the logic layer would; `limit` is how many results the list has loaded. */
+export function querySample(papers: PaperView[], folders: FolderView[], query: LibraryQuery, limit: number) {
   const descendants = (id: string): string[] => [id, ...folders.filter((f) => f.parentId === id).flatMap((f) => descendants(f.id))];
   const inCollection = (paper: PaperView) => {
     switch (query.collection.kind) {
@@ -91,6 +92,8 @@ export function querySample(papers: PaperView[], folders: FolderView[], query: L
         return true;
       case 'recent':
         return Boolean(paper.lastReadAt);
+      case 'starred':
+        return paper.starred;
       case 'unfiled':
         return paper.folderId === null;
       case 'folder':
@@ -111,10 +114,9 @@ export function querySample(papers: PaperView[], folders: FolderView[], query: L
     };
     return query.fields.some((field) => haystacks[field]?.toLowerCase().includes(text));
   };
-  const matchesStar = (paper: PaperView) => !query.starredOnly || paper.starred;
   const matchesTags = (paper: PaperView) => query.tagIds.length === 0 || paper.tagIds.some((id) => query.tagIds.includes(id));
 
-  const filtered = papers.filter((p) => inCollection(p) && matchesText(p) && matchesStar(p) && matchesTags(p));
+  const filtered = papers.filter((p) => inCollection(p) && matchesText(p) && matchesTags(p));
   const sortKey = (paper: PaperView): string | number => {
     switch (query.sort.column) {
       case 'title':
@@ -143,6 +145,5 @@ export function querySample(papers: PaperView[], folders: FolderView[], query: L
     const order = x < y ? -1 : x > y ? 1 : 0;
     return query.sort.direction === 'asc' ? order : -order;
   });
-  const start = (query.page - 1) * query.pageSize;
-  return { total: sorted.length, items: sorted.slice(start, start + query.pageSize) };
+  return { total: sorted.length, items: sorted.slice(0, limit) };
 }

@@ -12,22 +12,27 @@ export const columnLabels: Record<ColumnId, string> = {
   pages: '页数',
 };
 
-/** Columns the reader can hide; the star and title are always shown. */
+/** Columns the reader can hide; the title and star are always shown. */
 export const optionalColumns: ColumnId[] = ['authors', 'year', 'venue', 'addedAt', 'lastReadAt', 'tags', 'pages'];
 
 export const defaultVisibleColumns: ColumnId[] = ['authors', 'year', 'addedAt'];
 
-export const columnDefaults: Record<ColumnId, { width: number; min: number; align?: 'end' }> = {
-  starred: { width: 40, min: 40 },
-  title: { width: 360, min: 200 },
-  authors: { width: 160, min: 100 },
-  year: { width: 64, min: 56, align: 'end' },
+/** Fixed widths for every column but the title, which takes the rest. */
+export const columnDefaults: Record<ColumnId, { width: number; min: number }> = {
+  starred: { width: 44, min: 44 },
+  title: { width: 360, min: 220 },
+  authors: { width: 168, min: 100 },
+  year: { width: 72, min: 64 },
   venue: { width: 180, min: 100 },
-  addedAt: { width: 104, min: 88, align: 'end' },
-  lastReadAt: { width: 104, min: 88, align: 'end' },
+  addedAt: { width: 112, min: 96 },
+  lastReadAt: { width: 112, min: 96 },
   tags: { width: 150, min: 90 },
-  pages: { width: 64, min: 56, align: 'end' },
+  pages: { width: 64, min: 56 },
 };
+
+/** Starred papers, newer dates and years come first on the first click. */
+export const firstDirection = (column: ColumnId): 'asc' | 'desc' =>
+  column === 'starred' || column === 'year' || column === 'addedAt' || column === 'lastReadAt' ? 'desc' : 'asc';
 
 /** Dates in the list: "今天", "昨天", else "2026-10-21". */
 export function formatDate(iso: string | undefined, now = new Date()): string {

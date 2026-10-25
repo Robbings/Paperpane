@@ -87,7 +87,8 @@ function InlineField({
     }
   };
   if (multiline) {
-    return <TextArea label={label} value={draft} onChange={setDraft} onBlur={commit} rows={2} maxRows={10} placeholder={placeholder} />;
+    // Capped so a very long abstract scrolls inside the field instead of pushing everything else away.
+    return <TextArea label={label} value={draft} onChange={setDraft} onBlur={commit} rows={2} maxRows={8} placeholder={placeholder} />;
   }
   return (
     <label className={variant === 'title' ? 'pp-lib-inline pp-lib-inline--title' : 'pp-lib-inline'}>

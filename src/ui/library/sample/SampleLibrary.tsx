@@ -6,6 +6,8 @@ import type { CollectionCounts } from '../LibrarySidebar';
 import type { FolderView, LibraryQuery, LibraryViewPreferences, PaperView, TagView } from '../types';
 import { querySample, sampleFolders, samplePapers, sampleTags } from './libraryData';
 
+const CHUNK = 12;
+
 /** 示例接线：用示例数据驱动文献库界面。所有修改只存在于当前页面，刷新即恢复。 */
 export function SampleLibrary() {
   const [papers, setPapers] = useState<PaperView[]>(samplePapers);
@@ -15,21 +17,21 @@ export function SampleLibrary() {
     collection: { kind: 'all' },
     text: '',
     fields: ['title', 'authors', 'abstract', 'venue', 'note', 'body', 'summary'],
-    starredOnly: false,
     tagIds: [],
     sort: { column: 'addedAt', direction: 'desc' },
-    page: 1,
-    pageSize: 20,
   });
+  // Loaded in chunks as the list scrolls, as the logic layer would page through the database.
+  const [limit, setLimit] = useState(CHUNK);
   const [prefs, setPrefs] = useState<LibraryViewPreferences>({ mode: 'compact', visibleColumns: defaultVisibleColumns, columnWidths: {} });
 
-  const { items, total } = useMemo(() => querySample(papers, folders, query), [papers, folders, query]);
+  const { items, total } = useMemo(() => querySample(papers, folders, query, limit), [papers, folders, query, limit]);
 
   const counts = useMemo<CollectionCounts>(() => {
     const within = (folderId: string): string[] => [folderId, ...folders.filter((f) => f.parentId === folderId).flatMap((f) => within(f.id))];
     return {
       all: papers.length,
       recent: papers.filter((p) => p.lastReadAt).length,
+      starred: papers.filter((p) => p.starred).length,
       unfiled: papers.filter((p) => p.folderId === null).length,
       folders: Object.fromEntries(folders.map((f) => [f.id, papers.filter((p) => p.folderId !== null && within(f.id).includes(p.folderId)).length])),
     };
@@ -52,12 +54,16 @@ export function SampleLibrary() {
       <LibraryView
         papers={items}
         total={total}
+        onLoadMore={() => setLimit((current) => current + CHUNK)}
         paperById={(id) => papers.find((p) => p.id === id)}
         folders={folders}
         tags={tags}
         counts={counts}
         query={query}
-        onQuery={(patch) => setQuery((current) => ({ ...current, ...patch }))}
+        onQuery={(patch) => {
+          setQuery((current) => ({ ...current, ...patch }));
+          setLimit(CHUNK);
+        }}
         prefs={prefs}
         onPrefs={(patch) => setPrefs((current) => ({ ...current, ...patch }))}
         onOpen={(id, newTab) => {

@@ -17,6 +17,8 @@ interface MenuProps {
   align?: 'start' | 'end';
   /** The button that toggles the menu; pressing it is not an outside click. */
   triggerRef?: RefObject<HTMLElement | null>;
+  /** Keep the menu open after toggling a checkable item, for picking several. */
+  multiple?: boolean;
   onSelect: (id: string) => void;
   onClose: () => void;
 }
@@ -24,7 +26,7 @@ interface MenuProps {
 const EDGE = 8;
 
 /** A glass popover menu rendered in a portal, clamped to the window. */
-export function Menu({ label, entries, anchor, align = 'start', triggerRef, onSelect, onClose }: MenuProps) {
+export function Menu({ label, entries, anchor, align = 'start', triggerRef, multiple, onSelect, onClose }: MenuProps) {
   const ref = useRef<HTMLDivElement>(null);
   const [position, setPosition] = useState<{ top: number; left: number } | null>(null);
 
@@ -107,7 +109,7 @@ export function Menu({ label, entries, anchor, align = 'start', triggerRef, onSe
             className="pp-menu__item"
             onClick={() => {
               onSelect(entry.id);
-              onClose();
+              if (!(multiple && entry.checked !== undefined)) onClose();
             }}
           >
             <span className="pp-menu__lead" aria-hidden="true">

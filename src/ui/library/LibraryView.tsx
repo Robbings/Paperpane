@@ -1,6 +1,7 @@
 import { useMemo, useRef, useState, type DragEvent } from 'react';
-import { Button, Dialog, EmptyState, GlassSurface, Icon, IconButton, Menu, Pagination, type MenuEntry, type PageSize } from '@/ui/components';
-import { defaultVisibleColumns } from './columns';
+import { Button, Dialog, EmptyState, GlassSurface, Icon, IconButton, Menu, type MenuEntry } from '@/ui/components';
+import { useViewport } from '@/ui/reader/useViewport';
+import { defaultVisibleColumns, firstDirection } from './columns';
 import { LibrarySidebar, type CollectionCounts } from './LibrarySidebar';
 import { LibraryTable } from './LibraryTable';
 import { LibraryToolbar, type ImportKind } from './LibraryToolbar';
@@ -9,9 +10,11 @@ import type { ColumnId, FolderView, LibraryQuery, LibraryViewPreferences, PaperV
 import './library.css';
 
 export interface LibraryViewProps {
-  /** The current page of results. */
+  /** Results loaded so far, in order; the list asks for more as it scrolls. */
   papers: readonly PaperView[];
+  /** All results for the query. */
   total: number;
+  onLoadMore: () => void;
   /** Looks up any paper by id (for the detail pane across pages). */
   paperById: (id: string) => PaperView | undefined;
   folders: readonly FolderView[];
@@ -39,6 +42,12 @@ export interface LibraryViewProps {
 
 type BatchMenu = 'tag' | 'move' | 'export' | null;
 
+const GAP = 10;
+const SIDEBAR_WIDTH = 232;
+const DETAIL_WIDTH = 320;
+/** Narrower than this, an open pane floats over the list instead of squeezing it. */
+const LIST_MIN = 480;
+
 export function LibraryView(props: LibraryViewProps) {
   const { papers, total, folders, tags, counts, query, prefs } = props;
   const [selectedIds, setSelectedIds] = useState<string[]>([]);
@@ -50,6 +59,16 @@ export function LibraryView(props: LibraryViewProps) {
   const dragDepth = useRef(0);
   const batchRefs = { tag: useRef<HTMLButtonElement>(null), move: useRef<HTMLButtonElement>(null), export: useRef<HTMLButtonElement>(null) };
 
+  const { width } = useViewport();
+
+  // Panes follow the window width until the reader toggles them.
+  const sidebarOpen = prefs.sidebarOpen ?? width >= 920;
+  const detailOpen = prefs.detailOpen ?? width >= 1200;
+  const roomFor = (...panes: number[]) => width - 2 * GAP - panes.reduce((sum, pane) => sum + pane + GAP, 0);
+  const sidebarDocked = sidebarOpen && roomFor(SIDEBAR_WIDTH) >= LIST_MIN;
+  const detailDocked = detailOpen && roomFor(...(sidebarDocked ? [SIDEBAR_WIDTH] : []), DETAIL_WIDTH) >= LIST_MIN;
+  const paneState = (open: boolean, docked: boolean) => (docked ? 'docked' : open ? 'floating' : 'closed');
+
   const tagsById = useMemo(() => new Map(tags.map((tag) => [tag.id, tag])), [tags]);
   const active = activeId ? (props.paperById(activeId) ?? null) : null;
   const currentFolder = query.collection.kind === 'folder' ? query.collection.folderId : null;
@@ -57,23 +76,24 @@ export function LibraryView(props: LibraryViewProps) {
   // Changing what is listed clears the selection.
   const changeQuery = (patch: Partial<LibraryQuery>) => {
     setSelectedIds([]);
-    props.onQuery({ ...patch, page: patch.page ?? 1 });
+    props.onQuery(patch);
   };
 
   const heading =
     query.collection.kind === 'all' ? '全部论文'
     : query.collection.kind === 'recent' ? '最近阅读'
+    : query.collection.kind === 'starred' ? '已标星'
     : query.collection.kind === 'unfiled' ? '未分类'
     : folderPath(folders, query.collection.folderId);
 
-  const filtering = query.text.trim() !== '' || query.starredOnly || query.tagIds.length > 0;
+  const filtering = query.text.trim() !== '' || query.tagIds.length > 0;
   const empty = filtering ? (
     <EmptyState
       icon="search"
       title="没有找到符合条件的论文"
       description="换个关键词，扩大搜索范围，或清除筛选条件。"
       actions={
-        <Button size="sm" onClick={() => changeQuery({ text: '', starredOnly: false, tagIds: [] })}>
+        <Button size="sm" onClick={() => changeQuery({ text: '', tagIds: [] })}>
           清除筛选
         </Button>
       }
@@ -82,6 +102,8 @@ export function LibraryView(props: LibraryViewProps) {
     <EmptyState icon="folder" title="这个文件夹还是空的" description="把论文从列表拖到左侧文件夹，或在详情里选择文件夹。" />
   ) : query.collection.kind === 'recent' ? (
     <EmptyState icon="clock" title="还没有阅读记录" description="打开过的论文会出现在这里。" />
+  ) : query.collection.kind === 'starred' ? (
+    <EmptyState icon="star" title="还没有标星的论文" description="点论文标题旁的星标，把常看的论文放到这里。" />
   ) : (
     <EmptyState icon="library" title="文献库还是空的" description="导入 PDF 或书目文件，或在阅读器里点「收藏」把正在读的论文加进来。" />
   );
@@ -127,6 +149,7 @@ export function LibraryView(props: LibraryViewProps) {
         props.onImport('pdf', files, currentFolder);
       }}
     >
+      <div className="pp-lib-pane" data-side="left" data-state={paneState(sidebarOpen, sidebarDocked)} style={{ ['--pp-pane-w' as string]: `${SIDEBAR_WIDTH}px` }} inert={!sidebarOpen}>
       <LibrarySidebar
         collection={query.collection}
         onCollection={(collection) => changeQuery({ collection })}
@@ -150,26 +173,26 @@ export function LibraryView(props: LibraryViewProps) {
         }}
         onMovePapers={props.onMovePapers}
       />
+      </div>
 
       <main className="pp-lib-main">
-        <LibraryToolbar
-          text={query.text}
-          onText={(text) => changeQuery({ text })}
-          fields={query.fields}
-          onFields={(fields) => changeQuery({ fields })}
-          starredOnly={query.starredOnly}
-          onStarredOnly={(starredOnly) => changeQuery({ starredOnly })}
-          prefs={prefs}
-          onPrefs={props.onPrefs}
-          onResetColumns={() => props.onPrefs({ visibleColumns: defaultVisibleColumns, columnWidths: {} })}
-          onImport={(kind, files) => props.onImport(kind, files, currentFolder)}
-        />
-
         <section className="pp-lib-list" aria-label={heading}>
-          <header className="pp-lib-list__head">
-            <h1>{heading}</h1>
-            <span className="pp-lib-list__count">{total} 篇</span>
-          </header>
+          <LibraryToolbar
+            heading={heading}
+            count={total}
+            text={query.text}
+            onText={(text) => changeQuery({ text })}
+            fields={query.fields}
+            onFields={(fields) => changeQuery({ fields })}
+            prefs={prefs}
+            onPrefs={props.onPrefs}
+            onResetColumns={() => props.onPrefs({ visibleColumns: defaultVisibleColumns, columnWidths: {} })}
+            onImport={(kind, files) => props.onImport(kind, files, currentFolder)}
+            sidebarOpen={sidebarOpen}
+            onToggleSidebar={() => props.onPrefs({ sidebarOpen: !sidebarOpen })}
+            detailOpen={detailOpen}
+            onToggleDetail={() => props.onPrefs({ detailOpen: !detailOpen })}
+          />
           <LibraryTable
             papers={papers}
             tagsById={tagsById}
@@ -179,8 +202,10 @@ export function LibraryView(props: LibraryViewProps) {
             sort={query.sort}
             onSort={(column) =>
               changeQuery({
-                sort: { column, direction: query.sort.column === column && query.sort.direction === 'asc' ? 'desc' : 'asc' },
-                page: query.page,
+                sort: {
+                  column,
+                  direction: query.sort.column !== column ? firstDirection(column) : query.sort.direction === 'asc' ? 'desc' : 'asc',
+                },
               })
             }
             mode={prefs.mode}
@@ -193,18 +218,9 @@ export function LibraryView(props: LibraryViewProps) {
             onOpen={props.onOpen}
             onToggleStar={(id, on) => props.onToggleStar([id], on)}
             empty={empty}
+            hasMore={papers.length < total}
+            onLoadMore={props.onLoadMore}
           />
-          {total > 0 && (
-            <footer className="pp-lib-list__foot">
-              <Pagination
-                page={query.page}
-                pageSize={query.pageSize}
-                total={total}
-                onPage={(page) => changeQuery({ page })}
-                onPageSize={(pageSize: PageSize) => changeQuery({ pageSize })}
-              />
-            </footer>
-          )}
 
           {selectedIds.length > 1 && (
             <GlassSurface tone="bar" radius="pill" className="pp-lib-batch" role="toolbar" aria-label="批量操作">
@@ -230,6 +246,7 @@ export function LibraryView(props: LibraryViewProps) {
         </section>
       </main>
 
+      <div className="pp-lib-pane" data-side="right" data-state={paneState(detailOpen, detailDocked)} style={{ ['--pp-pane-w' as string]: `${DETAIL_WIDTH}px` }} inert={!detailOpen}>
       <PaperDetail
         paper={active}
         selectionCount={selectedIds.length}
@@ -243,6 +260,7 @@ export function LibraryView(props: LibraryViewProps) {
         onOpen={props.onOpen}
         onRemove={(id) => setConfirmRemove([id])}
       />
+      </div>
 
       {batchMenu && (
         <Menu

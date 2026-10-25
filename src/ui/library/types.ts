@@ -41,6 +41,7 @@ export interface TagView {
 export type Collection =
   | { kind: 'all' }
   | { kind: 'recent' }
+  | { kind: 'starred' }
   | { kind: 'unfiled' }
   | { kind: 'folder'; folderId: string };
 
@@ -52,17 +53,16 @@ export interface LibraryQuery {
   collection: Collection;
   text: string;
   fields: SearchField[];
-  /** Only starred papers. */
-  starredOnly: boolean;
   /** A paper matches when it has any of these tags. */
   tagIds: string[];
   sort: { column: ColumnId; direction: 'asc' | 'desc' };
-  page: number;
-  pageSize: 10 | 20 | 50 | 100;
 }
 
 export interface LibraryViewPreferences {
   mode: 'compact' | 'detailed';
   visibleColumns: ColumnId[];
   columnWidths: Partial<Record<ColumnId, number>>;
+  /** Side panes; undefined follows the window width. */
+  sidebarOpen?: boolean;
+  detailOpen?: boolean;
 }

@@ -26,7 +26,7 @@
 | `Segmented` | 2–4 个互斥选项 | `options`、`value`、`onChange`、`label`、`stretch` |
 | `Tooltip` | 浮层提示 | `label`、`shortcut`、`placement`、`labelsChild`（子元素已用同样文字做名称时设为 true） |
 | `Popover` | 锚定在某个元素上的非模态浮层（引用预览、小表单） | `anchorRef`、`open`、`onClose`、`label`、`placement`、`width` |
-| `Menu` | 下拉 / 右键菜单 | `entries`（普通项、勾选项、分隔线）、`anchor`（坐标）、`align`、`triggerRef`、`onSelect`、`onClose` |
+| `Menu` | 下拉 / 右键菜单 | `entries`（普通项、勾选项、分隔线）、`anchor`（坐标）、`align`、`triggerRef`、`onSelect`、`onClose`；`multiple`：点勾选项后菜单不关，可以连续勾选 |
 | `Dialog` | 模态对话框 | `open`、`onClose`、`title`、`description`、`footer`、`size`、`dismissible` |
 | `toast` / `Toaster` | 页面顶部的轻提示 | `toast.show({ message, tone, action, duration })`；每个页面渲染一个 `<Toaster />` |
 | `TextField` / `TextArea` | 输入框 / 自动长高的多行输入 | `label`、`value`、`onChange(value)`、`description`、`error`、`icon`、`clearable`；`TextArea` 另有 `maxRows`、`maxLength` |
@@ -42,7 +42,7 @@
 | `Tree` | 可展开、可拖动的层级列表（文件夹） | `nodes`、`selectedId`、`expandedIds`、`onToggle`；改名用 `renamingId` / `onRename`；拖动用 `onMove`、`canMove`；接收外部拖入用 `acceptsExternal`、`onExternalDrop` |
 | `TagInput` | 标签输入：已选标签 + 联想 | `selected`、`options`、`onAdd({ id?, label })`（没有 id 表示新建）、`onRemove(id)` |
 | `StarToggle` | 星标开关 | `starred`、`onChange`（不传则只显示） |
-| `Pagination` | 分页与每页条数 | `page`（从 1 开始）、`pageSize`: 10 / 20 / 50 / 100、`total`、`onPage`、`onPageSize` |
+| `ScrollArea` | 纵向滚动区，用细的浮动滚动条代替系统滚动条 | `viewportClassName`（滚动元素的类名，如限高）、`viewportRef`、`onScroll`；其余属性加在滚动元素上 |
 
 ## 需要逻辑层配合的几个组件
 
@@ -59,7 +59,7 @@ toast.show({
 toast.show({ message: '翻译失败：请求超时', tone: 'error', action: { label: '重试', onAction: retry } });
 ```
 
-- `tone`: neutral / success / warning / error。错误默认不自动消失，其余 3.5 秒（带操作时 6 秒），鼠标停留时暂停。
+- `tone`: neutral / success / warning / error。错误默认不自动消失；其余停留 1.8 秒（带操作时 4 秒）后用 0.9 秒渐隐。鼠标移上去或聚焦时取消渐隐，离开后再停留片刻。`duration` 是开始渐隐前的毫秒数。
 - 最多同时显示 3 条，新的会挤掉最旧的。
 - 适合"做完了"或"出错了可以重试"。需要用户做决定的事用 `Dialog`，持续存在的状态（同步失败、未配置）放在对应界面里，不要只发一条提示。
 
@@ -103,7 +103,7 @@ toast.show({ message: '翻译失败：请求超时', tone: 'error', action: { la
 | `onNavigate`、`onZoom` | 跳页、缩放 |
 | `onHighlight(color, selection)`、`onSelectionAction(action, selection)` | 选区菜单的操作；`selection` 是选中时的快照，锚点由逻辑层生成 |
 | `onLocateAnnotation(id)`、`onTool(tool)` | 定位批注、工具栏按钮 |
-| `library` | 可选。传入后工具栏标题旁出现收藏按钮，侧栏多一个「文献」页：`currentPaperId`、`folders`、`papers`、`recent`、`saved`、`entry`、`tags`，以及 `onSave(draft)`、`onRemove`、`onOpenPaper(id, newTab)`、`onImport(files)`、`onOpenLibrary` |
+| `library` | 可选。传入后工具栏标题旁出现收藏按钮，侧栏多一个「文献」页：`currentPaperId`、`folders`、`papers`、`recent`、`saved`、`entry`、`tags`，以及 `onSave(draft)`、`onRemove`、`onCreateFolder(parentId, name)`（返回新文件夹 id）、`onOpenPaper(id, newTab)`、`onImport(files)`、`onOpenLibrary` |
 
 论文区的滚动容器是 `.pp-reader__paper`；外壳在它上面监听选区并显示选区菜单、绘制浮动滚动条。
 
@@ -111,8 +111,9 @@ toast.show({ message: '翻译失败：请求超时', tone: 'error', action: { la
 
 位于 `src/ui/library/LibraryView.tsx`，当前由 `src/ui/library/sample/SampleLibrary.tsx` 用示例数据驱动（`library.html`）。视图模型在 `src/ui/library/types.ts`。
 
-- 查询状态是一个 `LibraryQuery`（集合、搜索文字与范围、只看星标、标签、排序、分页），界面通过 `onQuery(patch)` 修改，逻辑层查询后传回当前页 `papers` 和 `total`。
-- 列表显示方式（简洁 / 详细、显示哪些列、列宽）是 `LibraryViewPreferences`，通过 `onPrefs(patch)` 由逻辑层保存为偏好。
+- 查询状态是一个 `LibraryQuery`（集合、搜索文字与范围、标签、排序），界面通过 `onQuery(patch)` 修改。集合里有「已标星」。
+- 列表连续滚动，不分页：逻辑层先传回一批 `papers` 和总数 `total`，列表滚到接近底部时调用 `onLoadMore()`，再把下一批追加到 `papers`。查询变化时从头加载。
+- 列表显示方式（简洁 / 详细、显示哪些列、列宽）和左右两栏是否显示是 `LibraryViewPreferences`，通过 `onPrefs(patch)` 由逻辑层保存为偏好。`sidebarOpen` / `detailOpen` 不设时按窗口宽度自动决定。
 - 其余都是动作回调：标星、改字段、标签、移动、移出、文件夹增改删、导入（PDF / CSL JSON / BibTeX）、导出引用。`onCreateFolder` 需要同步返回新文件夹的 id，界面随即进入改名。
 - 拖动论文时 `dataTransfer` 里是 `application/x-paperpane-papers`（id 数组的 JSON），见 `src/ui/library/dragTypes.ts`。
 

@@ -6,6 +6,8 @@ type IconPath = string | { d: string; fill: string };
 const paths = {
   sidebar: 'M4 5h16v14H4z M9.5 5v14',
   sidebarShown: { d: 'M4 5h16v14H4z M9.5 5v14', fill: 'M4 5h5.5v14H4z' },
+  paneRight: 'M4 5h16v14H4z M14.5 5v14',
+  paneRightShown: { d: 'M4 5h16v14H4z M14.5 5v14', fill: 'M14.5 5H20v14h-5.5z' },
   search: 'M10.5 17a6.5 6.5 0 1 0 0-13 6.5 6.5 0 0 0 0 13z M15.5 15.5 20 20',
   minus: 'M7 12h10',
   plus: 'M12 7v10 M7 12h10',

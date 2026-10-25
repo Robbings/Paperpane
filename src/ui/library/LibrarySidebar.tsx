@@ -6,6 +6,7 @@ import type { Collection, FolderView, TagView } from './types';
 export interface CollectionCounts {
   all: number;
   recent: number;
+  starred: number;
   unfiled: number;
   /** Papers in each folder, including its subfolders. */
   folders: Record<string, number>;
@@ -30,9 +31,10 @@ interface LibrarySidebarProps {
   onMovePapers: (paperIds: string[], folderId: string | null) => void;
 }
 
-const fixed: { kind: 'all' | 'recent' | 'unfiled'; label: string; icon: IconName }[] = [
+const fixed: { kind: 'all' | 'recent' | 'starred' | 'unfiled'; label: string; icon: IconName }[] = [
   { kind: 'all', label: '全部论文', icon: 'library' },
   { kind: 'recent', label: '最近阅读', icon: 'clock' },
+  { kind: 'starred', label: '已标星', icon: 'star' },
   { kind: 'unfiled', label: '未分类', icon: 'inbox' },
 ];
 

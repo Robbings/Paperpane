@@ -1,5 +1,5 @@
 import { useRef, useState, type MouseEvent } from 'react';
-import { Button, Icon, IconButton } from '@/ui/components';
+import { Button, Icon, IconButton, ScrollArea } from '@/ui/components';
 import './readerLibrary.css';
 import type { FolderView, PaperView } from '@/ui/library/types';
 
@@ -21,7 +21,8 @@ interface ReaderLibraryNavProps extends ReaderLibraryData {
 }
 
 const PAGE = 20;
-const RECENT = 5;
+/** Recent papers kept in the list; about four show at once and the rest scroll. */
+const RECENT = 20;
 
 /** The library inside the reader sidebar: folders as a drill-down list, starting at the open paper's folder. */
 export function ReaderLibraryNav({ currentPaperId, folders, papers, recent, onOpenPaper, onImport, onOpenLibrary }: ReaderLibraryNavProps) {
@@ -74,11 +75,13 @@ export function ReaderLibraryNav({ currentPaperId, folders, papers, recent, onOp
         <span className="pp-rlib__title">{folder?.name ?? '文献库'}</span>
       </div>
 
-      <div className="pp-sidebar__scroll">
+      <ScrollArea className="pp-rlib__scroll" viewportClassName="pp-rlib__viewport">
         {folderId === null && recent.length > 0 && (
           <section aria-label="最近阅读" className="pp-rlib__section">
             <h3 className="pp-rlib__label">最近阅读</h3>
-            <ul className="pp-rlib__list">{recent.slice(0, RECENT).map(paperRow)}</ul>
+            <ScrollArea className="pp-rlib__recent">
+              <ul className="pp-rlib__list">{recent.slice(0, RECENT).map(paperRow)}</ul>
+            </ScrollArea>
           </section>
         )}
 
@@ -103,7 +106,7 @@ export function ReaderLibraryNav({ currentPaperId, folders, papers, recent, onOp
             </Button>
           )}
         </section>
-      </div>
+      </ScrollArea>
 
       <div className="pp-rlib__foot">
         <Button size="sm" icon="upload" onClick={() => fileRef.current?.click()}>

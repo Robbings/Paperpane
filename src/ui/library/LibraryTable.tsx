@@ -1,5 +1,5 @@
-import { useRef, type KeyboardEvent, type MouseEvent, type PointerEvent, type ReactNode } from 'react';
-import { Badge, Icon, StarToggle } from '@/ui/components';
+import { useEffect, useRef, useState, type KeyboardEvent, type MouseEvent, type PointerEvent, type ReactNode } from 'react';
+import { Badge, Icon, ScrollArea, StarToggle } from '@/ui/components';
 import { authorLine, columnDefaults, columnLabels, formatDate } from './columns';
 import { PAPER_DRAG_TYPE } from './dragTypes';
 import type { ColumnId, LibraryQuery, PaperView, TagView } from './types';
@@ -7,7 +7,7 @@ import type { ColumnId, LibraryQuery, PaperView, TagView } from './types';
 interface LibraryTableProps {
   papers: readonly PaperView[];
   tagsById: ReadonlyMap<string, TagView>;
-  /** Visible optional columns, in order; star and title always come first. */
+  /** Visible optional columns, in order, after the title and star. Columns that do not fit the width are left out. */
   columns: readonly ColumnId[];
   widths: Partial<Record<ColumnId, number>>;
   onWidth: (column: ColumnId, width: number) => void;
@@ -22,21 +22,55 @@ interface LibraryTableProps {
   onToggleStar: (id: string, starred: boolean) => void;
   /** Shown instead of rows when the list is empty. */
   empty: ReactNode;
+  /** More results exist beyond those loaded; scrolling near the end asks for them. */
+  hasMore: boolean;
+  onLoadMore: () => void;
 }
 
+const CHECK = 40;
+/** Horizontal padding of the scrolling area. */
+const GUTTER = 24;
+const ABSTRACT_MAX = 600;
+
+/** Very long abstracts (e.g. a whole paper picked up by mistake) are cut before the line clamp. */
+const clip = (text: string) => (text.length > ABSTRACT_MAX ? `${text.slice(0, ABSTRACT_MAX).trimEnd()}…` : text);
+
 export function LibraryTable(props: LibraryTableProps) {
-  const { papers, tagsById, widths, sort, mode, selectedIds, activeId } = props;
-  const all: ColumnId[] = ['starred', 'title', ...props.columns];
+  const { papers, tagsById, widths, sort, mode, selectedIds, activeId, hasMore, onLoadMore } = props;
   const anchor = useRef<string | null>(activeId);
   const bodyRef = useRef<HTMLTableSectionElement>(null);
+  const viewport = useRef<HTMLDivElement>(null);
+  const [available, setAvailable] = useState(Number.POSITIVE_INFINITY);
   const selected = new Set(selectedIds);
   const ids = papers.map((p) => p.id);
   const allSelected = papers.length > 0 && ids.every((id) => selected.has(id));
   const someSelected = ids.some((id) => selected.has(id));
 
   const widthOf = (column: ColumnId) => widths[column] ?? columnDefaults[column].width;
-  // The title column takes the remaining space; below its minimum the table scrolls sideways.
-  const minTableWidth = 40 + all.reduce((sum, column) => sum + (column === 'title' ? columnDefaults.title.min : widthOf(column)), 0);
+
+  // Detailed rows carry authors, venue and year themselves; only a date column stays beside them.
+  const wanted: ColumnId[] = mode === 'detailed' ? [sort.column === 'lastReadAt' ? 'lastReadAt' : 'addedAt'] : [...props.columns];
+  // The title takes the remaining space. When the list gets narrow, columns
+  // drop from the end instead of the table scrolling sideways.
+  const needed = (columns: readonly ColumnId[]) => CHECK + widthOf('starred') + columnDefaults.title.min + columns.reduce((sum, c) => sum + widthOf(c), 0);
+  const shown = [...wanted];
+  while (shown.length > 0 && needed(shown) > available) shown.pop();
+  const all: ColumnId[] = ['title', 'starred', ...shown];
+
+  useEffect(() => {
+    const el = viewport.current;
+    if (!el) return;
+    const observer = new ResizeObserver(() => setAvailable(el.clientWidth - GUTTER));
+    observer.observe(el);
+    return () => observer.disconnect();
+  }, []);
+
+  // Load more when the end is near, and keep loading while the rows do not fill the view.
+  const maybeLoadMore = () => {
+    const el = viewport.current;
+    if (el && hasMore && el.scrollTop + el.clientHeight > el.scrollHeight - 240) onLoadMore();
+  };
+  useEffect(maybeLoadMore, [papers.length, hasMore, available]);
 
   const rangeTo = (id: string) => {
     const from = ids.indexOf(anchor.current ?? id);
@@ -111,27 +145,18 @@ export function LibraryTable(props: LibraryTableProps) {
   const cell = (paper: PaperView, column: ColumnId): ReactNode => {
     switch (column) {
       case 'starred':
-        return <StarToggle starred={paper.starred} size="sm" onChange={(on) => props.onToggleStar(paper.id, on)} />;
-      case 'title':
         return (
+          <div className="pp-lib-cell-center">
+            <StarToggle starred={paper.starred} size="sm" onChange={(on) => props.onToggleStar(paper.id, on)} />
+          </div>
+        );
+      case 'title':
+        return mode === 'detailed' ? (
+          <DetailedEntry paper={paper} tagsById={tagsById} />
+        ) : (
           <div className="pp-lib-title">
-            <span className="pp-lib-title__text">
-              {paper.title}
-              {!paper.hasPdf && (
-                <Badge tone="warn">无 PDF</Badge>
-              )}
-            </span>
-            {mode === 'detailed' && (
-              <>
-                <span className="pp-lib-title__meta">
-                  {authorLine(paper.authors)}
-                  {paper.venue && ` · ${paper.venue}`}
-                  {paper.year && ` · ${paper.year}`}
-                </span>
-                {paper.abstract && <span className="pp-lib-title__abstract">{paper.abstract}</span>}
-                {paper.tagIds.length > 0 && <TagChips ids={paper.tagIds} tagsById={tagsById} />}
-              </>
-            )}
+            <span className="pp-lib-title__text">{paper.title}</span>
+            {!paper.hasPdf && <Badge tone="warn">无 PDF</Badge>}
           </div>
         );
       case 'authors':
@@ -152,17 +177,17 @@ export function LibraryTable(props: LibraryTableProps) {
   };
 
   return (
-    <div className="pp-lib-table__scroll" data-mode={mode}>
+    <ScrollArea className="pp-lib-table__area" viewportClassName="pp-lib-table__scroll" viewportRef={viewport} data-mode={mode} onScroll={maybeLoadMore}>
       <table
         className="pp-lib-table"
         role="grid"
         aria-label="论文列表"
         aria-multiselectable="true"
         aria-rowcount={papers.length}
-        style={{ minWidth: minTableWidth }}
+        style={{ minWidth: needed(shown) }}
       >
         <colgroup>
-          <col style={{ width: 40 }} />
+          <col style={{ width: CHECK }} />
           {all.map((column) => (
             <col key={column} style={{ width: column === 'title' ? undefined : widthOf(column) }} />
           ))}
@@ -170,6 +195,7 @@ export function LibraryTable(props: LibraryTableProps) {
         <thead>
           <tr>
             <th className="pp-lib-table__check">
+              <div className="pp-lib-cell-center">
               <span className="pp-checkbox">
                 <input
                   type="checkbox"
@@ -184,6 +210,7 @@ export function LibraryTable(props: LibraryTableProps) {
                   {allSelected ? <Icon name="check" size={12} strokeWidth={2.4} /> : someSelected && <Icon name="minus" size={12} strokeWidth={2.4} />}
                 </span>
               </span>
+              </div>
             </th>
             {all.map((column) => {
               const sorted = sort.column === column;
@@ -192,14 +219,18 @@ export function LibraryTable(props: LibraryTableProps) {
                   key={column}
                   scope="col"
                   aria-sort={sorted ? (sort.direction === 'asc' ? 'ascending' : 'descending') : undefined}
-                  data-align={columnDefaults[column].align}
                   data-column={column}
                 >
-                  <button type="button" className="pp-lib-table__sort" onClick={() => props.onSort(column)}>
-                    {column === 'starred' ? <Icon name="star" size={13} title="标星" /> : columnLabels[column]}
-                    {sorted && <Icon name="chevronDown" size={12} strokeWidth={2} className={sort.direction === 'asc' ? 'pp-lib-table__asc' : undefined} />}
+                  <button
+                    type="button"
+                    className="pp-lib-table__sort"
+                    aria-label={column === 'starred' ? '按标星排序' : undefined}
+                    onClick={() => props.onSort(column)}
+                  >
+                    {column === 'starred' ? <Icon name="star" size={15} /> : <span className="pp-lib-table__label">{columnLabels[column]}</span>}
+                    {sorted && <Icon name="chevronDown" size={11} strokeWidth={2.2} className="pp-lib-table__arrow" data-dir={sort.direction} />}
                   </button>
-                  {column !== 'starred' && (
+                  {column !== 'starred' && column !== all[all.length - 1] && (
                     <span
                       className="pp-lib-table__resize"
                       role="separator"
@@ -237,6 +268,7 @@ export function LibraryTable(props: LibraryTableProps) {
                 onKeyDown={(event) => onRowKey(event, paper.id)}
               >
                 <td className="pp-lib-table__check" onClick={(event) => event.stopPropagation()}>
+                  <div className="pp-lib-cell-center">
                   <span className="pp-checkbox">
                     <input
                       type="checkbox"
@@ -252,9 +284,10 @@ export function LibraryTable(props: LibraryTableProps) {
                       {isSelected && <Icon name="check" size={12} strokeWidth={2.4} />}
                     </span>
                   </span>
+                  </div>
                 </td>
                 {all.map((column) => (
-                  <td key={column} data-align={columnDefaults[column].align} data-column={column}>
+                  <td key={column} data-column={column}>
                     {cell(paper, column)}
                   </td>
                 ))}
@@ -264,6 +297,31 @@ export function LibraryTable(props: LibraryTableProps) {
         </tbody>
       </table>
       {papers.length === 0 && <div className="pp-lib-table__empty">{props.empty}</div>}
+    </ScrollArea>
+  );
+}
+
+/** A detailed row: title, bibliographic line, the start of the abstract, then tags and reading facts. */
+function DetailedEntry({ paper, tagsById }: { paper: PaperView; tagsById: ReadonlyMap<string, TagView> }) {
+  const meta = [authorLine(paper.authors), paper.venue, paper.year].filter(Boolean).join(' · ');
+  const facts = [
+    paper.progress !== undefined && paper.progress > 0 ? `读到 ${Math.round(paper.progress * 100)}%` : null,
+    paper.annotationCount > 0 ? `${paper.annotationCount} 条批注` : null,
+  ].filter(Boolean);
+  return (
+    <div className="pp-lib-entry">
+      <span className="pp-lib-entry__title">{paper.title}</span>
+      <span className="pp-lib-entry__meta">
+        {meta || '作者未知'}
+        {!paper.hasPdf && <Badge tone="warn">无 PDF</Badge>}
+      </span>
+      {paper.abstract && <span className="pp-lib-entry__abstract">{clip(paper.abstract)}</span>}
+      {(paper.tagIds.length > 0 || facts.length > 0) && (
+        <span className="pp-lib-entry__foot">
+          {paper.tagIds.length > 0 && <TagChips ids={paper.tagIds} tagsById={tagsById} />}
+          {facts.length > 0 && <span className="pp-lib-entry__facts">{facts.join(' · ')}</span>}
+        </span>
+      )}
     </div>
   );
 }
