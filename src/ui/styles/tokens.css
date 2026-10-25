@@ -125,7 +125,7 @@
   --pp-z-float: 100;
 }
 
-/* Touch input: larger hit targets. Layouts for touch come later (R45). */
+/* Touch input: larger hit targets. Touch-specific layouts come later. */
 @media (pointer: coarse) {
   :root {
     --pp-control-sm: 32px;

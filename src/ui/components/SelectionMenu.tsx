@@ -1,5 +1,6 @@
 import { useRef, type CSSProperties, type KeyboardEvent } from 'react';
 import { Icon, type IconName } from './Icon';
+import { Tooltip } from './Tooltip';
 import './SelectionMenu.css';
 
 export type HighlightColor = 'yellow' | 'green' | 'blue' | 'pink' | 'purple';
@@ -86,18 +87,18 @@ export function SelectionMenu({
           const isCurrent = color === currentColor;
           const name = `${colorLabels[color]}高亮${isCurrent ? '（当前）' : ''}`;
           return (
-            <button
-              key={color}
-              type="button"
-              className="pp-selmenu__swatch"
-              aria-label={name}
-              aria-pressed={currentColor ? isCurrent : undefined}
-              title={name}
-              style={dotStyle(color)}
-              onClick={() => onColor?.(color)}
-            >
-              <span className="pp-selmenu__dot" />
-            </button>
+            <Tooltip key={color} label={name} placement="top" labelsChild>
+              <button
+                type="button"
+                className="pp-selmenu__swatch"
+                aria-label={name}
+                aria-pressed={currentColor ? isCurrent : undefined}
+                style={dotStyle(color)}
+                onClick={() => onColor?.(color)}
+              >
+                <span className="pp-selmenu__dot" />
+              </button>
+            </Tooltip>
           );
         })}
       </div>
@@ -114,9 +115,11 @@ export function SelectionMenu({
       {onDelete && (
         <>
           <span className="pp-selmenu__sep" aria-hidden="true" />
-          <button type="button" className="pp-selmenu__delete" aria-label="删除高亮" title="删除高亮" onClick={onDelete}>
-            <Icon name="trash" size={16} strokeWidth={1.5} />
-          </button>
+          <Tooltip label="删除高亮" placement="top" labelsChild>
+            <button type="button" className="pp-selmenu__delete" aria-label="删除高亮" onClick={onDelete}>
+              <Icon name="trash" size={16} strokeWidth={1.5} />
+            </button>
+          </Tooltip>
         </>
       )}
     </div>

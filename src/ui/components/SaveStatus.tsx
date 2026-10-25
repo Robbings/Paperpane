@@ -1,6 +1,7 @@
+import { Tooltip } from './Tooltip';
 import './SaveStatus.css';
 
-// Display vocabulary from docs/plan/00-breakdown.md §5. These are UI-side
+// Shared status vocabulary for local save and sync. These are UI-side
 // names only; the shared types will come from src/contracts once agreed.
 export type LocalSaveState = 'unmodified' | 'editing' | 'saving' | 'saved' | 'failed';
 export type SyncState = 'unconfigured' | 'pending' | 'syncing' | 'synced' | 'failed' | 'conflict';
@@ -37,13 +38,8 @@ const simulatedPart = { text: '演示内容，不会保存', tone: 'warn' as Ton
 /** Local save and remote sync are always shown separately; unsynced work is never called backed up. */
 export function SaveStatus({ local, sync, simulated, className }: SaveStatusProps) {
   const parts = simulated ? [simulatedPart] : [localText[local], syncText[sync]].filter((part) => part !== null);
-  return (
-    <span
-      role="status"
-      aria-live="polite"
-      className={className ? `pp-status ${className}` : 'pp-status'}
-      title={simulated ? '这是示例数据，只存在于当前页面，刷新后会丢失。' : undefined}
-    >
+  const status = (
+    <span role="status" aria-live="polite" className={className ? `pp-status ${className}` : 'pp-status'} tabIndex={simulated ? 0 : undefined}>
       {parts.map((part, index) => (
         <span key={part.text} className="pp-status__part">
           {index > 0 && (
@@ -57,4 +53,5 @@ export function SaveStatus({ local, sync, simulated, className }: SaveStatusProp
       ))}
     </span>
   );
+  return simulated ? <Tooltip label="这是示例数据，只存在于当前页面，刷新后会丢失。" placement="top">{status}</Tooltip> : status;
 }

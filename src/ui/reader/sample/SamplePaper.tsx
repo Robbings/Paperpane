@@ -79,7 +79,7 @@ export function SamplePaper({ pageCount, zoomPercent }: SamplePaperProps) {
               </div>
             ))}
           </div>
-          <span className="pp-sample__folio">{offset + 2}</span>
+          <span className="pp-sample__page-number">{offset + 2}</span>
         </article>
       ))}
     </div>
