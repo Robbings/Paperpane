@@ -10,7 +10,7 @@ interface LibraryTableProps {
   /** Visible optional columns, in order, after the title and star. Columns that do not fit the width are left out. */
   columns: readonly ColumnId[];
   widths: Partial<Record<ColumnId, number>>;
-  onWidth: (column: ColumnId, width: number) => void;
+  onWidths: (patch: Partial<Record<ColumnId, number>>) => void;
   sort: LibraryQuery['sort'];
   onSort: (column: ColumnId) => void;
   mode: 'compact' | 'detailed';
@@ -121,21 +121,40 @@ export function LibraryTable(props: LibraryTableProps) {
     }
   };
 
-  // Column resize: drag the right edge of a header cell.
+  // Column resize: the edge between a column and the next one follows the
+  // pointer. The next column gives or takes the space, so nothing else moves;
+  // the edge after the star column trades space with the title instead.
+  const [resizing, setResizing] = useState<ColumnId | null>(null);
   const startResize = (event: PointerEvent<HTMLSpanElement>, column: ColumnId) => {
+    const next = all[all.indexOf(column) + 1];
+    if (!next || event.button !== 0) return;
     event.preventDefault();
     event.stopPropagation();
     const startX = event.clientX;
-    const startWidth = widthOf(column);
+    const startLeft = widthOf(column);
+    const startNext = widthOf(next);
+    const titleRoom = (bodyRef.current?.closest('table')?.querySelector<HTMLElement>('th[data-column="title"]')?.offsetWidth ?? 0) - columnDefaults.title.min;
+    const growsLeft = column !== 'starred';
+    // How far the edge may travel: the next column keeps its minimum on the right;
+    // on the left, the column (or the title) keeps its own.
+    const maxRight = startNext - columnDefaults[next].min;
+    const maxLeft = growsLeft ? startLeft - columnDefaults[column].min : Math.max(0, titleRoom);
     const target = event.currentTarget;
     target.setPointerCapture(event.pointerId);
     document.body.style.cursor = 'col-resize';
-    const move = (e: globalThis.PointerEvent) => props.onWidth(column, Math.max(columnDefaults[column].min, Math.round(startWidth + e.clientX - startX)));
+    document.body.style.userSelect = 'none';
+    setResizing(column);
+    const move = (e: globalThis.PointerEvent) => {
+      const delta = Math.round(Math.min(maxRight, Math.max(-maxLeft, e.clientX - startX)));
+      props.onWidths(growsLeft ? { [column]: startLeft + delta, [next]: startNext - delta } : { [next]: startNext - delta });
+    };
     const end = () => {
       target.removeEventListener('pointermove', move);
       target.removeEventListener('pointerup', end);
       target.removeEventListener('pointercancel', end);
       document.body.style.removeProperty('cursor');
+      document.body.style.removeProperty('user-select');
+      setResizing(null);
     };
     target.addEventListener('pointermove', move);
     target.addEventListener('pointerup', end);
@@ -184,6 +203,7 @@ export function LibraryTable(props: LibraryTableProps) {
         aria-label="论文列表"
         aria-multiselectable="true"
         aria-rowcount={papers.length}
+        data-resizing={resizing ? 'true' : undefined}
         style={{ minWidth: needed(shown) }}
       >
         <colgroup>
@@ -227,15 +247,16 @@ export function LibraryTable(props: LibraryTableProps) {
                     aria-label={column === 'starred' ? '按标星排序' : undefined}
                     onClick={() => props.onSort(column)}
                   >
-                    {column === 'starred' ? <Icon name="star" size={15} /> : <span className="pp-lib-table__label">{columnLabels[column]}</span>}
+                    {column === 'starred' ? <Icon name="star" size={16} /> : <span className="pp-lib-table__label">{columnLabels[column]}</span>}
                     {sorted && <Icon name="chevronDown" size={11} strokeWidth={2.2} className="pp-lib-table__arrow" data-dir={sort.direction} />}
                   </button>
-                  {column !== 'starred' && column !== all[all.length - 1] && (
+                  {column !== 'title' && column !== all[all.length - 1] && (
                     <span
                       className="pp-lib-table__resize"
+                      data-active={resizing === column ? 'true' : undefined}
                       role="separator"
                       aria-orientation="vertical"
-                      aria-label={`调整「${columnLabels[column]}」列宽`}
+                      aria-label={`调整「${columnLabels[column]}」与右侧一列的分界`}
                       onPointerDown={(event) => startResize(event, column)}
                     />
                   )}

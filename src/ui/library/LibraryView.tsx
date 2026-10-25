@@ -6,7 +6,7 @@ import { LibrarySidebar, type CollectionCounts } from './LibrarySidebar';
 import { LibraryTable } from './LibraryTable';
 import { LibraryToolbar, type ImportKind } from './LibraryToolbar';
 import { folderEntries, folderPath, PaperDetail } from './PaperDetail';
-import type { ColumnId, FolderView, LibraryQuery, LibraryViewPreferences, PaperView, TagView } from './types';
+import type { FolderView, LibraryQuery, LibraryViewPreferences, PaperView, TagView } from './types';
 import './library.css';
 
 export interface LibraryViewProps {
@@ -198,7 +198,7 @@ export function LibraryView(props: LibraryViewProps) {
             tagsById={tagsById}
             columns={prefs.visibleColumns}
             widths={prefs.columnWidths}
-            onWidth={(column: ColumnId, width) => props.onPrefs({ columnWidths: { ...prefs.columnWidths, [column]: width } })}
+            onWidths={(patch) => props.onPrefs({ columnWidths: { ...prefs.columnWidths, ...patch } })}
             sort={query.sort}
             onSort={(column) =>
               changeQuery({
