@@ -176,12 +176,12 @@
 /* The opening lines: the page's anchor. */
 /* The opening lines: same type as the rest; their place at the top is emphasis enough. */
 .pp-ov-lead {
-  font-size: 14px;
+  font-size: var(--pp-text-read);
   line-height: 1.7;
 }
 
 .pp-ov-prose {
-  font-size: 14px;
+  font-size: var(--pp-text-read);
   line-height: 1.7;
 }
 
@@ -215,7 +215,7 @@
 .pp-ov-points li {
   position: relative;
   padding-left: 14px;
-  font-size: 14px;
+  font-size: var(--pp-text-read);
   line-height: 1.7;
 }
 
@@ -249,7 +249,7 @@
 
 .pp-ov-fields dd {
   margin: 0;
-  font-size: 14px;
+  font-size: var(--pp-text-read);
   line-height: 1.7;
 }
 

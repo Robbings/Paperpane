@@ -24,6 +24,8 @@
 | `Button` | 文字按钮 | `variant`: plain / primary / quiet / danger；`size`: sm / md；`shape`: rounded / pill；`icon` |
 | `IconButton` | 只有图标的按钮，自带浮层提示 | `icon`、`label`（必填，也是读屏名称和提示文字）、`active`、`shortcut`、`tooltipPlacement`、`tooltip` |
 | `Segmented` | 2–4 个互斥选项 | `options`、`value`、`onChange`、`label`、`stretch` |
+| `Select` | 下拉选择：按钮显示当前项，点开是菜单 | `options`（`value`、`label`、`shortLabel` 按钮上的短名、`group` 不同组之间画分隔线、`disabled`）、`value`、`onChange`、`label`、`placeholder`、`size`、`block` |
+| `Stepper` | 一步一步调整的数值（− 值 +），方向键也能调 | `value`、`min`、`max`、`step`、`onChange`、`label`、`format` |
 | `Tooltip` | 浮层提示 | `label`、`shortcut`、`placement`、`labelsChild`（子元素已用同样文字做名称时设为 true） |
 | `Popover` | 锚定在某个元素上的非模态浮层（引用预览、小表单） | `anchorRef`、`open`、`onClose`、`label`、`placement`、`width` |
 | `Menu` | 下拉 / 右键菜单 | `entries`（普通项、勾选项、分隔线）、`anchor`（坐标）、`align`、`triggerRef`、`onSelect`、`onClose`；`multiple`：点勾选项后菜单不关，可以连续勾选 |
@@ -101,7 +103,7 @@ toast.show({ message: '翻译失败：请求超时', tone: 'error', action: { la
 | `annotations`、`annotationStatus` | 批注列表与保存 / 同步状态 |
 | `notes` | 笔记内容、`onChange`、保存 / 同步状态 |
 | `initialLayout`、`onLayoutChange` | 停靠位置、宽高、是否显示标题；由逻辑层保存为偏好 |
-| `onNavigate`、`onZoom` | 跳页、缩放 |
+| `onNavigate`、`onZoom(direction)`、`onZoomTo(percent)` | 跳页、按档位缩放、输入的百分比（界面已限制在 25–400） |
 | `onHighlight(color, selection)`、`onSelectionAction(action, selection)` | 选区菜单的操作；`selection` 是选中时的快照，锚点由逻辑层生成 |
 | `onLocateAnnotation(id)`、`onTool(tool)` | 定位批注、工具栏按钮 |
 | `panels` | 可选。由页面提供的研究区面板内容，如 `{ discuss: <ChatPanel …/>, overview: <OverviewPanel …/> }`；没提供的面板显示占位 |
@@ -122,6 +124,9 @@ toast.show({ message: '翻译失败：请求超时', tone: 'error', action: { la
 - `subscribeGeometry(listener)`：批注位置可能变化时通知（页面渲染完成、缩放、旋转、重排），便签据此重新定位；建议直接接 `AnchorService.subscribeProjection`。
 - `onAnnotationComment`：便签每次输入都会立即调用，不做延迟；由运行时持有草稿、合并写入，并在关闭或切换文档时写完。
 - 评论便签放在滚动容器里、钉在原文旁边，随论文滚动和缩放；可以拖动、调大小、收起成标题小条、关闭后再打开（保持原位置）。标题就是评论的第一行。便签所在的层带 `data-pp-overlay`，运行时捕获选区和点击时应忽略来自这里的事件。
+- `noteLayouts` / `onNoteLayouts(layouts)`：便签的布局由运行时持有并随论文保存，下次打开时原样交回。每项是 `NoteLayout { id, dx, dy, width, height, collapsed, open, z }`：`id` 是批注 id；`(dx, dy)` 是便签相对原文第一行左上角的偏移（CSS 像素）；`open: false` 表示已关闭但保留位置；`z` 是叠放顺序。外壳每次拖动、缩放、收起、关闭、打开都会交回整组新值（拖动过程中会连续调用，写入请自行合并）。批注被彻底删除时，由运行时一并去掉对应布局；撤销删除时保留。
+- `rotation` / `onRotate(rotation)`：页面旋转，`0 | 90 | 180 | 270`，作用于所有页面（对应 PDF.js 的 `pagesRotation`）。工具栏按钮每次顺时针转 90°，旋转后按钮保持标记，右键或「更多」菜单里可以恢复。旋转后请通知 `subscribeGeometry`。
+- 查找：`search` 是当前状态 `{ query, matchCase, wholeWord, status: 'idle' | 'searching' | 'done', total, current }`（`current` 从 1 开始，没有结果为 0）。查找栏随输入调用 `onSearch(query, { matchCase, wholeWord })`，Enter / Shift+Enter 和上下按钮调用 `onSearchStep(1 | -1)`，关闭时调用 `onSearchClose()`（清除页面上的标记，保留上次的查询词）。⌘F / Ctrl+F 打开查找栏（有选中文字时用它作查询词），⌘G / ⌘⇧G 跳到下一个 / 上一个。运行时负责搜索文本层、标记全部结果并把当前结果滚到视野里；对应 PDF.js 的 `find` / `findagain` 事件和 `updatefindmatchescount`、`updatefindcontrolstate`。页面上的标记颜色已在界面定义：`.textLayer .highlight` 和 `.highlight.selected`（`--pp-find-match`、`--pp-find-current`）。
 - PDF 页面的外观（纸张、阴影、页间距、深色模式减光）由界面在 `.pp-pdf-surface .page` 上定义。高亮色点（`--pp-hl-*-dot`）与页面高亮（`--pp-hl-*-fill`，与 PDF.js 使用的颜色一致）同色相。
 
 ## 讨论面板 `ChatPanel`
@@ -153,6 +158,30 @@ toast.show({ message: '翻译失败：请求超时', tone: 'error', action: { la
 - 列表显示方式（简洁 / 详细、显示哪些列、列宽）和左右两栏是否显示是 `LibraryViewPreferences`，通过 `onPrefs(patch)` 由逻辑层保存为偏好。`sidebarOpen` / `detailOpen` 不设时按窗口宽度自动决定。
 - 其余都是动作回调：标星、改字段、标签、移动、移出、文件夹增改删、导入（PDF / CSL JSON / BibTeX）、导出引用。`onCreateFolder` 需要同步返回新文件夹的 id，界面随即进入改名。
 - 拖动论文时 `dataTransfer` 里是 `application/x-paperpane-papers`（id 数组的 JSON），见 `src/ui/library/dragTypes.ts`。
+
+## 设置 `SettingsView` 与快速设置
+
+位于 `src/ui/settings/`，视图模型在 `settings/types.ts`，按设置接口草案 v0.1 对应；示例接线是 `settings/sample/useSampleSettings.ts`（偏好和配置存在 localStorage，设置页与阅读器之间同步，仅作演示）。
+
+- **两类设置**：
+  - 偏好 `Preferences`（主题、界面语言、回答语言、正文字号、深色减光、公式复制格式）：每项改了立即生效，调用 `onPreference(key, value)`，由逻辑层单字段保存并同步到其他标签页；保存失败时 `PreferencesState.local = 'failed'`，界面提示并可重试。
+  - 配置 `SettingsView`（模型服务、模型、默认模型、功能路由、提示词、运行参数、同步）：设置页编辑一份草稿，所有节共用，切换节不会丢；底部保存条整体调用 `onSave(draft, baseRevision)`，按 `SaveSettingsResult` 显示成功、需要修改（`problems` 的 `path` 对应到字段）、冲突（保留草稿，用户选择载入最新或覆盖）、失败。
+- **密钥**：快照只有 `hasKey` / `hasPassword`；草稿里用 `SecretEdit`（keep / clear / replace）。`toDraft(view)` 把快照转成草稿，所有密钥初始为 keep。
+- **外观的应用**：`applyAppearance()`（`src/ui/theme.ts`）设置主题、`--pp-read-scale` 和页面减光。正文字号只作用于批注、笔记、概览和回答正文（`--pp-text-read*`），不缩放工具栏，也不改变 PDF 缩放。
+- **节**：`SettingsSection` = general / models / features / sync / advanced / privacy；设置页地址的 `#models` 等直达对应一节。目前完成了通用和高级，其余几节下一步做。
+- **状态行** `StatusLine`：保存、同步、模型三种状态，设置页、阅读器快速设置和扩展弹窗共用，数据来自 `StatusSummary`。
+- **阅读器快速设置**：`ReaderShell` 的 `settings` prop（`ReaderSettingsProps`），工具栏设置按钮弹出：主题、正文字号、深色减光、回答语言、默认模型，加状态行和「全部设置…」。默认模型调用 `onDefaultModel(id)`，对应逻辑层的 `setDefaultModel(modelId, baseRevision)` 单项原子命令；不传 `settings` 时按钮仍调用 `onTool('settings')`。
+
+## 扩展弹窗 `PopupView`
+
+位于 `src/ui/popup/`，视图模型在 `popup/types.ts`；示例接线是 `popup/sample/SamplePopup.tsx`，`popup.html?state=pdf|local|checking|not-pdf|restricted|file-access|in-reader` 切换当前标签页的几种情况。
+
+- 浅灰磨砂底配白色圆角卡片，与阅读器同一套风格；弹窗是独立小窗口，背后没有可模糊的内容，磨砂感用顶部的柔光渐变表现。宽 340px，高度随内容。
+- **当前页面**：`activeTab: ActiveTabView | null`（null 表示正在识别）。可打开时显示首页缩略、标题、`displayUrl`（不含查询参数）和「在纸窗中打开」→ `onOpenInReader(tabId)`；不能打开时按 `block` 说明原因：`not-pdf`、`restricted`、`file-access`（附「打开扩展详情」→ `onAllowFileAccess`）、`in-reader`。`inLibrary` 为真时标「已在文献库」。
+- **自动打开 PDF**：一个开关，`autoOpenPdf` / `onAutoOpenPdf`。
+- **继续阅读**：`recent` 最多 3 篇，`onOpenRecent(id)`。
+- **状态行**：与设置页共用 `StatusLine`（单行），点击跳到设置的对应一节。
+- **底部**：文献库 `onOpenLibrary`、打开文件 `onOpenFile`（弹窗里直接选文件会让弹窗关闭，所以交给阅读器页弹出文件选择）、设置 `onOpenSettings(section?)`。
 
 ## 修改与扩展
 

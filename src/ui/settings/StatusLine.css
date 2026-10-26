@@ -1,0 +1,64 @@
+/* Save, sync and model state; used on the settings page, in quick settings and the popup. */
+
+.pp-statusline {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.pp-statusline[data-inline='true'] {
+  flex-flow: row wrap;
+  column-gap: 14px;
+}
+
+.pp-statusline li {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-width: 0;
+  color: var(--pp-text-2);
+  font-size: var(--pp-text-sm);
+}
+
+.pp-statusline button {
+  min-width: 0;
+  padding: 0;
+  border: 0;
+  background: none;
+  color: inherit;
+  font: inherit;
+  text-align: left;
+}
+
+.pp-statusline button:hover {
+  color: var(--pp-text);
+  text-decoration: underline;
+  text-underline-offset: 2px;
+}
+
+.pp-statusline__dot {
+  flex-shrink: 0;
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: var(--pp-text-3);
+}
+
+.pp-statusline li[data-tone='ok'] .pp-statusline__dot {
+  background: var(--pp-ok);
+}
+
+.pp-statusline li[data-tone='warn'] .pp-statusline__dot {
+  background: var(--pp-warn);
+}
+
+.pp-statusline li[data-tone='danger'] .pp-statusline__dot {
+  background: var(--pp-danger);
+}
+
+.pp-statusline li[data-tone='busy'] .pp-statusline__dot {
+  background: var(--pp-accent);
+}

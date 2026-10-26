@@ -95,7 +95,7 @@
   padding: 8px 13px;
   border-radius: 16px 16px 5px 16px;
   background: var(--pp-fill-hover);
-  font-size: 14px;
+  font-size: var(--pp-text-read);
   line-height: 1.6;
   white-space: pre-wrap;
   overflow-wrap: anywhere;
@@ -171,7 +171,7 @@
 }
 
 .pp-chat-a__text {
-  font-size: 14px;
+  font-size: var(--pp-text-read);
   line-height: 1.7;
 }
 

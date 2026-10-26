@@ -82,7 +82,7 @@
   padding: 10px 12px 14px;
   border: 0;
   background: var(--pp-reading-surface);
-  font-size: 14px;
+  font-size: var(--pp-text-read);
   line-height: 1.6;
   resize: none;
 }

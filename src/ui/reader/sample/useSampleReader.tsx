@@ -2,13 +2,24 @@ import { useCallback, useEffect, useMemo, useRef, useState, type CSSProperties }
 import { createPortal } from 'react-dom';
 import { toast, type HighlightColor } from '@/ui/components';
 import type { PageRect } from '../LocateFlash';
-import type { AnnotationView, ReaderInteraction, ReaderMenuTarget, ReaderTool, ViewRect } from '../types';
+import type {
+  AnnotationView,
+  NoteLayout,
+  ReaderInteraction,
+  ReaderMenuTarget,
+  ReaderSearchState,
+  ReaderTool,
+  Rotation,
+  ViewRect,
+} from '../types';
+import { pageToView, viewToPage } from './pageFrame';
 
 // 示例接线：替代真实运行时的演示版本，按 ReaderInteraction 驱动阅读器外壳。
 // 选区捕获、自动高亮、点中已有高亮的判断都在这里；新建的高亮画成页面上的覆盖层，
-// 和 PDF.js 自己画高亮层的方式一样。只在当前页面有效，刷新即恢复。
+// 和 PDF.js 自己画高亮层的方式一样。页面旋转、查找、评论便签的位置也在这里。
+// 只在当前页面有效，刷新即恢复。
 
-/** A drawn highlight: its page, and line boxes in units of the page width, so it stays put when zooming. */
+/** A drawn highlight: its page, and line boxes in the unturned page in units of its width, so it stays put when zooming or rotating. */
 interface Overlay {
   page: HTMLElement;
   rects: PageRect[];
@@ -16,6 +27,64 @@ interface Overlay {
 
 const toView = (r: DOMRect): ViewRect => ({ left: r.left, top: r.top, width: r.width, height: r.height });
 const inside = (r: ViewRect, x: number, y: number) => x >= r.left && x <= r.left + r.width && y >= r.top && y <= r.top + r.height;
+const scaled = (r: ViewRect, by: number): ViewRect => ({ left: r.left * by, top: r.top * by, width: r.width * by, height: r.height * by });
+
+const idleSearch: ReaderSearchState = { query: '', matchCase: false, wholeWord: false, status: 'idle', total: 0, current: 0 };
+
+/** Every match of the query in the pages' text, as DOM ranges. Text in different blocks is never joined into one match. */
+function findAll(container: HTMLElement, query: string, matchCase: boolean, wholeWord: boolean): Range[] {
+  if (!query.trim()) return [];
+  const escaped = query.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+  const pattern = new RegExp(wholeWord ? `(?<![\\p{L}\\p{N}_])${escaped}(?![\\p{L}\\p{N}_])` : escaped, matchCase ? 'gu' : 'giu');
+  const ranges: Range[] = [];
+  for (const page of Array.from(container.querySelectorAll<HTMLElement>('[data-page-index]'))) {
+    const walker = document.createTreeWalker(page, NodeFilter.SHOW_TEXT, {
+      acceptNode: (node) => (node.parentElement?.closest('[data-pp-overlay], [aria-hidden="true"]') ? NodeFilter.FILTER_REJECT : NodeFilter.FILTER_ACCEPT),
+    });
+    // The page's text, with each text node's start in it; blocks are kept apart by a line break.
+    let text = '';
+    const starts: { node: Text; at: number }[] = [];
+    let block: Element | null = null;
+    for (let node = walker.nextNode() as Text | null; node; node = walker.nextNode() as Text | null) {
+      const owner = node.parentElement?.closest('p, h1, h2, h3, li, figcaption') ?? null;
+      if (block && owner !== block) text += '\n';
+      block = owner;
+      starts.push({ node, at: text.length });
+      text += node.data;
+    }
+    const locate = (offset: number, end: boolean) => {
+      // The last text node starting at or before the offset (for an end, strictly before it).
+      let found = starts[0]!;
+      for (const start of starts) if (end ? start.at < offset : start.at <= offset) found = start;
+      return { node: found.node, offset: offset - found.at };
+    };
+    for (const match of text.matchAll(pattern)) {
+      if (!match[0]) continue;
+      const start = locate(match.index, false);
+      const end = locate(match.index + match[0].length, true);
+      const range = document.createRange();
+      range.setStart(start.node, start.offset);
+      range.setEnd(end.node, end.offset);
+      ranges.push(range);
+    }
+  }
+  return ranges;
+}
+
+/** Marks the matches with the CSS highlight registry; the current one on top. */
+function paintMatches(ranges: readonly Range[], current: number) {
+  if (!('highlights' in CSS)) return;
+  CSS.highlights.delete('pp-find');
+  CSS.highlights.delete('pp-find-current');
+  if (ranges.length === 0) return;
+  CSS.highlights.set('pp-find', new Highlight(...ranges));
+  const selected = ranges[current - 1];
+  if (selected) {
+    const highlight = new Highlight(selected);
+    highlight.priority = 1;
+    CSS.highlights.set('pp-find-current', highlight);
+  }
+}
 
 /** The demo reader: annotations, the interaction object for ReaderShell, and the highlights it draws. */
 export function useSampleReader(initial: readonly AnnotationView[]) {
@@ -24,6 +93,12 @@ export function useSampleReader(initial: readonly AnnotationView[]) {
   const [tool, setTool] = useState<ReaderTool>('select');
   const [overlays, setOverlays] = useState<ReadonlyMap<string, Overlay>>(new Map());
   const [container, setContainer] = useState<HTMLDivElement | null>(null);
+  const [rotation, setRotation] = useState<Rotation>(0);
+  const [search, setSearch] = useState<ReaderSearchState>(idleSearch);
+  const matches = useRef<Range[]>([]);
+  const searchRef = useRef(search);
+  searchRef.current = search;
+  const [noteLayouts, setNoteLayouts] = useState<NoteLayout[]>([]);
   const lastColor = useRef<HighlightColor>('yellow');
   const ranges = useRef(new Map<string, { range: Range; text: string }>());
   const deleted = useRef(new Map<string, { item: AnnotationView; index: number }>());
@@ -38,9 +113,8 @@ export function useSampleReader(initial: readonly AnnotationView[]) {
     if (mark) return Array.from(mark.getClientRects()).map(toView);
     const overlay = latest.current.overlays.get(id);
     if (!overlay || !overlay.page.isConnected) return null;
-    const box = overlay.page.getBoundingClientRect();
-    const w = box.width;
-    return overlay.rects.map((r) => ({ left: box.left + r.left * w, top: box.top + r.top * w, width: r.width * w, height: r.height * w }));
+    const w = overlay.page.offsetWidth;
+    return overlay.rects.map((r) => pageToView(overlay.page, scaled(r, w)));
   }, [container]);
 
   /** Turns a captured selection into a highlight drawn over its page. */
@@ -48,11 +122,10 @@ export function useSampleReader(initial: readonly AnnotationView[]) {
     const captured = ranges.current.get(selectionId);
     const page = captured?.range.startContainer.parentElement?.closest<HTMLElement>('[data-page-index]');
     if (!captured || !page) return null;
-    const box = page.getBoundingClientRect();
-    const w = box.width;
+    const w = page.offsetWidth;
     const rects = Array.from(captured.range.getClientRects())
-      .filter((r) => r.width > 1)
-      .map((r) => ({ left: (r.left - box.left) / w, top: (r.top - box.top) / w, width: r.width / w, height: r.height / w }));
+      .filter((r) => r.width > 1 && r.height > 1)
+      .map((r) => scaled(viewToPage(page, r), 1 / w));
     const id = `demo-${++counter.current}`;
     lastColor.current = color;
     setOverlays((current) => new Map(current).set(id, { page, rects }));
@@ -113,6 +186,78 @@ export function useSampleReader(initial: readonly AnnotationView[]) {
     return () => container.removeEventListener('mouseup', onPointerUp);
   }, [container, highlight, annotationRects]);
 
+  // ---- Find ------------------------------------------------------------------
+  /** Brings a match into view, about a third of the way down, unless it is already comfortably visible. */
+  const reveal = useCallback(
+    (range: Range | undefined) => {
+      if (!container || !range) return;
+      const box = range.getBoundingClientRect();
+      const view = container.getBoundingClientRect();
+      if (box.top >= view.top + 80 && box.bottom <= view.bottom - 60 && box.left >= view.left && box.right <= view.right) return;
+      container.scrollTo({
+        top: container.scrollTop + box.top - view.top - container.clientHeight * 0.35,
+        left: container.scrollLeft + box.left - view.left - container.clientWidth / 2,
+        behavior: 'smooth',
+      });
+    },
+    [container],
+  );
+
+  const runSearch = useCallback(
+    (query: string, options: { matchCase: boolean; wholeWord: boolean }, keepCurrent = false) => {
+      if (!container) return;
+      const ranges = findAll(container, query, options.matchCase, options.wholeWord);
+      matches.current = ranges;
+      let current = 0;
+      if (ranges.length > 0) {
+        if (keepCurrent) current = Math.min(Math.max(searchRef.current.current, 1), ranges.length);
+        else {
+          // Start from the first match below the top of the visible paper, like the browser does.
+          const top = container.getBoundingClientRect().top + 60;
+          current = ranges.findIndex((r) => r.getBoundingClientRect().bottom >= top) + 1 || 1;
+        }
+      }
+      paintMatches(ranges, current);
+      if (!keepCurrent) reveal(ranges[current - 1]);
+      setSearch({ query, ...options, status: query.trim() ? 'done' : 'idle', total: ranges.length, current });
+    },
+    [container, reveal],
+  );
+
+  // The paper's text changes when built-in highlights are recoloured or removed: search it again in place.
+  const searchOpen = search.status !== 'idle';
+  useEffect(() => {
+    const { query, matchCase, wholeWord } = searchRef.current;
+    if (searchOpen && query) runSearch(query, { matchCase, wholeWord }, true);
+  }, [annotations, searchOpen, runSearch]);
+
+  // Clear the marks when the reader goes away.
+  useEffect(() => () => paintMatches([], 0), []);
+
+  // ---- Rotation ---------------------------------------------------------------
+  /** Turns the pages and keeps the page that was at the top of the view there. */
+  const rotate = useCallback(
+    (next: Rotation) => {
+      if (!container) {
+        setRotation(next);
+        return;
+      }
+      const view = container.getBoundingClientRect();
+      const pages = Array.from(container.querySelectorAll<HTMLElement>('[data-page-index]'));
+      const anchor = pages.find((page) => page.getBoundingClientRect().bottom > view.top + 80) ?? pages[0];
+      setRotation(next);
+      requestAnimationFrame(() => {
+        if (!anchor) return;
+        const box = anchor.getBoundingClientRect();
+        container.scrollTop += box.top - view.top - 70;
+        const centred = container.scrollLeft + box.left + box.width / 2 - view.left - container.clientWidth / 2;
+        container.scrollLeft = Math.max(0, centred);
+        geometryListeners.current.forEach((listener) => listener());
+      });
+    },
+    [container],
+  );
+
   const interaction = useMemo<ReaderInteraction>(
     () => ({
       onScrollContainer: setContainer,
@@ -156,8 +301,27 @@ export function useSampleReader(initial: readonly AnnotationView[]) {
       },
       annotationRects,
       subscribeGeometry,
+      rotation,
+      onRotate: rotate,
+      search,
+      onSearch: (query, options) => runSearch(query, options),
+      onSearchStep: (direction) => {
+        const total = matches.current.length;
+        if (total === 0) return;
+        const current = ((searchRef.current.current - 1 + direction + total) % total) + 1;
+        paintMatches(matches.current, current);
+        reveal(matches.current[current - 1]);
+        setSearch((previous) => ({ ...previous, current }));
+      },
+      onSearchClose: () => {
+        matches.current = [];
+        paintMatches([], 0);
+        setSearch((previous) => ({ ...previous, status: 'idle', total: 0, current: 0 }));
+      },
+      noteLayouts,
+      onNoteLayouts: setNoteLayouts,
     }),
-    [menuTarget, tool, highlight, annotationRects, subscribeGeometry],
+    [menuTarget, tool, highlight, annotationRects, subscribeGeometry, rotation, rotate, search, runSearch, reveal, noteLayouts],
   );
 
   // Built-in highlights on the sample paper follow the annotations' colours, or vanish when deleted.

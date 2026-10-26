@@ -1,5 +1,6 @@
 import type { CSSProperties } from 'react';
 import type { HighlightColor } from '@/ui/components';
+import type { Rotation } from '../types';
 import './sample.css';
 
 // 示例内容：在 PDF 渲染接入之前占位的论文页面。文字为样稿自拟，不是真实论文。
@@ -9,11 +10,12 @@ const fill = (color: HighlightColor) => ({ background: `var(--pp-hl-${color}-fil
 interface SamplePaperProps {
   pageCount: number;
   zoomPercent: number;
+  rotation: Rotation;
   /** Current colour of each built-in highlight by annotation id; missing means deleted (plain text). */
   highlights: Readonly<Record<string, HighlightColor>>;
 }
 
-export function SamplePaper({ pageCount, zoomPercent, highlights }: SamplePaperProps) {
+export function SamplePaper({ pageCount, zoomPercent, rotation, highlights }: SamplePaperProps) {
   // A built-in highlight: a <mark> the demo runtime can hit-test by id, or plain text once deleted.
   const mark = (id: string, text: string) => {
     const color = highlights[id];
@@ -29,7 +31,7 @@ export function SamplePaper({ pageCount, zoomPercent, highlights }: SamplePaperP
   const style = { '--pp-sample-scale': scale } as CSSProperties;
 
   return (
-    <div className="pp-sample" style={style}>
+    <div className="pp-sample" style={style} data-rotation={rotation}>
       <article className="pp-sample__page" data-page-index={0} aria-label="第 1 页">
         <h1>Recovering Reading Order in Two-Column Scientific PDFs</h1>
         <p className="pp-sample__authors">A. Author · B. Author · C. Author</p>

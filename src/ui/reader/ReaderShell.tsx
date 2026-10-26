@@ -7,7 +7,9 @@ import {
   type SelectionMenuAction,
   type SyncState,
 } from '@/ui/components';
-import { CommentNotes, NOTE_SIZE, type NoteLayout } from './notes/CommentNotes';
+import { CommentNotes, NOTE_SIZE } from './notes/CommentNotes';
+import { FindBar } from './FindBar';
+import { QuickSettings, type ReaderSettingsProps } from './QuickSettings';
 import { FunctionRail, researchPanels } from './FunctionRail';
 import { ReaderLibraryNav, type ReaderLibraryData } from './library/ReaderLibraryNav';
 import { SaveToLibraryPopover, type LibraryEntryDraft } from './library/SaveToLibraryPopover';
@@ -38,9 +40,11 @@ import type {
   AnnotationView,
   DockPlacement,
   DocumentHeaderView,
+  NoteLayout,
   OutlineItemView,
   ResearchPanelId,
   ReaderInteraction,
+  Rotation,
 } from './types';
 import { useViewport } from './useViewport';
 import type { TagView } from '@/ui/library/types';
@@ -71,12 +75,16 @@ interface ReaderShellProps {
   onLayoutChange?: (layout: ReaderLayout) => void;
   onNavigate: (pageIndex: number) => void;
   onZoom: (direction: 'in' | 'out') => void;
+  /** A typed zoom percentage (25–400). */
+  onZoomTo: (percent: number) => void;
   /** Selection, highlights, comments: driven by the runtime (see ReaderInteraction). */
   interaction: ReaderInteraction;
   onLocateAnnotation: (id: string) => void;
   onTool: (tool: string) => void;
   /** Library features inside the reader: bookmark popover and the sidebar tab. */
   library?: ReaderLibraryProps;
+  /** Quick settings behind the toolbar's settings button: appearance, answer language, default model. */
+  settings?: ReaderSettingsProps;
   /** Content for research panels the page supplies itself (discussion, overview, …); the rest show a placeholder. */
   panels?: Partial<Record<ResearchPanelId, ReactNode>>;
 }
@@ -202,6 +210,8 @@ export function ReaderShell(props: ReaderShellProps) {
   // Window resizes follow the pointer directly instead of tweening behind it.
   const [saveOpen, setSaveOpen] = useState(false);
   const saveRef = useRef<HTMLButtonElement>(null);
+  const [settingsOpen, setSettingsOpen] = useState(false);
+  const settingsRef = useRef<HTMLButtonElement>(null);
   const { library } = props;
 
   const [windowResizing, setWindowResizing] = useState(false);
@@ -314,8 +324,17 @@ export function ReaderShell(props: ReaderShellProps) {
 
   // ---- Comment notes ---------------------------------------------------------
   // Pinned to their passages on the paper. Closed notes keep their layout for when they reopen.
-  const [noteLayouts, setNoteLayouts] = useState<NoteLayout[]>([]);
+  // The runtime keeps the layouts (and saves them with the paper); changes go back through onNoteLayouts.
+  const noteLayouts = interaction.noteLayouts;
+  const latestNotes = useRef(noteLayouts);
+  latestNotes.current = noteLayouts;
+  const setNoteLayouts = (update: (current: readonly NoteLayout[]) => NoteLayout[]) => {
+    const next = update(latestNotes.current);
+    latestNotes.current = next;
+    interaction.onNoteLayouts(next);
+  };
   const topZ = useRef(1);
+  topZ.current = Math.max(topZ.current, ...noteLayouts.map((n) => n.z));
 
   /** Opens (or unfolds and brings forward) the note for an annotation; a new one opens just below its passage. */
   const openNote = (id: string) =>
@@ -331,14 +350,6 @@ export function ReaderShell(props: ReaderShellProps) {
       return [...current, { id, dx, dy: first ? bottom - first.top + 10 : 0, width: NOTE_SIZE.width, height: NOTE_SIZE.height, collapsed: false, open: true, z }];
     });
 
-  // A deleted annotation takes its note with it.
-  useEffect(() => {
-    setNoteLayouts((current) => {
-      const next = current.filter((n) => annotations.some((a) => a.id === n.id));
-      return next.length === current.length ? current : next;
-    });
-  }, [annotations]);
-
   const deleteAnnotation = (id: string) => {
     interaction.onAnnotationDelete(id);
     toast.show({
@@ -352,6 +363,52 @@ export function ReaderShell(props: ReaderShellProps) {
       () => toast.show({ message: '已复制' }),
       () => toast.show({ message: '无法访问剪贴板', tone: 'warning' }),
     );
+
+  // ---- Find --------------------------------------------------------------------
+  // ⌘F / Ctrl+F opens the bar (with the selected words, if any); ⌘G steps while it is open.
+  const [find, setFind] = useState<{ query?: string; key: number } | null>(null);
+  const [toolbarWidth, setToolbarWidth] = useState<number | null>(null);
+  const openFind = () => {
+    const selected = window.getSelection()?.toString().trim() ?? '';
+    const query = selected && selected.length <= 80 && !selected.includes('\n') ? selected : undefined;
+    // Already open with nothing new to look for: just focus it.
+    if (find && query === undefined) {
+      document.querySelector<HTMLInputElement>('.pp-findbar__input')?.select();
+      return;
+    }
+    setFind({ query, key: Date.now() });
+    // Measured now so the bar opens in place rather than sliding there.
+    setToolbarWidth(document.querySelector<HTMLElement>('.pp-toolbar')?.offsetWidth ?? null);
+  };
+  // The bar hangs under the toolbar's right end (see reader.css), which needs the toolbar's width.
+  useLayoutEffect(() => {
+    if (!find) return;
+    const width = document.querySelector<HTMLElement>('.pp-toolbar')?.offsetWidth ?? null;
+    if (width !== toolbarWidth) setToolbarWidth(width);
+  });
+  const closeFind = () => {
+    setFind(null);
+    interaction.onSearchClose();
+  };
+  const latestFind = useRef({ openFind, step: interaction.onSearchStep, open: Boolean(find) });
+  latestFind.current = { openFind, step: interaction.onSearchStep, open: Boolean(find) };
+  useEffect(() => {
+    const onKey = (event: KeyboardEvent) => {
+      if (!(event.metaKey || event.ctrlKey) || event.altKey) return;
+      const key = event.key.toLowerCase();
+      if (key === 'f') {
+        event.preventDefault();
+        latestFind.current.openFind();
+      } else if (key === 'g' && latestFind.current.open) {
+        event.preventDefault();
+        latestFind.current.step(event.shiftKey ? -1 : 1);
+      }
+    };
+    window.addEventListener('keydown', onKey);
+    return () => window.removeEventListener('keydown', onKey);
+  }, []);
+
+  const nextRotation = ((interaction.rotation + 90) % 360) as Rotation;
 
   // ---- Layout variables ----------------------------------------------------
   const style = {
@@ -433,10 +490,31 @@ export function ReaderShell(props: ReaderShellProps) {
         onSave={library ? () => setSaveOpen((open) => !open) : undefined}
         onPageSubmit={props.onNavigate}
         onZoom={props.onZoom}
+        onZoomTo={props.onZoomTo}
         onTogglePlacement={togglePlacement}
         onToggleAutoHighlight={() => interaction.onToolChange(interaction.tool === 'auto-highlight' ? 'select' : 'auto-highlight')}
+        findOpen={Boolean(find)}
+        onFind={() => (find ? closeFind() : openFind())}
+        rotation={interaction.rotation}
+        onRotate={() => interaction.onRotate(nextRotation)}
+        onResetRotation={() => interaction.onRotate(0)}
+        settingsRef={settingsRef}
+        settingsOpen={settingsOpen}
+        onSettings={props.settings ? () => setSettingsOpen((open) => !open) : undefined}
         onTool={props.onTool}
       />
+
+      {find && (
+        <FindBar
+          key={find.key}
+          search={interaction.search}
+          initialQuery={find.query}
+          onSearch={interaction.onSearch}
+          onStep={interaction.onSearchStep}
+          onClose={closeFind}
+          style={toolbarWidth !== null ? ({ '--pp-toolbar-w': px(toolbarWidth) } as CSSProperties) : undefined}
+        />
+      )}
 
       {panelOpen && (
         <Splitter
@@ -491,6 +569,8 @@ export function ReaderShell(props: ReaderShellProps) {
         </div>
         <FunctionRail placement={effectivePlacement} active={panel} panelOpen={panelOpen} onSelect={selectPanel} />
       </GlassSurface>
+
+      {props.settings && <QuickSettings {...props.settings} anchorRef={settingsRef} open={settingsOpen} onClose={() => setSettingsOpen(false)} />}
 
       {library && (
         <SaveToLibraryPopover
@@ -562,7 +642,7 @@ export function ReaderShell(props: ReaderShellProps) {
         notes={noteLayouts}
         annotations={annotations}
         container={paperElement}
-        layoutKey={`${zoomPercent}:${effectivePlacement}:${effectiveWidth}:${effectiveHeight}:${sidebarOpen}`}
+        layoutKey={`${zoomPercent}:${interaction.rotation}:${effectivePlacement}:${effectiveWidth}:${effectiveHeight}:${sidebarOpen}`}
         annotationRects={interaction.annotationRects}
         subscribeGeometry={interaction.subscribeGeometry}
         onChange={(note) => setNoteLayouts((current) => current.map((n) => (n.id === note.id ? note : n)))}

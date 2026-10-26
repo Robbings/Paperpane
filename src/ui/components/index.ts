@@ -13,7 +13,9 @@ export { Popover } from './Popover';
 export { ScrollArea } from './ScrollArea';
 export { SaveStatus, type LocalSaveState, type SyncState } from './SaveStatus';
 export { Segmented, type SegmentedOption } from './Segmented';
+export { Select, type SelectOption } from './Select';
 export { StarToggle } from './StarToggle';
+export { Stepper } from './Stepper';
 export { TagInput, type TagOption } from './TagInput';
 export {
   SelectionMenu,
