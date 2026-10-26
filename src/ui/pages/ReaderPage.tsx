@@ -8,11 +8,11 @@ import type { LibraryEntryDraft } from '@/ui/reader/library/SaveToLibraryPopover
 import { LocateFlash, type PageRect } from '@/ui/reader/LocateFlash';
 import { ReaderShell } from '@/ui/reader/ReaderShell';
 import { findQuote } from '@/ui/reader/sample/findQuote';
+import { useSampleReader } from '@/ui/reader/sample/useSampleReader';
 import { SampleChat } from '@/ui/reader/sample/SampleChat';
 import { SampleOverview } from '@/ui/reader/sample/SampleOverview';
 import { SamplePaper } from '@/ui/reader/sample/SamplePaper';
 import { sampleAnnotations, sampleHeader, sampleOutline } from '@/ui/reader/sample/sampleData';
-import type { AnnotationView } from '@/ui/reader/types';
 import { applyTheme } from '@/ui/theme';
 
 // Review switches: reader.html?view=gallery shows the component gallery,
@@ -32,7 +32,8 @@ export function ReaderPage() {
 function SampleReader() {
   const [pageIndex, setPageIndex] = useState(0);
   const [zoom, setZoom] = useState(100);
-  const [annotations, setAnnotations] = useState<AnnotationView[]>(sampleAnnotations);
+  const reader = useSampleReader(sampleAnnotations);
+  const { annotations } = reader;
   const [note, setNote] = useState('');
   // 示例：文献库里的论文与标签，当前论文是第一篇。
   const [papers, setPapers] = useState<PaperView[]>(samplePapers);
@@ -100,25 +101,18 @@ function SampleReader() {
         // 示例数据不保存：状态行如实标为演示，而不是模拟"已保存"。
         annotationStatus={{ local: 'unmodified', sync: 'unconfigured', simulated: true }}
         notes={{ value: note, onChange: setNote, local: 'unmodified', sync: 'unconfigured', simulated: true }}
-        document={<SamplePaper pageCount={sampleHeader.pageCount} zoomPercent={zoom} />}
+        document={<SamplePaper pageCount={sampleHeader.pageCount} zoomPercent={zoom} highlights={reader.paperHighlights} />}
         onNavigate={navigate}
         onZoom={(direction) => {
           const index = ZOOM_STEPS.indexOf(zoom);
           const next = ZOOM_STEPS[Math.min(Math.max(index + (direction === 'in' ? 1 : -1), 0), ZOOM_STEPS.length - 1)];
           if (next !== undefined) setZoom(next);
         }}
-        onHighlight={(color, selection) =>
-          setAnnotations((current) => [
-            ...current,
-            { id: `sample-${current.length + 1}`, kind: 'highlight', color, pageIndex, quote: selection.text },
-          ])
-        }
-        onSelectionAction={(action, selection) => {
-          if (action === 'copy') void navigator.clipboard?.writeText(selection.text);
-        }}
+        interaction={reader.interaction}
         onLocateAnnotation={(id) => {
           const target = annotations.find((item) => item.id === id);
-          if (target) navigate(target.pageIndex);
+          if (target?.quote) locateQuote(target.quote);
+          else if (target) navigate(target.pageIndex);
         }}
         onTool={() => undefined}
         panels={{ discuss: <SampleChat onLocateQuote={locateQuote} />, overview: <SampleOverview onLocateQuote={locateQuote} /> }}
@@ -156,6 +150,7 @@ function SampleReader() {
         }}
       />
       <Toaster />
+      {reader.overlayLayer}
       {flash && createPortal(<LocateFlash key={flash.key} rects={flash.rects} />, flash.page)}
     </>
   );
