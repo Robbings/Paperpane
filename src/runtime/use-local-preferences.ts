@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { PreferenceStore } from '@/data/preference-store';
 import { applyAppearance } from '@/ui/theme';
-import { DEFAULT_PREFERENCES, FONT_SIZE, type Preferences, type PreferencesState } from '@/ui/settings/types';
+import { DEFAULT_PREFERENCES, DEFAULT_SELECTION_BAR, FONT_SIZE, type Preferences, type PreferencesState } from '@/ui/settings/types';
 
 function valid<K extends keyof Preferences>(key: K, value: unknown): value is Preferences[K] {
   switch (key) {
@@ -21,6 +21,19 @@ function valid<K extends keyof Preferences>(key: K, value: unknown): value is Pr
       return typeof value === 'boolean';
     case 'mathDelimiter':
       return value === 'brackets' || value === 'dollars' || value === 'none';
+    case 'selectionBar': {
+      if (typeof value !== 'object' || value === null) return false;
+      const bar = value as { order?: unknown; hidden?: unknown; look?: unknown };
+      const items = DEFAULT_SELECTION_BAR.order as readonly unknown[];
+      const isList = (list: unknown) => Array.isArray(list) && list.every((item) => items.includes(item)) && new Set(list).size === list.length;
+      return (
+        isList(bar.order) &&
+        (bar.order as unknown[]).length === items.length &&
+        isList(bar.hidden) &&
+        (bar.hidden as unknown[]).length < items.length &&
+        ['text', 'icon', 'both', 'stacked', 'reveal'].includes(bar.look as string)
+      );
+    }
   }
   return false;
 }

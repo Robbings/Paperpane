@@ -10,6 +10,7 @@ import {
 import { CommentNotes, NOTE_SIZE } from './notes/CommentNotes';
 import { FindBar } from './FindBar';
 import { QuickSettings, type ReaderSettingsProps } from './QuickSettings';
+import { DEFAULT_SELECTION_BAR } from '@/ui/settings/types';
 import { FunctionRail, researchPanels } from './FunctionRail';
 import { ReaderLibraryNav, type ReaderLibraryData } from './library/ReaderLibraryNav';
 import { SaveToLibraryPopover, type LibraryEntryDraft } from './library/SaveToLibraryPopover';
@@ -276,6 +277,9 @@ export function ReaderShell(props: ReaderShellProps) {
   const menuRef = useRef<HTMLDivElement>(null);
   const [menuPosition, setMenuPosition] = useState<{ top: number; left: number } | null>(null);
   const targetAnnotation = target?.kind === 'annotation' ? annotations.find((a) => a.id === target.annotationId) : undefined;
+  // What the bar shows, in what order and how, from the reader's preferences.
+  const bar = props.settings?.preferences.selectionBar ?? DEFAULT_SELECTION_BAR;
+  const barLayout = bar.order.filter((item) => !bar.hidden.includes(item));
 
   // Hand the scroll container to the runtime: its viewer mounts and listens there.
   const onScrollContainer = interaction.onScrollContainer;
@@ -606,6 +610,8 @@ export function ReaderShell(props: ReaderShellProps) {
           {target.kind === 'selection' ? (
             <SelectionMenu
               label="选区操作"
+              look={bar.look}
+              layout={barLayout}
               actions={selectionActions}
               onColor={(color) => {
                 void interaction.onCreateHighlight(target.id, color);
@@ -625,6 +631,8 @@ export function ReaderShell(props: ReaderShellProps) {
           ) : (
             <SelectionMenu
               label="高亮操作"
+              look={bar.look}
+              layout={barLayout}
               // The same actions as a fresh selection, with the comment opening its note.
               actions={selectionActions.map((action) => (action.id === 'comment' && targetAnnotation?.note ? { ...action, label: '查看评论' } : action))}
               currentColor={targetAnnotation?.color}
