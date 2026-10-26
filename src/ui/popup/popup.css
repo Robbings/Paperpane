@@ -8,6 +8,11 @@ body[data-page='popup'] #root {
   height: auto;
 }
 
+/* The window can be taller or wider than the content: paint the whole of it, not just the body. */
+html:has(body[data-page='popup']) {
+  background: var(--pp-popup-ground);
+}
+
 body[data-page='popup'] {
   width: 340px;
   background:
