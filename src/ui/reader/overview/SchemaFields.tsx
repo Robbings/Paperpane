@@ -8,32 +8,74 @@ export interface SchemaField {
   description: string;
 }
 
+type JsonObject = Record<string, unknown>;
+const isObject = (value: unknown): value is JsonObject => typeof value === 'object' && value !== null && !Array.isArray(value);
+
+/**
+ * The parsed schema when the field list can edit it: an object whose properties
+ * are all strings. Everything else in it (enum, pattern, additionalProperties,
+ * which fields are required…) is kept as it is when the list writes it back.
+ */
+function parseEditable(schema: string | undefined): { root: JsonObject; properties: Record<string, JsonObject> } | null {
+  try {
+    const root: unknown = JSON.parse(schema ?? '');
+    if (!isObject(root) || root.type !== 'object' || !isObject(root.properties)) return null;
+    const properties: Record<string, JsonObject> = {};
+    for (const [key, value] of Object.entries(root.properties)) {
+      if (!isObject(value) || value.type !== 'string') return null;
+      properties[key] = value;
+    }
+    return { root, properties };
+  } catch {
+    return null;
+  }
+}
+
 /**
  * Reads a JSON Schema as a simple field list when it is one: an object whose
  * properties are all strings. Anything richer returns null and is edited as text.
  */
 export function schemaToFields(schema: string | undefined): SchemaField[] | null {
   if (!schema?.trim()) return [];
-  try {
-    const parsed = JSON.parse(schema) as { type?: unknown; properties?: Record<string, { type?: unknown; title?: unknown; description?: unknown }> };
-    if (parsed.type !== 'object' || !parsed.properties || typeof parsed.properties !== 'object') return null;
-    const fields: SchemaField[] = [];
-    for (const [key, value] of Object.entries(parsed.properties)) {
-      if (!value || value.type !== 'string') return null;
-      fields.push({ key, title: typeof value.title === 'string' ? value.title : key, description: typeof value.description === 'string' ? value.description : '' });
-    }
-    return fields;
-  } catch {
-    return null;
-  }
+  const parsed = parseEditable(schema);
+  if (!parsed) return null;
+  return Object.entries(parsed.properties).map(([key, value]) => ({
+    key,
+    title: typeof value.title === 'string' ? value.title : key,
+    description: typeof value.description === 'string' ? value.description : '',
+  }));
 }
 
-/** The field list as a JSON Schema: every field a required string, in this order. */
-export function fieldsToSchema(fields: readonly SchemaField[]): string {
+/**
+ * The field list as a JSON Schema, in this order. Written over `base` when given,
+ * so only names, descriptions, order and added or removed fields change: other
+ * constraints stay, fields that were optional stay optional, new fields are required.
+ */
+export function fieldsToSchema(fields: readonly SchemaField[], base?: string): string {
+  const parsed = base ? parseEditable(base) : null;
+  const root: JsonObject = parsed?.root ?? { type: 'object' };
+  const before = parsed?.properties ?? {};
+  const wasRequired = Array.isArray(root.required) ? root.required.filter((key): key is string => typeof key === 'string') : [];
+
   const properties = Object.fromEntries(
-    fields.map((field) => [field.key, { type: 'string', title: field.title.trim(), ...(field.description.trim() ? { description: field.description.trim() } : {}) }]),
+    fields.map((field) => {
+      const old = before[field.key];
+      const next: JsonObject = { ...old, type: 'string' };
+      const title = field.title.trim();
+      // A field shown under its key without a title of its own keeps having none.
+      if (old && typeof old.title !== 'string' && title === field.key) delete next.title;
+      else next.title = title;
+      const description = field.description.trim();
+      if (description) next.description = description;
+      else delete next.description;
+      return [field.key, next];
+    }),
   );
-  return JSON.stringify({ type: 'object', properties, required: fields.map((field) => field.key) }, null, 2);
+  const required = fields.filter((field) => (before[field.key] ? wasRequired.includes(field.key) : true)).map((field) => field.key);
+
+  const next: JsonObject = { ...root, type: 'object', properties };
+  if (required.length > 0 || 'required' in root) next.required = required;
+  return JSON.stringify(next, null, 2);
 }
 
 /** Why a schema cannot be used, or undefined when it can. */
@@ -64,7 +106,7 @@ export function SchemaFields({ schema, onChange }: SchemaFieldsProps) {
   const [raw, setRaw] = useState(fields === null);
   const [dragging, setDragging] = useState<number | null>(null);
 
-  const update = (next: SchemaField[]) => onChange(fieldsToSchema(next));
+  const update = (next: SchemaField[]) => onChange(fieldsToSchema(next, schema));
   const newKey = (list: readonly SchemaField[]) => {
     let n = list.length + 1;
     while (list.some((field) => field.key === `field${n}`)) n += 1;
