@@ -1,4 +1,4 @@
-import { useRef, type CSSProperties, type KeyboardEvent } from 'react';
+import { Fragment, useRef, type CSSProperties, type KeyboardEvent } from 'react';
 import { Icon, type IconName } from './Icon';
 import { Tooltip } from './Tooltip';
 import './SelectionMenu.css';
@@ -14,6 +14,12 @@ const colorLabels: Record<HighlightColor, string> = {
   pink: '粉色',
   purple: '紫色',
 };
+
+/**
+ * How actions are shown (under review): text · icon (name on hover) · both side by side ·
+ * stacked (icon over a small name) · reveal (icon; the name slides out on hover).
+ */
+export type SelectionMenuLook = 'text' | 'icon' | 'both' | 'stacked' | 'reveal';
 
 export interface SelectionMenuAction {
   id: string;
@@ -35,6 +41,12 @@ interface SelectionMenuProps {
   className?: string;
   /** The caller positions the menu (it is laid out at its natural width). */
   style?: CSSProperties;
+  look?: SelectionMenuLook;
+  /**
+   * What to show, in order: "colors" for the colour dots and action ids for
+   * actions. Left out: hidden. Default: colours, then every action.
+   */
+  layout?: readonly string[];
 }
 
 const dotStyle = (color: HighlightColor) => ({ '--pp-dot': `var(--pp-hl-${color}-dot)` }) as CSSProperties;
@@ -49,8 +61,54 @@ export function SelectionMenu({
   onDismiss,
   className,
   style,
+  look = 'text',
+  layout,
 }: SelectionMenuProps) {
   const ref = useRef<HTMLDivElement>(null);
+  const sequence = (layout ?? ['colors', ...actions.map((a) => a.id)]).filter((id) => id === 'colors' || actions.some((a) => a.id === id));
+
+  const colors = (
+    <div className="pp-selmenu__colors">
+      {highlightColors.map((color) => {
+        const isCurrent = color === currentColor;
+        const name = `${colorLabels[color]}高亮${isCurrent ? '（当前）' : ''}`;
+        return (
+          <Tooltip key={color} label={name} placement="top" labelsChild>
+            <button
+              type="button"
+              className="pp-selmenu__swatch"
+              aria-label={name}
+              aria-pressed={currentColor ? isCurrent : undefined}
+              style={dotStyle(color)}
+              onClick={() => onColor?.(color)}
+            >
+              <span className="pp-selmenu__dot" />
+            </button>
+          </Tooltip>
+        );
+      })}
+    </div>
+  );
+
+  const renderAction = (action: SelectionMenuAction) =>
+    look === 'icon' ? (
+      <Tooltip key={action.id} label={action.label} placement="top" labelsChild>
+        <button type="button" className="pp-selmenu__action" aria-label={action.label} onClick={() => onAction?.(action.id)}>
+          <Icon name={action.icon} size={17} strokeWidth={1.5} />
+        </button>
+      </Tooltip>
+    ) : (
+      <button key={action.id} type="button" className="pp-selmenu__action" onClick={() => onAction?.(action.id)}>
+        {look !== 'text' && <Icon name={action.icon} size={look === 'stacked' ? 17 : 15} strokeWidth={1.5} />}
+        {look === 'reveal' ? (
+          <span className="pp-selmenu__reveal">
+            <span>{action.label}</span>
+          </span>
+        ) : (
+          <span>{action.label}</span>
+        )}
+      </button>
+    );
 
   // Toolbar keyboard model: arrows move between items, Esc closes.
   const handleKeyDown = (event: KeyboardEvent<HTMLDivElement>) => {
@@ -79,38 +137,20 @@ export function SelectionMenu({
       aria-label={label}
       className={className ? `pp-glass pp-selmenu ${className}` : 'pp-glass pp-selmenu'}
       data-tone="float"
+      data-look={look}
       style={style}
       onKeyDown={handleKeyDown}
     >
-      <div className="pp-selmenu__colors">
-        {highlightColors.map((color) => {
-          const isCurrent = color === currentColor;
-          const name = `${colorLabels[color]}高亮${isCurrent ? '（当前）' : ''}`;
-          return (
-            <Tooltip key={color} label={name} placement="top" labelsChild>
-              <button
-                type="button"
-                className="pp-selmenu__swatch"
-                aria-label={name}
-                aria-pressed={currentColor ? isCurrent : undefined}
-                style={dotStyle(color)}
-                onClick={() => onColor?.(color)}
-              >
-                <span className="pp-selmenu__dot" />
-              </button>
-            </Tooltip>
-          );
-        })}
-      </div>
-
-      <span className="pp-selmenu__sep" aria-hidden="true" />
-
-      {actions.map((action) => (
-        // Text only: short labels read faster than icons and keep the bar small over the paper.
-        <button key={action.id} type="button" className="pp-selmenu__action" onClick={() => onAction?.(action.id)}>
-          {action.label}
-        </button>
-      ))}
+      {sequence.map((entry, index) => {
+        // The colour dots sit apart from the actions: a line between them and their neighbours.
+        const apart = index > 0 && (entry === 'colors' || sequence[index - 1] === 'colors');
+        return (
+          <Fragment key={entry}>
+            {apart && <span className="pp-selmenu__sep" aria-hidden="true" />}
+            {entry === 'colors' ? colors : renderAction(actions.find((a) => a.id === entry)!)}
+          </Fragment>
+        );
+      })}
 
       {onDelete && (
         <>

@@ -309,3 +309,168 @@
   margin-right: 10px;
   color: var(--pp-ok);
 }
+
+/* ---- Selection bar ------------------------------------------------------------- */
+
+.pp-set-selbar {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  padding: 6px 0 12px;
+}
+
+/* The bar as it will look, on a strip of paper. */
+.pp-set-selbar__preview {
+  display: flex;
+  justify-content: center;
+  padding: 18px 12px;
+  border-radius: var(--pp-radius-control);
+  background: var(--pp-fill);
+}
+
+.pp-set-selbar__preview .pp-selmenu {
+  animation: none;
+}
+
+.pp-set-selbar__list {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.pp-set-selbar__item {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  min-height: 40px;
+  padding: 0 4px;
+  border-radius: var(--pp-radius-control);
+  color: var(--pp-text);
+}
+
+.pp-set-selbar__item + .pp-set-selbar__item {
+  border-top: 0.5px solid var(--pp-hairline);
+}
+
+.pp-set-selbar__item > svg {
+  flex-shrink: 0;
+  color: var(--pp-text-2);
+}
+
+.pp-set-selbar__item[data-hidden='true'] .pp-set-selbar__label,
+.pp-set-selbar__item[data-hidden='true'] > svg {
+  color: var(--pp-text-3);
+}
+
+.pp-set-selbar__item[data-dragging='true'] {
+  opacity: 0.45;
+}
+
+.pp-set-selbar__grip {
+  display: flex;
+  flex-shrink: 0;
+  align-items: center;
+  justify-content: center;
+  width: 20px;
+  height: 28px;
+  padding: 0;
+  border: 0;
+  border-radius: 6px;
+  background: transparent;
+  color: var(--pp-text-3);
+  cursor: grab;
+}
+
+.pp-set-selbar__grip:hover {
+  background: var(--pp-fill-hover);
+  color: var(--pp-text-2);
+}
+
+.pp-set-selbar__label {
+  flex: 1;
+  font-size: var(--pp-text-md);
+}
+
+.pp-set-selbar__actions {
+  display: flex;
+  justify-content: flex-end;
+}
+
+/* 显示方式: folded away by default. */
+.pp-set-selbar__look {
+  border-top: 0.5px solid var(--pp-hairline);
+  padding-top: 6px;
+}
+
+.pp-set-selbar__disclosure {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  width: 100%;
+  height: 32px;
+  padding: 0 4px;
+  border: 0;
+  border-radius: var(--pp-radius-control);
+  background: transparent;
+  color: var(--pp-text);
+  font-size: var(--pp-text-md);
+  text-align: left;
+}
+
+.pp-set-selbar__disclosure:hover {
+  background: var(--pp-fill-hover);
+}
+
+.pp-set-selbar__disclosure svg {
+  color: var(--pp-text-2);
+  transition: transform var(--pp-dur-fast) var(--pp-ease-out);
+}
+
+.pp-set-selbar__look[data-open='true'] .pp-set-selbar__disclosure svg {
+  transform: rotate(90deg);
+}
+
+.pp-set-selbar__current {
+  margin-left: auto;
+  color: var(--pp-text-2);
+  font-size: var(--pp-text-sm);
+}
+
+.pp-set-selbar__looks {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  padding: 4px 0 0 22px;
+}
+
+.pp-set-selbar__option {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  min-height: 34px;
+  padding: 0 6px;
+  border-radius: var(--pp-radius-control);
+  cursor: pointer;
+}
+
+.pp-set-selbar__option:hover {
+  background: var(--pp-fill-hover);
+}
+
+.pp-set-selbar__option input {
+  flex-shrink: 0;
+  margin: 0;
+  accent-color: var(--pp-accent);
+}
+
+.pp-set-selbar__option-text {
+  display: flex;
+  align-items: baseline;
+  gap: 10px;
+  font-size: var(--pp-text-md);
+}
+
+.pp-set-selbar__option-text > span + span {
+  color: var(--pp-text-2);
+  font-size: var(--pp-text-sm);
+}

@@ -1,12 +1,14 @@
-import { useMemo, useRef, useState, type DragEvent } from 'react';
+import { useEffect, useMemo, useRef, useState, type DragEvent } from 'react';
 import { Button, Dialog, EmptyState, GlassSurface, Icon, IconButton, Menu, type MenuEntry } from '@/ui/components';
 import { useViewport } from '@/ui/reader/useViewport';
 import { defaultVisibleColumns, firstDirection } from './columns';
 import { LibrarySidebar, type CollectionCounts } from './LibrarySidebar';
 import { LibraryTable } from './LibraryTable';
+import { ImportTasks, jobPending, UrlImportDialog } from './ImportTasks';
+import { BatchTagPopover, type BatchTagChoice, type BatchTagApplyResult } from './BatchTagPopover';
 import { LibraryToolbar, type ImportKind } from './LibraryToolbar';
 import { folderEntries, folderPath, PaperDetail } from './PaperDetail';
-import type { FolderView, LibraryQuery, LibraryViewPreferences, PaperView, TagView } from './types';
+import type { FolderView, LibraryImports, LibraryQuery, LibraryViewPreferences, PaperView, TagView } from './types';
 import './library.css';
 
 export interface LibraryViewProps {
@@ -28,6 +30,8 @@ export interface LibraryViewProps {
   onToggleStar: (ids: string[], starred: boolean) => void;
   onUpdate: (id: string, patch: Partial<PaperView>) => void;
   onAddTag: (ids: string[], tag: { id?: string; label: string }) => void;
+  /** One callback for the complete batch; failure keeps the editor and draft open. */
+  onAddTags?: (ids: string[], tags: BatchTagChoice[]) => void | BatchTagApplyResult | Promise<void | BatchTagApplyResult>;
   onRemoveTag: (id: string, tagId: string) => void;
   onMovePapers: (ids: string[], folderId: string | null) => void;
   onRemoveFromLibrary: (ids: string[]) => void;
@@ -37,6 +41,8 @@ export interface LibraryViewProps {
   onMoveFolder: (id: string, parentId: string | null) => void;
   onDeleteFolder: (id: string) => void;
   onImport: (kind: ImportKind, files: File[], folderId: string | null) => void;
+  /** The import queue and link import; without it the toolbar shows only file imports. */
+  imports?: LibraryImports;
   onExportCitations: (ids: string[], format: 'bibtex' | 'apa' | 'csv') => void;
 }
 
@@ -59,6 +65,19 @@ export function LibraryView(props: LibraryViewProps) {
   const dragDepth = useRef(0);
   const batchRefs = { tag: useRef<HTMLButtonElement>(null), move: useRef<HTMLButtonElement>(null), export: useRef<HTMLButtonElement>(null) };
 
+  // Imports: the link dialog, and the task list, which opens by itself when new jobs arrive.
+  const { imports } = props;
+  const [urlOpen, setUrlOpen] = useState(false);
+  const [tasksOpen, setTasksOpen] = useState(false);
+  const tasksRef = useRef<HTMLButtonElement>(null);
+  const jobCount = imports?.jobs.length ?? 0;
+  const lastJobCount = useRef(jobCount);
+  useEffect(() => {
+    if (jobCount > lastJobCount.current) setTasksOpen(true);
+    if (jobCount === 0) setTasksOpen(false);
+    lastJobCount.current = jobCount;
+  }, [jobCount]);
+
   const { width } = useViewport();
 
   // Panes follow the window width until the reader toggles them.
@@ -71,6 +90,7 @@ export function LibraryView(props: LibraryViewProps) {
 
   const tagsById = useMemo(() => new Map(tags.map((tag) => [tag.id, tag])), [tags]);
   const active = activeId ? (props.paperById(activeId) ?? null) : null;
+  const allSelectedStarred = selectedIds.length > 0 && selectedIds.every(id => props.paperById(id)?.starred);
   const currentFolder = query.collection.kind === 'folder' ? query.collection.folderId : null;
 
   // Changing what is listed clears the selection.
@@ -188,6 +208,18 @@ export function LibraryView(props: LibraryViewProps) {
             onPrefs={props.onPrefs}
             onResetColumns={() => props.onPrefs({ visibleColumns: defaultVisibleColumns, columnWidths: {} })}
             onImport={(kind, files) => props.onImport(kind, files, currentFolder)}
+            onImportUrl={imports ? () => setUrlOpen(true) : undefined}
+            tasks={
+              imports && imports.jobs.length > 0
+                ? {
+                    ref: tasksRef,
+                    active: imports.jobs.filter(jobPending).length,
+                    failed: imports.jobs.filter((job) => job.phase === 'failed').length,
+                    open: tasksOpen,
+                    onToggle: () => setTasksOpen((open) => !open),
+                  }
+                : undefined
+            }
             sidebarOpen={sidebarOpen}
             onToggleSidebar={() => props.onPrefs({ sidebarOpen: !sidebarOpen })}
             detailOpen={detailOpen}
@@ -225,10 +257,10 @@ export function LibraryView(props: LibraryViewProps) {
           {selectedIds.length > 1 && (
             <GlassSurface tone="bar" radius="pill" className="pp-lib-batch" role="toolbar" aria-label="批量操作">
               <span className="pp-lib-batch__count">已选 {selectedIds.length} 篇</span>
-              <Button size="sm" variant="quiet" icon="star" onClick={() => props.onToggleStar(selectedIds, true)}>
-                标星
+              <Button size="sm" variant="quiet" icon="star" aria-pressed={allSelectedStarred} onClick={() => props.onToggleStar(selectedIds, !allSelectedStarred)}>
+                {allSelectedStarred ? '取消标星' : '标星'}
               </Button>
-              <Button ref={batchRefs.tag} size="sm" variant="quiet" icon="tag" aria-haspopup="menu" onClick={() => setBatchMenu(batchMenu === 'tag' ? null : 'tag')}>
+              <Button ref={batchRefs.tag} size="sm" variant="quiet" icon="tag" aria-haspopup={props.onAddTags ? 'dialog' : 'menu'} aria-expanded={batchMenu === 'tag'} onClick={() => setBatchMenu(batchMenu === 'tag' ? null : 'tag')}>
                 加标签
               </Button>
               <Button ref={batchRefs.move} size="sm" variant="quiet" icon="folder" aria-haspopup="menu" onClick={() => setBatchMenu(batchMenu === 'move' ? null : 'move')}>
@@ -262,7 +294,25 @@ export function LibraryView(props: LibraryViewProps) {
       />
       </div>
 
-      {batchMenu && (
+      {imports && (
+        <>
+          <UrlImportDialog open={urlOpen} onClose={() => setUrlOpen(false)} onSubmit={(url) => imports.onImportUrl(url, currentFolder)} />
+          <ImportTasks
+            anchorRef={tasksRef}
+            open={tasksOpen && jobCount > 0}
+            onClose={() => setTasksOpen(false)}
+            jobs={imports.jobs}
+            onCancel={imports.onCancel}
+            onRetry={imports.onRetry}
+            onPassword={imports.onPassword}
+          />
+        </>
+      )}
+
+      {batchMenu === 'tag' && props.onAddTags ? (
+        <BatchTagPopover key={selectedIds.join(',')} anchorRef={batchRefs.tag} tags={tags} paperCount={selectedIds.length}
+          onApply={choices => props.onAddTags?.([...selectedIds], choices)} onClose={() => setBatchMenu(null)} />
+      ) : batchMenu && (
         <Menu
           label={batchMenu === 'tag' ? '加标签' : batchMenu === 'move' ? '移动到文件夹' : '导出引用'}
           entries={batchEntries[batchMenu]}

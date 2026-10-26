@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react';
 import { createPortal } from 'react-dom';
 import { Toaster, toast } from '@/ui/components';
 import { ComponentGallery } from '@/ui/gallery/ComponentGallery';
+import { SelectionBarDemo } from '@/ui/gallery/SelectionBarDemo';
 import { sampleFolders, samplePapers, sampleTags } from '@/ui/library/sample/libraryData';
 import type { FolderView, PaperView, TagView } from '@/ui/library/types';
 import type { LibraryEntryDraft } from '@/ui/reader/library/SaveToLibraryPopover';
@@ -27,6 +28,7 @@ const ZOOM_STEPS = [50, 67, 80, 90, 100, 110, 125, 150, 175, 200];
 
 export function ReaderPage() {
   if (params.get('view') === 'gallery') return <ComponentGallery />;
+  if (params.get('view') === 'selbar') return <SelectionBarDemo />;
   return <SampleReader />;
 }
 

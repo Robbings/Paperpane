@@ -46,10 +46,21 @@ interface ReaderToolbarProps {
   settingsRef?: RefObject<HTMLButtonElement | null>;
   settingsOpen?: boolean;
   onSettings?: () => void;
+  /** A back button at the start, to the library the paper was opened from. */
+  onBack?: () => void;
+  /** What 导出 offers; without it the button reports onTool('export'). */
+  exports?: readonly ExportOption[];
+  onExport?: (id: string) => void;
   onTool: (tool: ToolbarTool) => void;
 }
 
-type OpenMenu = { kind: 'context' | 'more' | 'rotate'; x: number; y: number; align: 'start' | 'end' } | null;
+export interface ExportOption {
+  id: string;
+  label: string;
+  disabled?: boolean;
+}
+
+type OpenMenu = { kind: 'context' | 'more' | 'rotate' | 'export'; x: number; y: number; align: 'start' | 'end' } | null;
 
 export function ReaderToolbar({
   header,
@@ -80,6 +91,9 @@ export function ReaderToolbar({
   settingsRef,
   settingsOpen,
   onSettings,
+  onBack,
+  exports,
+  onExport,
   onTool,
 }: ReaderToolbarProps) {
   const [pageDraft, setPageDraft] = useState(String(pageIndex + 1));
@@ -94,6 +108,17 @@ export function ReaderToolbar({
 
   const [menu, setMenu] = useState<OpenMenu>(null);
   const moreRef = useRef<HTMLButtonElement>(null);
+  const exportRef = useRef<HTMLButtonElement>(null);
+
+  /** 导出: a menu of what can be exported, under the button it came from. */
+  const openExport = (from: HTMLButtonElement | null) => {
+    if (!exports) {
+      onTool('export');
+      return;
+    }
+    const box = from?.getBoundingClientRect();
+    if (box) setMenu({ kind: 'export', x: box.right, y: box.bottom + 6, align: 'end' });
+  };
 
   const submitPage = (event: FormEvent) => {
     event.preventDefault();
@@ -150,7 +175,8 @@ export function ReaderToolbar({
     else if (id === 'zoom-out') onZoom('out');
     else if (id === 'rotate') onRotate();
     else if (id === 'rotate-reset') onResetRotation();
-    else if (id === 'open' || id === 'region' || id === 'export') onTool(id);
+    else if (id === 'export') window.setTimeout(() => openExport(moreRef.current), 0);
+    else if (id === 'open' || id === 'region') onTool(id);
   };
 
   return (
@@ -164,6 +190,7 @@ export function ReaderToolbar({
       title={titleVisible ? undefined : fullTitle}
       onContextMenu={openContextMenu}
     >
+      {onBack && <IconButton icon="chevronLeft" label="返回文献库" shape="pill" onClick={onBack} />}
       {/* Layout toggles show their state in the icon, not in accent colour. */}
       <IconButton
         icon={sidebarOpen ? 'sidebarShown' : 'sidebar'}
@@ -297,17 +324,36 @@ export function ReaderToolbar({
           tooltip={!settingsOpen}
           onClick={onSettings ?? (() => onTool('settings'))}
         />
-        {density === 'full' && <IconButton icon="export" label="导出" shape="pill" onClick={() => onTool('export')} />}
+        {density === 'full' && (
+          <IconButton
+            ref={exportRef}
+            icon="export"
+            label="导出"
+            shape="pill"
+            aria-haspopup={exports ? 'menu' : undefined}
+            aria-expanded={exports ? menu?.kind === 'export' : undefined}
+            tooltip={menu?.kind !== 'export'}
+            onClick={() => (menu?.kind === 'export' ? setMenu(null) : openExport(exportRef.current))}
+          />
+        )}
       </div>
 
       {menu && (
         <Menu
-          label={menu.kind === 'more' ? '更多工具' : menu.kind === 'rotate' ? '页面方向' : '工具栏'}
-          entries={menu.kind === 'more' ? moreEntries : menu.kind === 'rotate' ? [resetEntry] : [titleEntry]}
+          label={menu.kind === 'more' ? '更多工具' : menu.kind === 'rotate' ? '页面方向' : menu.kind === 'export' ? '导出' : '工具栏'}
+          entries={
+            menu.kind === 'more'
+              ? moreEntries
+              : menu.kind === 'rotate'
+                ? [resetEntry]
+                : menu.kind === 'export'
+                  ? (exports ?? []).map((option) => ({ id: option.id, label: option.label, disabled: option.disabled }))
+                  : [titleEntry]
+          }
           anchor={{ x: menu.x, y: menu.y }}
           align={menu.align}
-          triggerRef={menu.kind === 'more' ? moreRef : undefined}
-          onSelect={onMenuSelect}
+          triggerRef={menu.kind === 'more' ? moreRef : menu.kind === 'export' ? exportRef : undefined}
+          onSelect={menu.kind === 'export' ? (id) => onExport?.(id) : onMenuSelect}
           onClose={() => setMenu(null)}
         />
       )}

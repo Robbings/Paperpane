@@ -4,9 +4,12 @@ import { Button, Dialog, EmptyState, ProgressBar, TextField, Toaster } from '@/u
 import type { ReaderInteraction } from '@/ui/reader/types';
 import { ReaderController } from './reader-controller';
 import '@/document/reader/surface.css';
+import { useLocalPreferences } from './use-local-preferences';
+import { downloadFile } from './library-page';
 
 /** Production reader entry; the proof URL uses exactly this same integration. */
 export function LiveReaderPage() {
+  const preferences = useLocalPreferences();
   const [container,setContainer] = useState<HTMLDivElement|null>(null);
   const [surface,setSurface] = useState<HTMLDivElement|null>(null);
   const [owner,setOwner] = useState<ReaderController>();
@@ -73,6 +76,10 @@ export function LiveReaderPage() {
         <div ref={setSurface} className="pdfViewer pp-pdf-surface"/>
       </>}
       interaction={interaction}
+      onBack={()=>{location.href='library.html';}}
+      exports={[{id:'original',label:'导出原 PDF',disabled:!owner?.document}]}
+      onExport={()=>{if(owner?.document)void owner.db.readFile(owner.document).then(blob=>downloadFile(blob,`${owner.document!.title}.pdf`)).catch(()=>report('原文件导出失败，请重试。'));}}
+      settings={{preferences:preferences.state.preferences,onPreference:preferences.setPreference,models:[],defaultModelId:null,onDefaultModel:()=>report('模型配置将在后续接入。'),status:{local:preferences.state.local,sync:'unconfigured',lastSyncedAt:null,modelAvailability:'unconfigured'},onOpenSettings:section=>window.open(`options.html${section?'#'+section:''}`,'_blank','noopener')}}
       onNavigate={index=>{void owner?.reader.navigate(index).then(r=>{if(!r.ok)report(r.error.message);});}}
       onZoom={direction=>{const r=owner?.reader.setZoom((state?.position.zoom??1)+(direction==='in'?.1:-.1));if(r&&!r.ok)report(r.error.message);}}
       onZoomTo={percent=>{const r=owner?.reader.setZoom(percent/100);if(r&&!r.ok)report(r.error.message);}}

@@ -75,6 +75,7 @@ export class PdfjsReader implements ReaderService, AnchorService {
   }
   getSnapshot = () => this.snapshot;
   subscribe = (listener: () => void) => { this.listeners.add(listener); return () => this.listeners.delete(listener); };
+  private reset(state: ReaderState) { if (this.disposed) return; this.snapshot = freeze({mode:'live',state:'ready',data:state}); this.listeners.forEach(fn=>fn()); }
   private publish(patch: Partial<ReaderState>) { if (this.disposed) return; this.snapshot = freeze({ mode: 'live', state: 'ready', data: { ...this.snapshot.data, ...patch } }); this.listeners.forEach(fn=>fn()); }
   private position(patch: Partial<ReaderState['position']>) { this.publish({ position: { ...this.snapshot.data.position, ...patch } }); }
   private capturePosition() {
@@ -111,7 +112,7 @@ export class PdfjsReader implements ReaderService, AnchorService {
     this.sessionLifecycle.abort(); this.sessionLifecycle = new AbortController();
     const sessionId = crypto.randomUUID(); const previous = this.task; this.task = undefined;
     this.password = undefined; this.highlights?.dispose(); this.highlights = undefined; this.annotations = []; this.pdf = undefined;
-    this.publish({ ...empty(), sessionId, document: ref, phase: 'loading' });
+    this.reset({ ...empty(), sessionId, document: ref, phase: 'loading' });
     this.links.setDocument(null); this.viewer.setDocument(null); await previous?.destroy().catch(() => {});
     if (this.disposed || this.snapshot.data.sessionId !== sessionId) return;
     try {
@@ -250,10 +251,17 @@ export class PdfjsReader implements ReaderService, AnchorService {
   }
   stepSearch(direction: 1 | -1) { const s=this.snapshot.data.search; if(s.query) this.eventBus.dispatch('find',{source:this,type:'again',query:s.query,caseSensitive:s.matchCase,entireWord:s.wholeWord,highlightAll:true,findPrevious:direction===-1,matchDiacritics:false}); }
   closeSearch() { this.search('',{matchCase:false,wholeWord:false}); }
+  async cancelOpen(): Promise<void> {
+    if (this.disposed) return;
+    this.sessionLifecycle.abort(); this.sessionLifecycle = new AbortController();
+    const task = this.task; this.task = undefined;
+    this.password = undefined; this.highlights?.dispose(); this.highlights = undefined; this.annotations = []; this.pdf = undefined;
+    this.reset(empty()); this.links.setDocument(null); this.viewer.setDocument(null);
+    await task?.destroy().catch(() => {});
+  }
   async cancelPassword(id: string): Promise<Result<void>> {
     if (this.password?.id !== id) return failure('STALE_CONFIRMATION','密码请求已结束');
-    this.password=undefined; this.sessionLifecycle.abort(); this.publish({sessionId:crypto.randomUUID(),phase:'empty',passwordRequest:undefined});
-    await this.task?.destroy(); this.task=undefined; return success(undefined);
+    await this.cancelOpen(); return success(undefined);
   }
   async dispose() { if (this.disposed) return; this.disposed = true; this.sessionLifecycle.abort(); this.lifecycle.abort(); this.observer.disconnect(); this.listeners.clear(); Object.values(this.projections).forEach(s=>s.clear()); this.password = undefined; this.highlights?.dispose(); this.highlights = undefined; this.links.setDocument(null); this.viewer.setDocument(null); await this.task?.destroy().catch(()=>{}); }
 }

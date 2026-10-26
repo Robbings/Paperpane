@@ -158,6 +158,7 @@ toast.show({ message: '翻译失败：请求超时', tone: 'error', action: { la
 - 列表显示方式（简洁 / 详细、显示哪些列、列宽）和左右两栏是否显示是 `LibraryViewPreferences`，通过 `onPrefs(patch)` 由逻辑层保存为偏好。`sidebarOpen` / `detailOpen` 不设时按窗口宽度自动决定。
 - 其余都是动作回调：标星、改字段、标签、移动、移出、文件夹增改删、导入（PDF / CSL JSON / BibTeX）、导出引用。`onCreateFolder` 需要同步返回新文件夹的 id，界面随即进入改名。
 - 拖动论文时 `dataTransfer` 里是 `application/x-paperpane-papers`（id 数组的 JSON），见 `src/ui/library/dragTypes.ts`。
+- **导入**：`imports?: LibraryImports` 传入后，导入菜单多一项「从网址导入 PDF…」（对话框里填链接，`onImportUrl(url, folderId)` 返回错误文字或 null），导入按钮左侧出现任务按钮：进行中显示转圈和数量，结束后显示完成或失败；点开是任务浮层，按最新在前列出 `jobs`，可取消、重试、输入 PDF 密码。有新任务加入时浮层自动打开。示例接线是 `library/sample/useSampleImports.ts`（文件名含 locked 需要密码 1234，含 fail 会失败）。
 
 ## 设置 `SettingsView` 与快速设置
 
@@ -170,6 +171,7 @@ toast.show({ message: '翻译失败：请求超时', tone: 'error', action: { la
 - **外观的应用**：`applyAppearance()`（`src/ui/theme.ts`）设置主题、`--pp-read-scale` 和页面减光。正文字号只作用于批注、笔记、概览和回答正文（`--pp-text-read*`），不缩放工具栏，也不改变 PDF 缩放。
 - **节**：`SettingsSection` = general / models / features / sync / advanced / privacy；设置页地址的 `#models` 等直达对应一节。目前完成了通用和高级，其余几节下一步做。
 - **状态行** `StatusLine`：保存、同步、模型三种状态，设置页、阅读器快速设置和扩展弹窗共用，数据来自 `StatusSummary`。
+- **返回与导出**：`ReaderShell` 的 `onBack` 在工具栏最左边显示「返回文献库」；`exports`（`{ id, label, disabled? }[]`）让工具栏的导出按钮（窄窗口时在「更多」里）弹出导出菜单，选择后调用 `onExport(id)`。不传 `exports` 时导出按钮仍调用 `onTool('export')`。
 - **阅读器快速设置**：`ReaderShell` 的 `settings` prop（`ReaderSettingsProps`），工具栏设置按钮弹出：主题、正文字号、深色减光、回答语言、默认模型，加状态行和「全部设置…」。默认模型调用 `onDefaultModel(id)`，对应逻辑层的 `setDefaultModel(modelId, baseRevision)` 单项原子命令；不传 `settings` 时按钮仍调用 `onTool('settings')`。
 
 ## 扩展弹窗 `PopupView`

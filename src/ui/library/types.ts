@@ -66,3 +66,27 @@ export interface LibraryViewPreferences {
   sidebarOpen?: boolean;
   detailOpen?: boolean;
 }
+
+/** One file or link in the import queue, in the order it was added. */
+export interface ImportJobView {
+  id: string;
+  title: string;
+  phase: 'queued' | 'reading' | 'validating' | 'password-required' | 'saving' | 'completed' | 'failed' | 'cancelled';
+  progress?: { completed: number; total?: number; unit: 'bytes' | 'pages' };
+  /** The PDF is locked; incorrect is set after a wrong password. */
+  passwordRequest?: { requestId: string; incorrect: boolean };
+  /** When completed: papers added, and ones already in the library that were reused. */
+  added?: number;
+  reused?: number;
+  error?: string;
+}
+
+/** The import queue and the link import, for the library page. */
+export interface LibraryImports {
+  jobs: readonly ImportJobView[];
+  /** Queues a PDF link; resolves with an error message when it cannot be queued. */
+  onImportUrl: (url: string, folderId: string | null) => Promise<string | null>;
+  onCancel: (id: string) => void;
+  onRetry: (id: string) => void;
+  onPassword: (id: string, requestId: string, password: string) => void;
+}
