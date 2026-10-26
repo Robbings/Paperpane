@@ -1,6 +1,7 @@
 /* The translation pane: an opaque reading surface beside the paper, one continuous text. */
 
 .pp-tr {
+  container-type: inline-size;
   display: flex;
   flex-direction: column;
   height: 100%;
@@ -24,7 +25,9 @@
 }
 
 .pp-tr__title {
+  flex-shrink: 0;
   color: var(--pp-text);
+  white-space: nowrap;
   font-size: var(--pp-text-md);
   font-weight: var(--pp-weight-semibold);
 }
@@ -39,6 +42,23 @@
 
 .pp-tr__spacer {
   flex: 1;
+}
+
+/* Narrow: the progress goes first, then the title; the controls stay on one line. */
+@container (max-width: 400px) {
+  .pp-tr__summary {
+    display: none;
+  }
+}
+
+@container (max-width: 330px) {
+  .pp-tr__title {
+    display: none;
+  }
+
+  .pp-tr__head {
+    padding-left: 10px;
+  }
 }
 
 .pp-tr__head .pp-seg {
