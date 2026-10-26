@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from 'react';
 import { toast } from '@/ui/components';
 import { OverviewPanel } from '../overview/OverviewPanel';
+import { fieldsToSchema } from '../overview/SchemaFields';
 import type { OverviewCardDef, OverviewContent, OverviewResultView, OverviewSourceView } from '../overview/types';
 
 // 示例接线：概览面板的演示数据。打开时自动"生成"（定时器模拟逐段出现），
@@ -14,6 +15,13 @@ const cards: OverviewCardDef[] = [
     name: '结构化摘要',
     prompt: '按给定字段整理论文的研究问题、方法、数据、主要结果和局限。',
     output: 'fields',
+    schema: fieldsToSchema([
+      { key: 'question', title: '研究问题', description: '论文要解决的具体问题' },
+      { key: 'method', title: '方法', description: '核心做法，一两句话' },
+      { key: 'data', title: '数据', description: '实验用的数据或材料；没写明就如实说明' },
+      { key: 'results', title: '主要结果', description: '最重要的发现' },
+      { key: 'limits', title: '局限', description: '作者承认的或明显存在的不足' },
+    ]),
     builtIn: true,
     visible: true,
   },
@@ -157,7 +165,17 @@ export function SampleOverview({ onLocateQuote }: { onLocateQuote: (quote: strin
         setDefs((all) => all.map((c) => (c.id === id ? { ...c, visible: false } : c)));
         toast.show({ message: '已隐藏，可以在「管理概览内容」里重新打开。', action: { label: '撤销', onAction: () => setDefs((all) => all.map((c) => (c.id === id ? { ...c, visible: true } : c))) } });
       }}
-      onManageCards={() => toast.show({ message: '示例：打开设置里的「概览内容」' })}
+      defaultCards={cards}
+      onSaveCards={(next) => {
+        // Cards whose prompt or form changed keep their old result, marked as possibly out of date.
+        const changed = next.filter((card) => {
+          const before = defs.find((c) => c.id === card.id);
+          return before && (before.prompt !== card.prompt || before.output !== card.output || before.schema !== card.schema);
+        });
+        setDefs(next.map((card) => (card.id.startsWith('new:') ? { ...card, id: `card-${card.id.slice(4)}` } : card)));
+        setResults((all) => ({ ...all, ...Object.fromEntries(changed.filter((c) => all[c.id]?.content).map((c) => [c.id, { ...all[c.id]!, stale: true }])) }));
+        toast.show({ message: '已保存概览内容设置', tone: 'success' });
+      }}
       onLocate={(s) => onLocateQuote(s.quote)}
       onConfigureModels={() => toast.show({ message: '示例：打开模型设置' })}
     />

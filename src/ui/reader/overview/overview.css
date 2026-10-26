@@ -334,108 +334,253 @@
   text-underline-offset: 2px;
 }
 
-/* ---- Card editor (for the settings page) ---------------------------------------------------- */
+/* ---- Settings dialog: the card list on the glass, the editor on a card ---------------- */
 
-.pp-ov-editor {
-  flex: 1;
-  margin: var(--pp-space-2) -6px 0;
+.pp-ov-settings {
+  display: grid;
+  grid-template-columns: 216px minmax(0, 1fr);
+  gap: var(--pp-space-4);
+  height: min(500px, calc(100vh - 240px));
+  min-height: 320px;
 }
 
-.pp-ov-editor__viewport {
-  padding: 0 6px var(--pp-space-4);
+.pp-ov-settings__list {
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+  margin-left: -6px;
 }
 
-.pp-ov-editor__hint {
-  margin: 0 0 var(--pp-space-2);
-  color: var(--pp-text-2);
-  font-size: var(--pp-text-sm);
-  line-height: var(--pp-leading-body);
-}
-
-.pp-ov-editor__list {
+.pp-ov-settings__list ol {
   display: flex;
   flex-direction: column;
   gap: 2px;
   margin: 0;
   padding: 0;
+  overflow-y: auto;
   list-style: none;
 }
 
-.pp-ov-editor__row {
+.pp-ov-settings__item {
   display: flex;
   align-items: center;
-  gap: 6px;
-  padding: 2px 4px 2px 2px;
+  gap: 2px;
+  padding: 0 6px 0 2px;
   border-radius: var(--pp-radius-control);
 }
 
-.pp-ov-editor__row:hover {
+.pp-ov-settings__item:hover {
   background: var(--pp-fill-hover);
 }
 
-.pp-ov-editor__row[data-dragging='true'] {
+.pp-ov-settings__item[aria-current='true'] {
+  background: var(--pp-accent-soft);
+}
+
+.pp-ov-settings__item[data-dragging='true'] {
   opacity: 0.4;
 }
 
-.pp-ov-editor__grip {
-  flex-shrink: 0;
+.pp-ov-settings__item[data-hidden='true'] .pp-ov-settings__name {
   color: var(--pp-text-3);
-  cursor: grab;
 }
 
-.pp-ov-editor__open {
+/* A grip of dots, only while hovering the row. */
+.pp-ov-settings__grip {
+  flex-shrink: 0;
+  width: 10px;
+  height: 16px;
+  background-image: radial-gradient(circle, var(--pp-text-3) 1px, transparent 1.3px);
+  background-size: 5px 5px;
+  cursor: grab;
+  opacity: 0;
+}
+
+.pp-ov-settings__item:hover .pp-ov-settings__grip {
+  opacity: 1;
+}
+
+.pp-ov-settings__open {
   display: flex;
   flex: 1;
   flex-direction: column;
   gap: 1px;
   min-width: 0;
-  padding: 6px 4px;
+  padding: 7px 4px;
   border: 0;
   background: transparent;
   color: var(--pp-text);
   text-align: left;
 }
 
-.pp-ov-editor__name {
+.pp-ov-settings__name {
+  display: flex;
+  align-items: center;
+  gap: 6px;
   overflow: hidden;
   font-size: var(--pp-text-md);
   text-overflow: ellipsis;
   white-space: nowrap;
 }
 
-.pp-ov-editor__kind {
-  color: var(--pp-text-3);
+.pp-ov-settings__problem {
+  flex-shrink: 0;
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: var(--pp-danger);
+}
+
+.pp-ov-settings__kind {
+  color: var(--pp-text-2);
   font-size: var(--pp-text-xs);
 }
 
-.pp-ov-editor__add {
-  margin-top: var(--pp-space-2);
+.pp-ov-settings__add {
+  align-self: flex-start;
+  margin-top: 6px;
 }
 
-.pp-ov-form {
+.pp-ov-settings__card {
+  min-height: 0;
+  overflow: hidden;
+  border-radius: var(--pp-radius-float);
+  background: var(--pp-reading-surface);
+  box-shadow: 0 0 0 0.5px var(--pp-hairline);
+}
+
+.pp-ov-settings__editor {
   display: flex;
   flex-direction: column;
-  gap: var(--pp-space-3);
-  padding-top: 2px;
+  gap: var(--pp-space-4);
+  padding: var(--pp-space-4) var(--pp-space-5);
 }
 
-.pp-ov-form__field {
+.pp-ov-settings__empty {
+  margin: auto;
+  color: var(--pp-text-2);
+  font-size: var(--pp-text-sm);
+}
+
+.pp-ov-settings__field {
   display: flex;
   flex-direction: column;
   gap: 6px;
 }
 
-.pp-ov-form__schema {
+.pp-ov-settings__card-actions {
+  display: flex;
+  align-items: center;
+  gap: var(--pp-space-3);
+  margin-top: auto;
+  padding-top: var(--pp-space-2);
+  border-top: 0.5px solid var(--pp-hairline);
+}
+
+.pp-ov-settings__remove {
+  color: var(--pp-danger) !important;
+}
+
+.pp-ov-settings__note {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  color: var(--pp-text-2);
+  font-size: var(--pp-text-xs);
+}
+
+/* Field list of a structured card. */
+.pp-ov-fields-edit {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.pp-ov-fields-edit__head {
+  display: flex;
+  align-items: baseline;
+  gap: 8px;
+}
+
+.pp-ov-fields-edit__hint {
+  color: var(--pp-text-3);
+  font-size: var(--pp-text-xs);
+}
+
+.pp-ov-fields-edit__list {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.pp-ov-fields-edit__row {
+  display: grid;
+  grid-template-columns: 10px 7.5em minmax(0, 1fr) 28px;
+  align-items: center;
+  gap: 6px;
+}
+
+.pp-ov-fields-edit__row[data-dragging='true'] {
+  opacity: 0.4;
+}
+
+.pp-ov-fields-edit__grip {
+  width: 10px;
+  height: 16px;
+  background-image: radial-gradient(circle, var(--pp-text-3) 1px, transparent 1.3px);
+  background-size: 5px 5px;
+  cursor: grab;
+}
+
+.pp-ov-fields-edit__row input {
+  min-width: 0;
+  height: 30px;
+  padding: 0 9px;
+  border: 0;
+  border-radius: var(--pp-radius-control);
+  background: var(--pp-fill);
+  font-size: var(--pp-text-md);
+}
+
+.pp-ov-fields-edit__row input::placeholder {
+  color: var(--pp-text-3);
+}
+
+.pp-ov-fields-edit__row input:focus-visible {
+  outline: none;
+  background: var(--pp-surface);
+  box-shadow:
+    inset 0 0 0 1px var(--pp-accent),
+    0 0 0 3px var(--pp-accent-soft);
+}
+
+.pp-ov-fields-edit__title {
+  font-weight: var(--pp-weight-medium);
+}
+
+.pp-ov-fields-edit__row .pp-icon-btn {
+  color: var(--pp-text-3);
+}
+
+.pp-ov-fields-edit__actions {
+  display: flex;
+  align-items: center;
+  margin-left: -8px;
+}
+
+.pp-ov-fields-edit__spacer {
+  flex: 1;
+}
+
+.pp-ov-fields-edit__raw {
   font-family: var(--pp-font-mono);
   font-size: 12px !important;
 }
 
-.pp-ov-form__actions {
-  display: flex;
-  align-items: center;
-  gap: var(--pp-space-2);
-}
-
-.pp-ov-form__spacer {
-  flex: 1;
+.pp-ov-fields-edit__switch {
+  align-self: flex-start;
+  margin-left: -8px;
 }

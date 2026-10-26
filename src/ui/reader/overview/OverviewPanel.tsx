@@ -4,6 +4,7 @@ import { formatDate } from '@/ui/library/columns';
 import { PanelBody } from '../panels/PanelBody';
 import { PanelHeader } from '../panels/PanelHeader';
 import { OverviewSection } from './OverviewSection';
+import { OverviewSettings } from './OverviewSettings';
 import type { OverviewCardDef, OverviewContent, OverviewResultView, OverviewSourceView } from './types';
 import './overview.css';
 
@@ -20,8 +21,10 @@ export interface OverviewPanelProps {
   onRegenerate: (cardIds: string[]) => void;
   onStop: (cardIds: string[]) => void;
   onHide: (cardId: string) => void;
-  /** Card prompts and forms are edited in settings. */
-  onManageCards: () => void;
+  /** Saves edited cards from the settings dialog opened in the "…" menu. */
+  onSaveCards: (cards: OverviewCardDef[]) => void;
+  /** The built-in cards as shipped, for "恢复默认". */
+  defaultCards: readonly OverviewCardDef[];
   onLocate: (source: OverviewSourceView) => void;
   onConfigureModels: () => void;
 }
@@ -66,10 +69,13 @@ const timeOf = (iso: string) => {
 /** The paper at a glance, laid out as one page: opening lines, keywords, the structured summary, key points. */
 export function OverviewPanel(props: OverviewPanelProps) {
   const [menu, setMenu] = useState(false);
+  const [settings, setSettings] = useState(false);
   // Folded parts, per card; the logic layer may keep this as a preference later.
   const [collapsed, setCollapsed] = useState<ReadonlySet<string>>(() => new Set());
   const moreRef = useRef<HTMLButtonElement>(null);
-  const visible = props.cards.filter((card) => card.visible);
+  // The opening card always comes first, whatever its place in the list.
+  const shown = props.cards.filter((card) => card.visible);
+  const visible = [...shown.filter((card) => card.display === 'lead'), ...shown.filter((card) => card.display !== 'lead')];
   const resultOf = (id: string) => props.results[id] ?? emptyResult;
   const runningIds = visible.filter((card) => ['running', 'queued'].includes(resultOf(card.id).state)).map((card) => card.id);
   const running = runningIds.length > 0;
@@ -140,6 +146,10 @@ export function OverviewPanel(props: OverviewPanelProps) {
     />
   );
 
+  const settingsEl = (
+    <OverviewSettings open={settings} onClose={() => setSettings(false)} cards={props.cards} defaults={props.defaultCards} onSave={props.onSaveCards} />
+  );
+
   const menuEl = menu && (
     <Menu
       label="概览操作"
@@ -154,7 +164,7 @@ export function OverviewPanel(props: OverviewPanelProps) {
       })()}
       align="end"
       triggerRef={moreRef}
-      onSelect={(id) => (id === 'copy' ? copyAll() : props.onManageCards())}
+      onSelect={(id) => (id === 'copy' ? copyAll() : setSettings(true))}
       onClose={() => setMenu(false)}
     />
   );
@@ -176,6 +186,7 @@ export function OverviewPanel(props: OverviewPanelProps) {
         />
         </PanelBody>
         {menuEl}
+        {settingsEl}
       </div>
     );
   }
@@ -243,6 +254,7 @@ export function OverviewPanel(props: OverviewPanelProps) {
       </ScrollArea>
       </PanelBody>
       {menuEl}
+      {settingsEl}
     </div>
   );
 }
