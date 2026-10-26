@@ -6,6 +6,7 @@ interface ReaderSidebarProps {
   /** Stays mounted while hidden so it can slide and keeps its tab. */
   open: boolean;
   outline: readonly OutlineItemView[];
+  navigationPending?: boolean;
   pageCount: number;
   /** 0-based. */
   pageIndex: number;
@@ -18,7 +19,7 @@ interface ReaderSidebarProps {
 
 type SidebarTab = 'thumbs' | 'outline' | 'library';
 
-export function ReaderSidebar({ open, outline, pageCount, pageIndex, overlay, onNavigate, library }: ReaderSidebarProps) {
+export function ReaderSidebar({ open, outline, pageCount, pageIndex, overlay, onNavigate, library, navigationPending }: ReaderSidebarProps) {
   const [tab, setTab] = useState<SidebarTab>('outline');
   const tabs: { value: SidebarTab; label: string }[] = [
     { value: 'thumbs', label: '缩略图' },
@@ -43,6 +44,8 @@ export function ReaderSidebar({ open, outline, pageCount, pageIndex, overlay, on
 
       {tab === 'library' && library ? (
         library
+      ) : navigationPending ? (
+        <p className="pp-sidebar__empty">{tab === 'outline' ? '目录暂不可用。' : '缩略图暂不可用。'}</p>
       ) : tab === 'outline' ? (
         outline.length > 0 ? (
           <nav aria-label="目录" className="pp-sidebar__scroll pp-outline">

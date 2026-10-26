@@ -1,6 +1,9 @@
 @import 'pdfjs-dist/web/pdf_viewer.css';
 /* Surface adapter only. All Paperpane chrome still belongs to src/ui. */
 .pp-pdf-surface { --scale-factor: 1; --user-unit: 1; --total-scale-factor: calc(var(--scale-factor) * var(--user-unit)); }
-.pp-pdf-surface.pdfViewer .page { margin: 0 auto 16px; border: 0; }
+
 /* Upstream editor geometry/history remain; Paperpane owns visible edit actions. */
 .pp-pdf-surface .editToolbar, .pp-pdf-surface .highlightToolbar { display: none !important; }
+
+/* Canonical business annotations are changed only through the controlled UI. */
+.pp-pdf-surface .annotationEditorLayer, .pp-pdf-surface .highlightEditor { pointer-events: none !important; }

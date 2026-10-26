@@ -1,4 +1,3 @@
 import { mountPage } from '@/runtime/mount-page';
-import { ReaderPage } from '@/ui/pages/ReaderPage';
-
-mountPage(<ReaderPage />);
+import { LiveReaderPage } from '@/runtime/reader-page';
+mountPage(<LiveReaderPage />);

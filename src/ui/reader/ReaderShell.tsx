@@ -61,6 +61,7 @@ export interface ReaderLayout {
 interface ReaderShellProps {
   header: DocumentHeaderView;
   outline: readonly OutlineItemView[];
+  navigationPending?: boolean;
   /** 0-based. */
   pageIndex: number;
   zoomPercent: number;
@@ -350,8 +351,8 @@ export function ReaderShell(props: ReaderShellProps) {
       return [...current, { id, dx, dy: first ? bottom - first.top + 10 : 0, width: NOTE_SIZE.width, height: NOTE_SIZE.height, collapsed: false, open: true, z }];
     });
 
-  const deleteAnnotation = (id: string) => {
-    interaction.onAnnotationDelete(id);
+  const deleteAnnotation = async (id: string) => {
+    if (await interaction.onAnnotationDelete(id) === false) return;
     toast.show({
       message: '已删除批注',
       action: interaction.onAnnotationRestore ? { label: '撤销', onAction: () => interaction.onAnnotationRestore?.(id) } : undefined,
@@ -448,6 +449,7 @@ export function ReaderShell(props: ReaderShellProps) {
       <ReaderSidebar
         open={sidebarOpen}
         outline={outline}
+        navigationPending={props.navigationPending}
         pageCount={header.pageCount}
         pageIndex={pageIndex}
         // Floating or docked is decided by room, not by open state, so it

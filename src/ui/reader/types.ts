@@ -110,9 +110,9 @@ export interface ReaderInteraction {
    * document switch; a deleted annotation simply ignores later calls.
    */
   onAnnotationComment: (annotationId: string, comment: string) => void;
-  onAnnotationDelete: (annotationId: string) => void;
+  onAnnotationDelete: (annotationId: string) => void | Promise<boolean>;
   /** Undoes a delete (offered right after deleting). */
-  onAnnotationRestore?: (annotationId: string) => void;
+  onAnnotationRestore?: (annotationId: string) => void | Promise<void>;
   /** Where an annotation's text is on screen now, or null when its page is not rendered. Read while drawing a note's connector. */
   annotationRects: (annotationId: string) => readonly ViewRect[] | null;
   /**

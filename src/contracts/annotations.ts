@@ -20,3 +20,7 @@ export interface AnnotationService extends Readable<AnnotationState> {
   restore(id: Id, expectedRevision: Revision): Promise<Result<Annotation>>;
   export(format: 'markdown' | 'csv'): Promise<Result<ExportArtifact>>;
 }
+
+/** Presentation preferences, not PDF geometry. CSS pixel offsets relative to the freshly projected anchor. */
+export interface AnnotationNoteLayout { id: Id; dx: number; dy: number; width: number; height: number; collapsed: boolean; open: boolean; z: number }
+export interface AnnotationLayoutRecord extends RecordStamp { document: DocumentRef; layout: AnnotationNoteLayout }
