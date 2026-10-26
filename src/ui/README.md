@@ -187,7 +187,10 @@ toast.show({ message: '翻译失败：请求超时', tone: 'error', action: { la
 
 ## 译文栏（演示阶段）
 
-位于 `src/ui/reader/translation/`。`ReaderShell` 的 `translation={ open, onToggle, pane }` 打开后，译文栏占阅读区右侧（论文与研究区之间），工具栏出现「译文」按钮；打开时左侧边栏自动收起，默认宽度优先给论文留出一整页，中间可拖动调宽、双击恢复。
+位于 `src/ui/reader/translation/`。`ReaderShell` 的 `translation={ open, onToggle, pane }` 提供后，工具栏出现「译文」按钮。两种方式，由译文栏标题上的按钮切换（`translation/dock.ts` 的上下文传给面板）：
+
+- 停靠（默认）：在论文与研究区之间、从上到下通顶，默认宽 360px，左边缘可拖动调宽、双击恢复；论文、工具栏、查找栏随之左移（`--pp-edge-right` 已包含译文栏）。放不下时左侧边栏先收起。
+- 悬浮：一张浮在论文上的卡片，按住标题栏拖动，四边和四角都能调大小；工具栏和论文恢复原位。
 
 - `TranslationPane`：按页流式排列译文（每页一行淡页码），标题、正文、公式标签（公式不翻译，点按回原文）、图注；「译文 / 对照」切换，对照时每句上方是灰色原句；「跟随阅读」开关；未翻译的页显示「翻译这一页」，翻译中逐字出现。
 - 联动：`activeId` + `onHover` 让同一句在两边同时标出（论文里用 CSS highlight `pp-trans`，颜色 `--pp-trans-link`）；`onLocate` 跳回原文；`reveal` 让译文栏滚到某句（点论文、跟随阅读）。

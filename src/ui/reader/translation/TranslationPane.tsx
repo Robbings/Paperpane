@@ -1,5 +1,6 @@
 import { Fragment, useEffect, useRef, type ReactNode } from 'react';
 import { Button, Icon, IconButton, ScrollArea, Segmented, Spinner, Tooltip } from '@/ui/components';
+import { useTranslationDock } from './dock';
 import type { TranslationMode, TranslationPageView, TranslationSentenceView } from './types';
 import './translation.css';
 
@@ -44,6 +45,7 @@ function paragraphs(sentences: readonly TranslationSentenceView[]) {
 export function TranslationPane(props: TranslationPaneProps) {
   const { pages, mode, activeId } = props;
   const viewport = useRef<HTMLDivElement>(null);
+  const dock = useTranslationDock();
 
   // Scroll a requested sentence into view (a jump from the paper, or following the reading).
   useEffect(() => {
@@ -102,8 +104,14 @@ export function TranslationPane(props: TranslationPaneProps) {
   };
 
   return (
-    <section className="pp-tr" aria-label="译文">
-      <header className="pp-tr__head">
+    <section className="pp-tr" aria-label="译文" data-floating={dock?.floating ? 'true' : undefined}>
+      <header
+        className="pp-tr__head"
+        onPointerDown={(event) => {
+          // Floating: the header is the handle (but not its buttons).
+          if (dock?.floating && !(event.target as Element).closest('button')) dock.onHeaderPointerDown(event);
+        }}
+      >
         <span className="pp-tr__title">译文</span>
         <span className="pp-tr__summary">{summary(pages)}</span>
         <span className="pp-tr__spacer" />
@@ -126,6 +134,15 @@ export function TranslationPane(props: TranslationPaneProps) {
           aria-pressed={props.follow}
           onClick={() => props.onFollow(!props.follow)}
         />
+        {dock && (
+          <IconButton
+            icon={dock.floating ? 'paneRight' : 'float'}
+            label={dock.floating ? '停靠到论文右侧' : '悬浮'}
+            size="md"
+            shape="pill"
+            onClick={dock.onToggleFloating}
+          />
+        )}
         <IconButton icon="close" label="关闭译文" size="md" shape="pill" onClick={props.onClose} />
       </header>
 
