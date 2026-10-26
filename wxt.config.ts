@@ -8,6 +8,8 @@ export default defineConfig({
   manifest: {
     name: 'Paperpane（纸窗）',
     description: 'Paperpane 论文阅读工具',
+    permissions: ['unlimitedStorage'],
+    optional_host_permissions: ['https://*/*', 'http://*/*'],
   },
   // Each contributor loads their own output directory in their own browser.
   webExt: { disabled: true },
