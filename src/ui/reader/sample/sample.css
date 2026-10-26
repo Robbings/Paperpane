@@ -115,7 +115,7 @@
   background: rgba(0, 0, 0, 0.1);
 }
 
-.pp-sample__folio {
+.pp-sample__page-number {
   position: absolute;
   bottom: calc(28px * var(--pp-sample-scale));
   left: 50%;

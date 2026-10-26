@@ -7,7 +7,7 @@ import type { AnnotationView } from '@/ui/reader/types';
 import { applyTheme } from '@/ui/theme';
 
 // Review switches: reader.html?view=gallery shows the component gallery,
-// ?theme=light|dark forces a theme. The theme preference itself is S04.
+// ?theme=light|dark forces a theme. The saved theme preference comes from the logic layer.
 const params = new URLSearchParams(window.location.search);
 const forcedTheme = params.get('theme');
 if (forcedTheme === 'light' || forcedTheme === 'dark') applyTheme(forcedTheme);

@@ -1,0 +1,81 @@
+.pp-toaster {
+  position: fixed;
+  left: 50%;
+  z-index: calc(var(--pp-z-float) + 2);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: var(--pp-space-2);
+  transform: translateX(-50%);
+  pointer-events: none;
+}
+
+.pp-toast {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  max-width: min(480px, calc(100vw - 32px));
+  min-height: 40px;
+  padding: 4px 4px 4px 14px;
+  border-radius: 20px;
+  color: var(--pp-text);
+  font-size: var(--pp-text-md);
+  pointer-events: auto;
+  animation: pp-toast-in var(--pp-dur-med) var(--pp-ease-spring);
+}
+
+@keyframes pp-toast-in {
+  from {
+    opacity: 0;
+    transform: translateY(-6px) scale(0.98);
+  }
+}
+
+.pp-toast__icon {
+  display: flex;
+  flex-shrink: 0;
+  align-items: center;
+  justify-content: center;
+  width: 20px;
+  height: 20px;
+  border-radius: 50%;
+  color: #ffffff;
+}
+
+.pp-toast[data-tone-kind='success'] .pp-toast__icon {
+  background: var(--pp-ok);
+}
+
+.pp-toast[data-tone-kind='warning'] .pp-toast__icon {
+  background: var(--pp-warn);
+}
+
+.pp-toast[data-tone-kind='error'] .pp-toast__icon {
+  background: var(--pp-danger);
+}
+
+.pp-toast__message {
+  flex: 1;
+  min-width: 0;
+  line-height: 1.4;
+}
+
+.pp-toast__action {
+  flex-shrink: 0;
+  height: 28px;
+  padding: 0 12px;
+  border: 0;
+  border-radius: var(--pp-radius-pill);
+  background: var(--pp-accent-soft);
+  color: var(--pp-accent);
+  font-size: var(--pp-text-sm);
+  font-weight: var(--pp-weight-semibold);
+}
+
+.pp-toast__action:hover {
+  filter: brightness(1.05);
+}
+
+.pp-toast .pp-icon-btn {
+  color: var(--pp-text-2);
+}

@@ -1,0 +1,115 @@
+.pp-toggle {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--pp-space-4);
+  min-width: 0;
+}
+
+.pp-toggle--check {
+  align-items: flex-start;
+  justify-content: flex-start;
+  gap: var(--pp-space-2);
+}
+
+.pp-toggle[data-disabled='true'] {
+  opacity: 0.5;
+}
+
+.pp-toggle__text {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
+}
+
+.pp-toggle__label {
+  font-size: var(--pp-text-md);
+}
+
+.pp-toggle__description {
+  margin: 0;
+  color: var(--pp-text-2);
+  font-size: var(--pp-text-xs);
+  line-height: 1.45;
+}
+
+/* Switch */
+
+.pp-switch {
+  position: relative;
+  flex-shrink: 0;
+  width: 36px;
+  height: 22px;
+  padding: 0;
+  border: 0;
+  border-radius: var(--pp-radius-pill);
+  background: var(--pp-fill-press);
+  transition: background-color var(--pp-dur-med) var(--pp-ease-out);
+}
+
+.pp-switch[aria-checked='true'] {
+  background: var(--pp-accent);
+}
+
+.pp-switch__thumb {
+  position: absolute;
+  top: 2px;
+  left: 2px;
+  width: 18px;
+  height: 18px;
+  border-radius: 50%;
+  background: #ffffff;
+  box-shadow:
+    0 1px 2px rgba(0, 0, 0, 0.2),
+    0 0 0 0.5px rgba(0, 0, 0, 0.06);
+  transition: transform var(--pp-dur-med) var(--pp-ease-spring);
+}
+
+.pp-switch[aria-checked='true'] .pp-switch__thumb {
+  transform: translateX(14px);
+}
+
+/* Checkbox */
+
+.pp-checkbox {
+  position: relative;
+  display: inline-flex;
+  flex-shrink: 0;
+  width: 16px;
+  height: 16px;
+  margin-top: 2px;
+}
+
+.pp-checkbox input {
+  position: absolute;
+  inset: 0;
+  margin: 0;
+  opacity: 0;
+  cursor: pointer;
+}
+
+.pp-checkbox__box {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 16px;
+  height: 16px;
+  border-radius: 4.5px;
+  background: var(--pp-surface);
+  box-shadow: inset 0 0 0 1px var(--pp-hairline-strong);
+  color: var(--pp-on-accent);
+  pointer-events: none;
+  transition: background-color var(--pp-dur-fast) var(--pp-ease-out);
+}
+
+.pp-checkbox input:checked + .pp-checkbox__box,
+.pp-checkbox input:indeterminate + .pp-checkbox__box {
+  background: var(--pp-accent);
+  box-shadow: none;
+}
+
+.pp-checkbox input:focus-visible + .pp-checkbox__box {
+  outline: 2px solid var(--pp-focus);
+  outline-offset: 2px;
+}

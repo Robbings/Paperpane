@@ -1,0 +1,127 @@
+.pp-field {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  min-width: 0;
+}
+
+.pp-field__label-row {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: var(--pp-space-2);
+}
+
+.pp-field__label {
+  font-size: var(--pp-text-sm);
+  font-weight: var(--pp-weight-medium);
+}
+
+.pp-field__meta {
+  color: var(--pp-text-2);
+  font-size: var(--pp-text-xs);
+  font-variant-numeric: tabular-nums;
+}
+
+.pp-field__description,
+.pp-field__error {
+  margin: 0;
+  font-size: var(--pp-text-xs);
+  line-height: 1.45;
+}
+
+.pp-field__description {
+  color: var(--pp-text-2);
+}
+
+.pp-field__error {
+  color: var(--pp-danger);
+}
+
+.pp-input,
+.pp-textarea {
+  border-radius: var(--pp-radius-control);
+  background: var(--pp-surface);
+  box-shadow:
+    inset 0 0 0 0.5px var(--pp-hairline-strong),
+    0 0.5px 1px rgba(0, 0, 0, 0.04);
+  transition: box-shadow var(--pp-dur-fast) var(--pp-ease-out);
+}
+
+.pp-input {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  height: var(--pp-control-lg);
+  padding: 0 8px 0 10px;
+}
+
+.pp-input input {
+  flex: 1;
+  min-width: 0;
+  height: 100%;
+  padding: 0;
+  border: 0;
+  background: transparent;
+  font-size: var(--pp-text-md);
+}
+
+.pp-input input:focus-visible,
+.pp-textarea:focus-visible {
+  outline: none;
+}
+
+.pp-input:focus-within,
+.pp-textarea:focus-visible {
+  box-shadow:
+    inset 0 0 0 1px var(--pp-accent),
+    0 0 0 3px var(--pp-accent-soft);
+}
+
+.pp-field[data-invalid='true'] .pp-input,
+.pp-field[data-invalid='true'] .pp-textarea {
+  box-shadow:
+    inset 0 0 0 1px var(--pp-danger),
+    0 0 0 3px var(--pp-danger-soft);
+}
+
+.pp-input[data-disabled='true'] {
+  opacity: 0.5;
+}
+
+.pp-input input::placeholder,
+.pp-textarea::placeholder {
+  color: var(--pp-text-3);
+}
+
+.pp-input__icon {
+  flex-shrink: 0;
+  color: var(--pp-text-2);
+}
+
+.pp-input__clear {
+  display: flex;
+  flex-shrink: 0;
+  align-items: center;
+  justify-content: center;
+  width: 18px;
+  height: 18px;
+  padding: 0;
+  border: 0;
+  border-radius: 50%;
+  background: var(--pp-fill-press);
+  color: var(--pp-text-2);
+}
+
+.pp-input__clear:hover {
+  color: var(--pp-text);
+}
+
+.pp-textarea {
+  width: 100%;
+  padding: 8px 10px;
+  border: 0;
+  font-size: var(--pp-text-md);
+  line-height: var(--pp-leading-body);
+  resize: none;
+}

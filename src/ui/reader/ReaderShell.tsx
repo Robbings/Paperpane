@@ -408,7 +408,7 @@ export function ReaderShell(props: ReaderShellProps) {
             );
           })}
         </div>
-        <FunctionRail active={panel} panelOpen={panelOpen} onSelect={selectPanel} />
+        <FunctionRail placement={effectivePlacement} active={panel} panelOpen={panelOpen} onSelect={selectPanel} />
       </GlassSurface>
 
       {selection && (

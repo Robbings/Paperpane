@@ -138,11 +138,16 @@
   gap: 6px;
 }
 
-.pp-toolbar__title {
+.pp-toolbar__title-wrap {
+  /* The flex item is the tooltip wrapper: it must be allowed to shrink. */
   flex: 0 1 auto;
   min-width: 0;
   max-width: 320px;
   margin-right: 6px;
+}
+
+.pp-toolbar__title {
+  min-width: 0;
   overflow: hidden;
   font-size: var(--pp-text-md);
   font-weight: var(--pp-weight-semibold);

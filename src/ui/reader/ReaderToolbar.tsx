@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState, type FormEvent, type MouseEvent } from 'react';
-import { GlassSurface, Icon, IconButton, Menu, type MenuEntry } from '@/ui/components';
+import { GlassSurface, Icon, IconButton, Menu, Tooltip, type MenuEntry } from '@/ui/components';
 import type { DocumentHeaderView, DockPlacement } from './types';
 
 /**
@@ -128,9 +128,9 @@ export function ReaderToolbar({
         onClick={onToggleSidebar}
       />
       {titleVisible ? (
-        <span className="pp-toolbar__title" title={fullTitle}>
-          {header.title}
-        </span>
+        <Tooltip label={fullTitle} className="pp-toolbar__title-wrap">
+          <span className="pp-toolbar__title">{header.title}</span>
+        </Tooltip>
       ) : (
         <span className="pp-visually-hidden">{header.title}</span>
       )}
@@ -152,13 +152,17 @@ export function ReaderToolbar({
         </form>
         {density !== 'tight' && (
           <div className="pp-toolbar__pill pp-toolbar__zoom">
-            <button type="button" aria-label="缩小" title="缩小" onClick={() => onZoom('out')}>
-              <Icon name="minus" size={15} strokeWidth={1.7} />
-            </button>
+            <Tooltip label="缩小" shortcut="⌘−" labelsChild>
+              <button type="button" aria-label="缩小" onClick={() => onZoom('out')}>
+                <Icon name="minus" size={15} strokeWidth={1.7} />
+              </button>
+            </Tooltip>
             <span aria-live="polite">{zoomPercent}%</span>
-            <button type="button" aria-label="放大" title="放大" onClick={() => onZoom('in')}>
-              <Icon name="plus" size={15} strokeWidth={1.7} />
-            </button>
+            <Tooltip label="放大" shortcut="⌘+" labelsChild>
+              <button type="button" aria-label="放大" onClick={() => onZoom('in')}>
+                <Icon name="plus" size={15} strokeWidth={1.7} />
+              </button>
+            </Tooltip>
           </div>
         )}
       </div>
@@ -180,6 +184,7 @@ export function ReaderToolbar({
             aria-haspopup="menu"
             aria-expanded={menu?.kind === 'more'}
             active={menu?.kind === 'more'}
+            tooltip={menu?.kind !== 'more'}
             onClick={toggleMoreMenu}
           />
         )}

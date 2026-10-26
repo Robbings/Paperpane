@@ -9,7 +9,7 @@ interface NotesPanelProps {
   simulated?: boolean;
 }
 
-// Plain text for now; the formatting toolbar (R33) comes with the notes PR.
+// Plain text for now; the formatting toolbar comes with the notes panel work.
 export function NotesPanel({ value, onChange, local, sync, simulated }: NotesPanelProps) {
   return (
     <div className="pp-panel">
