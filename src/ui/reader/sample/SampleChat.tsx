@@ -99,7 +99,7 @@ function latestLeaf(session: Session, id: string): string {
   return latestLeaf(session, newest.id);
 }
 
-export function SampleChat({ onLocatePage }: { onLocatePage: (pageIndex: number) => void }) {
+export function SampleChat({ onLocateQuote }: { onLocateQuote: (quote: string) => void }) {
   const [sessions, setSessions] = useState<Session[]>(seed);
   const [currentId, setCurrentId] = useState<string | null>('s1');
   const [newDraft, setNewDraft] = useState('');
@@ -223,10 +223,7 @@ export function SampleChat({ onLocatePage }: { onLocatePage: (pageIndex: number)
         const target = versions[versions.indexOf(message) + direction];
         if (target) update(current.id, (s) => ({ ...s, activeLeafId: latestLeaf(s, target.id) }));
       }}
-      onLocate={(citation) => {
-        const page = Number(/\d+/.exec(citation.pageLabel)?.[0] ?? 1);
-        onLocatePage(page - 1);
-      }}
+      onLocate={(citation) => onLocateQuote(citation.quote)}
       onRecover={(messageId, action) => {
         if (action === 'retry') {
           const message = current?.messages.find((m) => m.id === messageId);

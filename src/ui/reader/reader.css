@@ -818,3 +818,28 @@
 .pp-reader[data-resizing='true'] .pp-sidebar {
   transition: none;
 }
+
+/* ---- Locating a source: a brief mark on the passage ----------------------------- */
+
+.pp-locate-flash {
+  position: absolute;
+  z-index: 2;
+  border-radius: 3px;
+  background: color-mix(in srgb, var(--pp-accent) 22%, transparent);
+  box-shadow: 0 0 0 1.5px color-mix(in srgb, var(--pp-accent) 45%, transparent);
+  pointer-events: none;
+  animation: pp-locate 1.9s var(--pp-ease-out) forwards;
+}
+
+@keyframes pp-locate {
+  0% {
+    opacity: 0;
+  }
+  12%,
+  65% {
+    opacity: 1;
+  }
+  100% {
+    opacity: 0;
+  }
+}

@@ -65,3 +65,10 @@
   text-decoration-color: color-mix(in srgb, var(--pp-accent) 40%, transparent);
   text-underline-offset: 2px;
 }
+
+/* The caret used while generated text is still arriving. */
+@keyframes pp-caret {
+  50% {
+    opacity: 0;
+  }
+}

@@ -108,6 +108,11 @@ function renderInline(text: string, renderCitation?: (label: string) => ReactNod
   return out;
 }
 
+/** One line of generated text (a list item, a field value): emphasis, code, links and source markers, no blocks. */
+export function MarkdownInline({ text, renderCitation }: Pick<MarkdownProps, 'text' | 'renderCitation'>) {
+  return <>{renderInline(text, renderCitation)}</>;
+}
+
 /** A small, safe Markdown subset for generated text: paragraphs, headings, lists, quotes, code, emphasis and links. */
 export function Markdown({ text, renderCitation, className }: MarkdownProps) {
   const inline = (value: string) => renderInline(value, renderCitation);

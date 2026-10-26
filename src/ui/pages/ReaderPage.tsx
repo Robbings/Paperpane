@@ -1,10 +1,13 @@
 import { useEffect, useState } from 'react';
+import { createPortal } from 'react-dom';
 import { Toaster, toast } from '@/ui/components';
 import { ComponentGallery } from '@/ui/gallery/ComponentGallery';
 import { sampleFolders, samplePapers, sampleTags } from '@/ui/library/sample/libraryData';
 import type { FolderView, PaperView, TagView } from '@/ui/library/types';
 import type { LibraryEntryDraft } from '@/ui/reader/library/SaveToLibraryPopover';
+import { LocateFlash, type PageRect } from '@/ui/reader/LocateFlash';
 import { ReaderShell } from '@/ui/reader/ReaderShell';
+import { findQuote } from '@/ui/reader/sample/findQuote';
 import { SampleChat } from '@/ui/reader/sample/SampleChat';
 import { SampleOverview } from '@/ui/reader/sample/SampleOverview';
 import { SamplePaper } from '@/ui/reader/sample/SamplePaper';
@@ -62,6 +65,23 @@ function SampleReader() {
     return () => container.removeEventListener('scroll', onScroll);
   }, []);
 
+  // Jumping to a quoted passage: scroll it into view and mark it briefly.
+  const [flash, setFlash] = useState<{ page: HTMLElement; rects: PageRect[]; key: number } | null>(null);
+  const locateQuote = (quote: string) => {
+    const container = scroller();
+    const found = container && findQuote(container, quote);
+    if (!container || !found || found.rects.length === 0) {
+      toast.show({ message: '没有在论文中找到这段引文', tone: 'warning' });
+      return;
+    }
+    const first = found.rects[0]!;
+    const top = found.page.offsetTop + first.top - container.clientHeight * 0.35;
+    container.scrollTo({ top: Math.max(0, top), behavior: 'smooth' });
+    const key = Date.now();
+    setFlash({ page: found.page, rects: found.rects, key });
+    window.setTimeout(() => setFlash((current) => (current?.key === key ? null : current)), 2000);
+  };
+
   const navigate = (index: number) => {
     const container = scroller();
     const page = container?.querySelector<HTMLElement>(`[data-page-index="${index}"]`);
@@ -101,7 +121,7 @@ function SampleReader() {
           if (target) navigate(target.pageIndex);
         }}
         onTool={() => undefined}
-        panels={{ discuss: <SampleChat onLocatePage={navigate} />, overview: <SampleOverview /> }}
+        panels={{ discuss: <SampleChat onLocateQuote={locateQuote} />, overview: <SampleOverview onLocateQuote={locateQuote} /> }}
         library={{
           currentPaperId: current.id,
           folders,
@@ -136,6 +156,7 @@ function SampleReader() {
         }}
       />
       <Toaster />
+      {flash && createPortal(<LocateFlash key={flash.key} rects={flash.rects} />, flash.page)}
     </>
   );
 }

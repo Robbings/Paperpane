@@ -136,12 +136,6 @@
   animation: pp-caret 1.1s steps(2, jump-none) infinite;
 }
 
-@keyframes pp-caret {
-  50% {
-    opacity: 0;
-  }
-}
-
 .pp-chat-a__foot {
   display: flex;
   align-items: center;
