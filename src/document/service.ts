@@ -4,7 +4,7 @@ import { failure, success } from '../contracts/common';
 import { PaperDatabase, type ImportReceipt } from '../data/database';
 import { abortIfNeeded, importError } from './errors';
 import { downloadPdf, parseSourceUrl, readPdfBytes, safeFilename } from './download';
-import { requestImportOrigin } from './permissions';
+import { requestImportOrigin, hasImportOrigin } from './permissions';
 
 type Run = {
   source: ImportSource; controller: AbortController; saving: boolean; epoch: number;
@@ -24,7 +24,7 @@ export interface LiveDocumentOwner {
   dispose(): void;
 }
 /** Own this once per extension page, above React panels. No network work in popup lifetimes. */
-export function createDocumentService(database = new PaperDatabase()): LiveDocumentOwner {
+export function createDocumentService(database = new PaperDatabase(), options: { checkUrlPermissionOnly?: boolean } = {}): LiveDocumentOwner {
   let snapshot: Snapshot<DocumentState> = freeze({ mode: 'live', state: 'loading', data: { documents: [], jobs: [], recentIds: [] } });
   const listeners = new Set<() => void>(); const runs = new Map<string, Run>();
   const receipts = new Map<string, ImportReceipt>();
@@ -71,7 +71,7 @@ export function createDocumentService(database = new PaperDatabase()): LiveDocum
       patchJob(id, { phase: 'validating', progress: undefined });
       const { inspectPdf } = await import('./inspect-pdf');
       abortIfNeeded(signal);
-      const { pageCount } = await inspectPdf(bytes, signal, (submit, incorrect) => {
+      const { pageCount, bibliography } = await inspectPdf(bytes, signal, (submit, incorrect) => {
         if (!active()) return;
         const requestId = crypto.randomUUID();
         run.password = { requestId, submit };
@@ -86,10 +86,12 @@ export function createDocumentService(database = new PaperDatabase()): LiveDocum
       if (!active()) return;
       // Cancellation ends before this short atomic commit. Never report cancelled after saving.
       run.saving = true;
-      const receipt = await database.commitImport({ blob: run.source.kind === 'local' ? run.source.file : new Blob([bytes], { type: 'application/pdf' }), sha256, filename, pageCount, sourceUrl,
+      const receipt = await database.commitImport({ blob: run.source.kind === 'local' ? run.source.file : new Blob([bytes], { type: 'application/pdf' }), sha256, filename, pageCount, sourceUrl, bibliography,
         syncScope: run.source.kind === 'url' && run.source.intent === 'browse' ? 'record-only' : 'record-and-file' });
       receipts.set(id, receipt);
       if (active()) patchJob(id, { phase: 'readable', document: { documentId: receipt.document.id, fileVersion: receipt.document.fileVersion }, progress: undefined, error: undefined });
+      // Completed jobs cannot be retried; release their original File/URL owner.
+      runs.delete(id);
       if (!disposed) { channel?.postMessage({ kind: 'invalidate' }); await refresh(); }
     } catch (error) {
       if (!active()) return;
@@ -107,7 +109,7 @@ export function createDocumentService(database = new PaperDatabase()): LiveDocum
         // The request begins in the caller's user gesture; do not await DB readiness first.
         try {
           source = { ...source, url: parseSourceUrl(source.url).href };
-          if (!await requestImportOrigin(source.url)) return failure('ACCESS_DENIED', '未获准读取此站点；可重试授权或先下载到本机', ['request-access', 'choose-file']);
+          if (!await (options.checkUrlPermissionOnly ? hasImportOrigin(source.url) : requestImportOrigin(source.url))) return failure('ACCESS_DENIED', '未获准读取此站点；可重试授权或先下载到本机', ['request-access', 'choose-file']);
         } catch (error) {
           const detail = importError(error);
           return { ok: false, error: detail.code === 'INVALID_INPUT' ? detail : { code: 'ACCESS_DENIED', message: '请从扩展页面点击导入以授权读取站点', recovery: ['request-access', 'choose-file'] } };

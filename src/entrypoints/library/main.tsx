@@ -1,4 +1,6 @@
 import { mountPage } from '@/runtime/mount-page';
-import { LibraryPage } from '@/ui/pages/LibraryPage';
+import { LibraryPage, createLibraryRuntime } from '@/runtime/library-page';
 
-mountPage(<LibraryPage />);
+const owner = createLibraryRuntime();
+window.addEventListener('pagehide', event => { if (!event.persisted) owner.dispose(); });
+mountPage(<LibraryPage owner={owner} />);
