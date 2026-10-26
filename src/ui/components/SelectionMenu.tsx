@@ -106,9 +106,9 @@ export function SelectionMenu({
       <span className="pp-selmenu__sep" aria-hidden="true" />
 
       {actions.map((action) => (
+        // Text only: short labels read faster than icons and keep the bar small over the paper.
         <button key={action.id} type="button" className="pp-selmenu__action" onClick={() => onAction?.(action.id)}>
-          <Icon name={action.icon} size={16} strokeWidth={1.5} />
-          <span>{action.label}</span>
+          {action.label}
         </button>
       ))}
 
@@ -117,7 +117,7 @@ export function SelectionMenu({
           <span className="pp-selmenu__sep" aria-hidden="true" />
           <Tooltip label="删除高亮" placement="top" labelsChild>
             <button type="button" className="pp-selmenu__delete" aria-label="删除高亮" onClick={onDelete}>
-              <Icon name="trash" size={16} strokeWidth={1.5} />
+              <Icon name="trash" size={15} strokeWidth={1.5} />
             </button>
           </Tooltip>
         </>

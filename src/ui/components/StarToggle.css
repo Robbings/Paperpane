@@ -25,7 +25,7 @@ button.pp-star:hover {
 }
 
 .pp-star[data-on='true'] {
-  color: var(--pp-hl-yellow-dot);
+  color: var(--pp-star);
 }
 
 .pp-star[data-on='true'] .pp-star__icon {

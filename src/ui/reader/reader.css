@@ -199,9 +199,29 @@
   color: var(--pp-text-2);
 }
 
-.pp-toolbar__zoom > span {
-  min-width: 40px;
+/* The percentage between − and +: shows "100%", turns into a field when clicked. */
+.pp-toolbar__zoom-input {
+  width: 46px;
+  height: 22px;
+  padding: 0;
+  border: 0;
+  border-radius: var(--pp-radius-pill);
+  background: transparent;
+  color: var(--pp-text);
+  font-size: var(--pp-text-sm);
+  font-variant-numeric: tabular-nums;
   text-align: center;
+  cursor: text;
+}
+
+.pp-toolbar__zoom-input:hover {
+  background: var(--pp-fill-hover);
+}
+
+.pp-toolbar__zoom-input:focus-visible {
+  outline: none;
+  background: var(--pp-surface);
+  box-shadow: 0 0 0 0.5px var(--pp-hairline), 0 0 0 3px var(--pp-accent-soft);
 }
 
 .pp-toolbar__zoom button {
@@ -794,12 +814,12 @@
 
 .pp-annotation__quote {
   font-family: var(--pp-font-paper);
-  font-size: var(--pp-text-quote);
+  font-size: var(--pp-text-read-quote);
   line-height: 1.45;
 }
 
 .pp-annotation__note {
-  font-size: var(--pp-text-md);
+  font-size: var(--pp-text-read-sm);
   line-height: var(--pp-leading-body);
 }
 
@@ -812,7 +832,7 @@
   padding: var(--pp-space-3) 0;
   border: 0;
   background: transparent;
-  font-size: var(--pp-text-quote);
+  font-size: var(--pp-text-read-quote);
   line-height: 1.65;
   resize: none;
 }
@@ -879,4 +899,260 @@
   100% {
     opacity: 0;
   }
+}
+
+/* ---- Annotation list: hover tools, inline comment editing ----------------------- */
+
+.pp-annotation-item {
+  position: relative;
+}
+
+.pp-annotation__tools {
+  position: absolute;
+  top: 8px;
+  right: 0;
+  display: flex;
+  align-items: center;
+  gap: 0;
+  padding: 1px;
+  border-radius: var(--pp-radius-pill);
+  background: var(--pp-reading-surface);
+  box-shadow: 0 0 0 0.5px var(--pp-hairline-strong);
+  opacity: 0;
+  transition: opacity var(--pp-dur-fast) var(--pp-ease-out);
+}
+
+.pp-annotation-item:hover .pp-annotation__tools,
+.pp-annotation__tools:focus-within,
+.pp-annotation__tools[data-open='true'] {
+  opacity: 1;
+}
+
+.pp-annotation-item[data-editing='true'] .pp-annotation__tools {
+  display: none;
+}
+
+@media (hover: none) {
+  .pp-annotation__tools {
+    opacity: 1;
+  }
+}
+
+.pp-annotation__tools .pp-icon-btn {
+  width: 24px;
+  height: 24px;
+  color: var(--pp-text-2);
+}
+
+.pp-annotation__colors {
+  display: flex;
+}
+
+.pp-annotation__edit {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  padding: 0 4px var(--pp-space-3);
+}
+
+.pp-annotation__edit-bar {
+  display: flex;
+  justify-content: flex-end;
+  gap: 6px;
+}
+
+/* ---- PDF pages rendered by the runtime ---------------------------------------------
+ * The runtime mounts its viewer as `.pp-pdf-surface` inside the paper's scroll
+ * container and owns geometry only; the page's look (paper, shadow, spacing,
+ * dimming in dark mode) is defined here, matching the sample pages. */
+
+.pp-pdf-surface .page {
+  margin: 0 auto 24px;
+  border: 0;
+  background: #ffffff;
+  box-shadow:
+    0 1px 2px rgba(0, 0, 0, 0.06),
+    0 8px 28px rgba(0, 0, 0, 0.08);
+  filter: var(--pp-paper-filter);
+}
+
+.pp-pdf-surface .page:last-child {
+  margin-bottom: 0;
+}
+
+/* ---- Find bar --------------------------------------------------------------- */
+/* Under the toolbar's right end; matches are marked on the pages. The toolbar is centred
+   over the paper, so its right end follows from that centre and its width. */
+
+.pp-findbar {
+  --pp-toolbar-w: 0px;
+  position: absolute;
+  top: calc(var(--pp-gap) + var(--pp-bar-height) + 8px);
+  right: calc(100% - (var(--pp-edge-left) + 100% - var(--pp-edge-right)) / 2 - var(--pp-toolbar-w) / 2);
+  z-index: var(--pp-z-bar);
+  display: flex;
+  align-items: center;
+  gap: 2px;
+  width: min(392px, calc(100% - var(--pp-edge-left) - var(--pp-edge-right) - 28px));
+  height: 38px;
+  padding: 0 5px 0 11px;
+  animation: pp-findbar-in var(--pp-dur-fast, 140ms) var(--pp-ease-out, ease-out);
+  transition: right var(--pp-dur-layout) var(--pp-ease-layout);
+}
+
+@keyframes pp-findbar-in {
+  from {
+    opacity: 0;
+    transform: translateY(-4px);
+  }
+}
+
+.pp-findbar__icon {
+  flex-shrink: 0;
+  color: var(--pp-text-3);
+}
+
+.pp-findbar__input {
+  flex: 1 1 auto;
+  min-width: 0;
+  height: 28px;
+  padding: 0 6px;
+  border: 0;
+  background: transparent;
+  color: var(--pp-text);
+  font: inherit;
+  font-size: var(--pp-text-sm);
+  outline: none;
+}
+
+.pp-findbar__input::placeholder {
+  color: var(--pp-text-3);
+}
+
+.pp-findbar__status {
+  flex-shrink: 0;
+  min-width: 40px;
+  padding-right: 4px;
+  color: var(--pp-text-3);
+  font-size: var(--pp-text-xs);
+  font-variant-numeric: tabular-nums;
+  text-align: right;
+  white-space: nowrap;
+}
+
+.pp-findbar[data-empty='true'] .pp-findbar__status {
+  color: var(--pp-danger, #c4372b);
+}
+
+.pp-findbar__toggle {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+  width: 26px;
+  height: 24px;
+  padding: 0;
+  border: 0;
+  border-radius: 6px;
+  background: transparent;
+  color: var(--pp-text-2);
+  font: inherit;
+  font-size: 12px;
+  font-weight: 500;
+  letter-spacing: -0.01em;
+}
+
+.pp-findbar__toggle:hover {
+  color: var(--pp-text);
+  background: var(--pp-fill-hover);
+}
+
+.pp-findbar__toggle[aria-pressed='true'] {
+  color: var(--pp-accent);
+  background: var(--pp-accent-soft);
+}
+
+/* "ab" with a bar under it: the whole word, not part of one. */
+.pp-findbar__toggle--word {
+  text-decoration: underline;
+  text-decoration-thickness: 1px;
+  text-underline-offset: 3px;
+}
+
+.pp-findbar__sep {
+  flex-shrink: 0;
+  width: 0.5px;
+  height: 16px;
+  margin: 0 4px;
+  background: var(--pp-hairline-strong);
+}
+
+/* Matches on the pages. The PDF text layer marks them as .highlight / .highlight.selected;
+   the sample paper uses the CSS highlight registry with the same colours. */
+.pp-reader__paper .textLayer .highlight {
+  margin: -1px;
+  padding: 1px;
+  border-radius: 3px;
+  background-color: var(--pp-find-match);
+}
+
+.pp-reader__paper .textLayer .highlight.selected {
+  background-color: var(--pp-find-current);
+}
+
+::highlight(pp-find) {
+  background-color: var(--pp-find-match);
+}
+
+::highlight(pp-find-current) {
+  background-color: var(--pp-find-current);
+}
+
+/* ---- Quick settings ------------------------------------------------------------ */
+
+.pp-quick {
+  padding: 6px 14px 12px;
+}
+
+.pp-quick__rows {
+  display: flex;
+  flex-direction: column;
+}
+
+.pp-quick__row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  min-height: 40px;
+}
+
+.pp-quick__label {
+  flex-shrink: 0;
+  color: var(--pp-text);
+  font-size: var(--pp-text-md);
+}
+
+.pp-quick__model {
+  min-width: 0;
+  max-width: 172px;
+}
+
+.pp-quick__foot {
+  display: flex;
+  align-items: flex-end;
+  justify-content: space-between;
+  gap: 10px;
+  margin-top: 8px;
+  padding-top: 12px;
+  border-top: 0.5px solid var(--pp-hairline);
+}
+
+.pp-quick__foot .pp-statusline {
+  min-width: 0;
+}
+
+.pp-quick__all {
+  flex-shrink: 0;
+  margin: 0 -6px -2px 0;
 }

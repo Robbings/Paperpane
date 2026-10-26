@@ -1,0 +1,185 @@
+/* Comment notes: small glass notes pinned to the paper. They live inside the
+   scroll container, so they move with the text. */
+
+.pp-notes-layer {
+  position: absolute;
+  top: 0;
+  left: 0;
+  z-index: 3;
+  width: 0;
+  height: 0;
+}
+
+.pp-note {
+  /* They sit on top of paper text, so near-opaque like dialogs, not see-through glass. */
+  --pp-glass-bg: var(--pp-glass-float-solid);
+
+  position: absolute;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  border-radius: var(--pp-radius-float);
+  animation: pp-note-in var(--pp-dur-med) var(--pp-ease-out);
+}
+
+@keyframes pp-note-in {
+  from {
+    opacity: 0;
+    transform: translateY(4px) scale(0.98);
+  }
+}
+
+.pp-note__head {
+  display: flex;
+  flex-shrink: 0;
+  align-items: center;
+  gap: 6px;
+  height: 34px;
+  padding: 0 4px 0 12px;
+  border-bottom: 0.5px solid var(--pp-hairline);
+  cursor: grab;
+  touch-action: none;
+  user-select: none;
+}
+
+.pp-note__head:active {
+  cursor: grabbing;
+}
+
+.pp-note__dot {
+  flex-shrink: 0;
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: var(--pp-dot);
+}
+
+.pp-note__quote {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  color: var(--pp-text-2);
+  font-size: var(--pp-text-xs);
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.pp-note__head .pp-icon-btn {
+  width: 24px;
+  height: 24px;
+  color: var(--pp-text-3);
+}
+
+.pp-note__head .pp-icon-btn:hover {
+  color: var(--pp-text);
+}
+
+/* The writing area is opaque, like the rest of the long text. */
+.pp-note__text {
+  flex: 1;
+  min-height: 0;
+  margin: 0;
+  padding: 10px 12px 14px;
+  border: 0;
+  background: var(--pp-reading-surface);
+  font-size: var(--pp-text-read);
+  line-height: 1.6;
+  resize: none;
+}
+
+.pp-note__text:focus-visible {
+  outline: none;
+}
+
+.pp-note__text::placeholder {
+  color: var(--pp-text-3);
+}
+
+/* Resize from the lower-right corner: two short diagonal strokes. */
+.pp-note__resize {
+  position: absolute;
+  right: 0;
+  bottom: 0;
+  width: 16px;
+  height: 16px;
+  cursor: nwse-resize;
+  touch-action: none;
+}
+
+.pp-note__resize::after {
+  content: '';
+  position: absolute;
+  right: 4px;
+  bottom: 4px;
+  width: 7px;
+  height: 7px;
+  background: linear-gradient(135deg, transparent 0 40%, var(--pp-text-3) 40% 50%, transparent 50% 70%, var(--pp-text-3) 70% 80%, transparent 80%);
+  opacity: 0.7;
+}
+
+/* The dashed line from a hovered note to its passage, and an outline around the passage. */
+.pp-note-connector {
+  position: fixed;
+  inset: 0;
+  z-index: calc(var(--pp-z-panel) + 1);
+  pointer-events: none;
+}
+
+.pp-note-connector__mark {
+  fill: color-mix(in srgb, var(--pp-accent) 8%, transparent);
+  stroke: var(--pp-accent);
+  stroke-dasharray: 4 3;
+  stroke-width: 1;
+}
+
+.pp-note-connector__line {
+  stroke: var(--pp-accent);
+  stroke-dasharray: 5 4;
+  stroke-width: 1.25;
+}
+
+.pp-note-connector__end {
+  fill: var(--pp-accent);
+}
+
+/* Folded: a small titled pill that still sits by its passage. */
+.pp-note--pill {
+  overflow: visible;
+  border-radius: var(--pp-radius-pill);
+}
+
+.pp-note__pill {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  height: 100%;
+  max-width: 260px;
+  padding: 0 4px 0 12px;
+  cursor: grab;
+  touch-action: none;
+  user-select: none;
+}
+
+.pp-note__pill:active {
+  cursor: grabbing;
+}
+
+.pp-note__pill-icon {
+  flex-shrink: 0;
+  color: var(--pp-text-2);
+}
+
+.pp-note__pill-title {
+  min-width: 0;
+  overflow: hidden;
+  font-size: var(--pp-text-md);
+  font-weight: var(--pp-weight-medium);
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.pp-note__pill .pp-icon-btn {
+  width: 26px;
+  height: 26px;
+  color: var(--pp-text-3);
+}

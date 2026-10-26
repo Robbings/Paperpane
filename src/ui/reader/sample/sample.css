@@ -28,6 +28,27 @@
   filter: var(--pp-paper-filter);
 }
 
+/* Turned pages. A quarter turn swaps the page's footprint: margins make room
+   across and take it back down the column, so pages stay 18px apart. */
+.pp-sample[data-rotation='90'] .pp-sample__page,
+.pp-sample[data-rotation='270'] .pp-sample__page {
+  --pp-sample-height: calc(var(--pp-sample-width) * 1.294);
+  height: var(--pp-sample-height);
+  margin: calc((var(--pp-sample-width) - var(--pp-sample-height)) / 2) calc((var(--pp-sample-height) - var(--pp-sample-width)) / 2);
+}
+
+.pp-sample[data-rotation='90'] .pp-sample__page {
+  transform: rotate(90deg);
+}
+
+.pp-sample[data-rotation='180'] .pp-sample__page {
+  transform: rotate(180deg);
+}
+
+.pp-sample[data-rotation='270'] .pp-sample__page {
+  transform: rotate(270deg);
+}
+
 .pp-sample__page::selection,
 .pp-sample__page *::selection {
   background: var(--pp-selection);
@@ -121,4 +142,13 @@
   left: 50%;
   color: #6b6b6b;
   transform: translateX(-50%);
+}
+
+/* Highlights the demo runtime draws over the page, like a PDF highlight layer. */
+.pp-sample-hl {
+  position: absolute;
+  border-radius: 2px;
+  background: var(--pp-hl);
+  mix-blend-mode: multiply;
+  pointer-events: none;
 }
