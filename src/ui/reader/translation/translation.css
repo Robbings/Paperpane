@@ -1,0 +1,248 @@
+/* The translation pane: an opaque reading surface beside the paper, one continuous text. */
+
+.pp-tr {
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+  min-height: 0;
+  border-radius: var(--pp-radius-panel);
+  background: var(--pp-reading-surface);
+  box-shadow:
+    0 0 0 0.5px var(--pp-hairline),
+    var(--pp-shadow-panel);
+  overflow: hidden;
+}
+
+.pp-tr__head {
+  display: flex;
+  flex-shrink: 0;
+  align-items: center;
+  gap: 6px;
+  height: 44px;
+  padding: 0 8px 0 16px;
+  border-bottom: 0.5px solid var(--pp-hairline);
+}
+
+.pp-tr__title {
+  color: var(--pp-text);
+  font-size: var(--pp-text-md);
+  font-weight: var(--pp-weight-semibold);
+}
+
+.pp-tr__summary {
+  overflow: hidden;
+  color: var(--pp-text-2);
+  font-size: var(--pp-text-xs);
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.pp-tr__spacer {
+  flex: 1;
+}
+
+.pp-tr__head .pp-seg {
+  margin-right: 2px;
+}
+
+.pp-tr__scroll {
+  flex: 1;
+  min-height: 0;
+}
+
+.pp-tr__viewport {
+  height: 100%;
+}
+
+.pp-tr__flow {
+  padding: 8px 24px 40px;
+  color: var(--pp-text);
+  font-size: var(--pp-text-read);
+  line-height: 1.85;
+}
+
+/* A quiet page mark in the flow: a short rule and the page number. */
+.pp-tr__page {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin: 18px 0 8px;
+  color: var(--pp-text-3);
+  font-size: var(--pp-text-xs);
+  letter-spacing: 0.02em;
+}
+
+.pp-tr__page::after {
+  content: '';
+  flex: 1;
+  height: 0.5px;
+  background: var(--pp-hairline);
+}
+
+.pp-tr__heading {
+  margin: 14px 0 4px;
+  font-size: calc(var(--pp-text-read) * 1.04);
+  font-weight: var(--pp-weight-semibold);
+  line-height: 1.6;
+}
+
+.pp-tr__para {
+  margin: 0 0 10px;
+  text-align: justify;
+}
+
+.pp-tr__figure {
+  margin: 4px 0 10px;
+  color: var(--pp-text-2);
+  font-size: calc(var(--pp-text-read) * 0.93);
+}
+
+.pp-tr__formula {
+  margin: 2px 0 10px;
+}
+
+/* One sentence: lights up with its original, on either side. */
+.pp-tr__s {
+  border-radius: 3px;
+  cursor: pointer;
+  box-decoration-break: clone;
+  -webkit-box-decoration-break: clone;
+  transition: background-color var(--pp-dur-fast) var(--pp-ease-out);
+}
+
+.pp-tr__s[data-active='true'] {
+  background: var(--pp-trans-link);
+}
+
+.pp-tr__s--flash {
+  animation: pp-tr-flash 1.4s var(--pp-ease-out);
+}
+
+@keyframes pp-tr-flash {
+  0%,
+  35% {
+    background: var(--pp-trans-flash);
+  }
+}
+
+/* Parallel view: each sentence a small block, the original in grey above. */
+.pp-tr__flow[data-mode='parallel'] .pp-tr__para {
+  text-align: left;
+}
+
+.pp-tr__s--pair {
+  display: block;
+  margin: 0 -6px 8px;
+  padding: 3px 6px;
+  border-radius: 6px;
+}
+
+.pp-tr__source {
+  display: block;
+  color: var(--pp-text-2);
+  font-family: var(--pp-font-paper);
+  font-size: calc(var(--pp-text-read) * 0.9);
+  line-height: 1.55;
+}
+
+.pp-tr__target {
+  display: block;
+}
+
+.pp-tr__chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  height: 24px;
+  padding: 0 9px;
+  border: 0;
+  border-radius: var(--pp-radius-pill);
+  background: var(--pp-fill);
+  color: var(--pp-text-2);
+  font-size: var(--pp-text-sm);
+}
+
+.pp-tr__chip:hover,
+.pp-tr__chip[data-active='true'] {
+  background: var(--pp-trans-link);
+  color: var(--pp-text);
+}
+
+.pp-tr__caret {
+  display: inline-block;
+  width: 1.5px;
+  height: 1em;
+  margin-left: 2px;
+  vertical-align: -0.12em;
+  background: var(--pp-accent);
+  animation: pp-tr-caret 1s steps(1) infinite;
+}
+
+@keyframes pp-tr-caret {
+  50% {
+    opacity: 0;
+  }
+}
+
+.pp-tr__pending {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  margin: 4px 0 8px;
+  padding: 8px 6px 8px 12px;
+  border-radius: var(--pp-radius-control);
+  background: var(--pp-fill);
+  color: var(--pp-text-2);
+  font-size: var(--pp-text-sm);
+}
+
+.pp-tr__pending[data-tone='danger'] {
+  background: var(--pp-danger-soft);
+  color: var(--pp-danger);
+}
+
+.pp-tr__waiting {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin: 4px 0 10px;
+  color: var(--pp-text-2);
+  font-size: var(--pp-text-sm);
+}
+
+/* The same sentence in the paper (CSS highlight registry on the sample; a text-layer class on PDFs). */
+::highlight(pp-trans) {
+  background-color: var(--pp-trans-link);
+}
+
+/* Drag handle between the paper and the translation. */
+.pp-tr-handle {
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  left: -8px;
+  width: 12px;
+  cursor: col-resize;
+  touch-action: none;
+}
+
+.pp-tr-handle::after {
+  content: '';
+  position: absolute;
+  top: 50%;
+  left: 4px;
+  width: 4px;
+  height: 36px;
+  border-radius: 2px;
+  background: var(--pp-hairline-strong);
+  opacity: 0;
+  transform: translateY(-50%);
+  transition: opacity var(--pp-dur-fast) var(--pp-ease-out);
+}
+
+.pp-tr-handle:hover::after,
+.pp-tr-handle:focus-visible::after,
+.pp-tr-handle[data-dragging='true']::after {
+  opacity: 1;
+}

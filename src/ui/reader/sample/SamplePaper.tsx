@@ -83,8 +83,46 @@ export function SamplePaper({ pageCount, zoomPercent, rotation, highlights }: Sa
         </div>
       </article>
 
-      {Array.from({ length: pageCount - 1 }, (_, offset) => (
-        <article key={offset} className="pp-sample__page pp-sample__page--blank" data-page-index={offset + 1} aria-label={`第 ${offset + 2} 页`}>
+      <article className="pp-sample__page" data-page-index={1} aria-label="第 2 页">
+        <div className="pp-sample__columns pp-sample__columns--top">
+          <div>
+            <p className="pp-sample__heading">3  Block Model</p>
+            <p>
+              A block is a run of glyphs that share a baseline grid and a font. Each block records its text, its kind and
+              its bounding box in page coordinates. Kinds include body text, heading, caption, footnote and equation.
+            </p>
+            <p className="pp-sample__indent">
+              Blocks are built bottom-up. Glyphs are first joined into lines when their gaps are smaller than a fraction of
+              the font size, and lines are joined into blocks when their left edges align.
+            </p>
+            <p className="pp-sample__equation">
+              <span>d(a, b) = max(0, x<sub>b</sub> − x<sub>a</sub> − w<sub>a</sub>) / s</span>
+              <span>(1)</span>
+            </p>
+            <p>
+              Equation 1 gives the normalised horizontal gap between two glyphs, where s is the font size. A gap below 0.25
+              keeps the glyphs in the same word.
+            </p>
+          </div>
+          <div>
+            <div className="pp-sample__figure" aria-hidden="true" />
+            <p className="pp-sample__caption">Figure 1: Blocks found on a two-column page, coloured by kind.</p>
+            <p className="pp-sample__heading pp-sample__heading--spaced">4  Ordering Rules</p>
+            <p>
+              Blocks are ordered column by column. A block belongs to the left column when its centre lies left of the
+              gutter, and full-width blocks such as titles are placed before the columns they span.
+            </p>
+            <p className="pp-sample__indent">
+              Captions follow the figure they describe, and footnotes are moved to the end of the page so that they never
+              split a sentence of body text.
+            </p>
+          </div>
+        </div>
+        <span className="pp-sample__page-number">2</span>
+      </article>
+
+      {Array.from({ length: pageCount - 2 }, (_, offset) => (
+        <article key={offset} className="pp-sample__page pp-sample__page--blank" data-page-index={offset + 2} aria-label={`第 ${offset + 3} 页`}>
           <div className="pp-sample__lines" aria-hidden="true">
             {Array.from({ length: 2 }, (_, column) => (
               <div key={column}>
@@ -94,7 +132,7 @@ export function SamplePaper({ pageCount, zoomPercent, rotation, highlights }: Sa
               </div>
             ))}
           </div>
-          <span className="pp-sample__page-number">{offset + 2}</span>
+          <span className="pp-sample__page-number">{offset + 3}</span>
         </article>
       ))}
     </div>

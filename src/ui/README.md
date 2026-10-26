@@ -185,6 +185,14 @@ toast.show({ message: '翻译失败：请求超时', tone: 'error', action: { la
 - **状态行**：与设置页共用 `StatusLine`（单行），点击跳到设置的对应一节。
 - **底部**：文献库 `onOpenLibrary`、打开文件 `onOpenFile`（弹窗里直接选文件会让弹窗关闭，所以交给阅读器页弹出文件选择）、设置 `onOpenSettings(section?)`。
 
+## 译文栏（演示阶段）
+
+位于 `src/ui/reader/translation/`。`ReaderShell` 的 `translation={ open, onToggle, pane }` 打开后，译文栏占阅读区右侧（论文与研究区之间），工具栏出现「译文」按钮；打开时左侧边栏自动收起，默认宽度优先给论文留出一整页，中间可拖动调宽、双击恢复。
+
+- `TranslationPane`：按页流式排列译文（每页一行淡页码），标题、正文、公式标签（公式不翻译，点按回原文）、图注；「译文 / 对照」切换，对照时每句上方是灰色原句；「跟随阅读」开关；未翻译的页显示「翻译这一页」，翻译中逐字出现。
+- 联动：`activeId` + `onHover` 让同一句在两边同时标出（论文里用 CSS highlight `pp-trans`，颜色 `--pp-trans-link`）；`onLocate` 跳回原文；`reveal` 让译文栏滚到某句（点论文、跟随阅读）。
+- 示例接线：`reader/sample/useSampleTranslation.tsx`，示例译文在 `sample/sampleTranslation.ts`。视图模型 `translation/types.ts` 只是演示用，正式契约待确认。
+
 ## 修改与扩展
 
 - 需要新组件或新的 prop：在 PR 里提出；不要在页面里另写一套样式相近的组件。

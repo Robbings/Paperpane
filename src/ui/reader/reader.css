@@ -1165,3 +1165,29 @@
   min-height: 70vh;
   padding: 24px;
 }
+
+/* ---- Translation beside the paper --------------------------------------------- */
+
+.pp-reader[data-translation='open'] .pp-reader__paper {
+  right: calc(var(--pp-edge-right) + var(--pp-trans-w));
+}
+
+.pp-reader__translation {
+  position: absolute;
+  top: calc(var(--pp-gap) + var(--pp-bar-height) + 18px);
+  right: calc(var(--pp-edge-right) + 4px);
+  bottom: calc(var(--pp-edge-bottom) + 14px);
+  z-index: 1;
+  width: calc(var(--pp-trans-w) - 12px);
+  animation: pp-translation-in var(--pp-dur-layout) var(--pp-ease-layout);
+  transition:
+    right var(--pp-dur-layout) var(--pp-ease-layout),
+    bottom var(--pp-dur-layout) var(--pp-ease-layout);
+}
+
+@keyframes pp-translation-in {
+  from {
+    opacity: 0;
+    transform: translateX(12px);
+  }
+}

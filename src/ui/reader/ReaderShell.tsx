@@ -1,4 +1,4 @@
-import { useEffect, useLayoutEffect, useRef, useState, type CSSProperties, type ReactNode } from 'react';
+import { useEffect, useLayoutEffect, useRef, useState, type CSSProperties, type PointerEvent as ReactPointerEvent, type ReactNode } from 'react';
 import {
   GlassSurface,
   SelectionMenu,
@@ -89,6 +89,8 @@ interface ReaderShellProps {
   /** What the toolbar's 导出 offers (e.g. the original PDF); without it the button calls onTool('export'). */
   exports?: readonly ExportOption[];
   onExport?: (id: string) => void;
+  /** The translation beside the paper: the toolbar's 译文 button toggles it; the page supplies the pane. */
+  translation?: { open: boolean; onToggle: () => void; pane: ReactNode };
   /** Quick settings behind the toolbar's settings button: appearance, answer language, default model. */
   settings?: ReaderSettingsProps;
   /** Content for research panels the page supplies itself (discussion, overview, …); the rest show a placeholder. */
@@ -127,6 +129,11 @@ const placeholderText: Partial<Record<ResearchPanelId, string>> = {
 
 const px = (value: number) => `${value}px`;
 
+/** The translation pane's narrowest width, and the room the paper keeps beside it. */
+const TRANSLATION_MIN = 300;
+const PAPER_BESIDE_TRANSLATION = 360;
+const PAPER_PREFERRED = 660;
+
 export function ReaderShell(props: ReaderShellProps) {
   const { header, outline, pageIndex, zoomPercent, annotations, annotationStatus, notes, document: paper } = props;
   const viewport = useViewport();
@@ -155,7 +162,9 @@ export function ReaderShell(props: ReaderShellProps) {
   const space = (docked: boolean, at: DockPlacement) =>
     paperWidth({ viewportWidth: viewport.width, sidebarDocked: docked, placement: at, panelOpen: true, width: effectiveWidth });
   const sidebarFits = space(true, placement) >= PAPER_MIN_WIDTH;
-  const sidebarOpen = sidebarPref ?? space(true, placement) >= PAPER_COMFORT_WIDTH;
+  // Opening the translation folds the sidebar away unless the reader asked for it.
+  const translationOpen = Boolean(props.translation?.open);
+  const sidebarOpen = sidebarPref ?? (space(true, placement) >= PAPER_COMFORT_WIDTH && !translationOpen);
   const sidebarDocked = sidebarOpen && sidebarFits;
   const canDockRight = space(sidebarDocked, 'right') >= PAPER_MIN_WIDTH;
   const compact = !canDockRight;
@@ -258,6 +267,37 @@ export function ReaderShell(props: ReaderShellProps) {
   }, [onLayoutChange, placement, width, height, showTitle]);
 
   const density = toolbarDensity(viewport.width - edges.left - edges.right, showTitle);
+
+  // ---- Translation beside the paper ------------------------------------------
+  // It takes the right part of the reading area; the toolbar stays centred over both.
+  const readingWidth = viewport.width - edges.left - edges.right;
+  const [translationPref, setTranslationPref] = useState<number | null>(null);
+  const translationWidth = Math.round(
+    // By default the paper keeps room for a whole page; the translation takes the rest, up to half.
+    Math.min(
+      Math.max(translationPref ?? Math.min(readingWidth * 0.5, readingWidth - PAPER_PREFERRED), TRANSLATION_MIN),
+      Math.max(TRANSLATION_MIN, readingWidth - PAPER_BESIDE_TRANSLATION),
+    ),
+  );
+  const [translationDrag, setTranslationDrag] = useState(false);
+  const startTranslationDrag = (event: ReactPointerEvent<HTMLDivElement>) => {
+    if (event.button !== 0) return;
+    event.preventDefault();
+    const handle = event.currentTarget;
+    handle.setPointerCapture(event.pointerId);
+    setTranslationDrag(true);
+    const right = viewport.width - edges.right;
+    const move = (e: PointerEvent) => setTranslationPref(right - e.clientX);
+    const end = () => {
+      setTranslationDrag(false);
+      handle.removeEventListener('pointermove', move);
+      handle.removeEventListener('pointerup', end);
+      handle.removeEventListener('pointercancel', end);
+    };
+    handle.addEventListener('pointermove', move);
+    handle.addEventListener('pointerup', end);
+    handle.addEventListener('pointercancel', end);
+  };
 
   const selectPanel = (id: ResearchPanelId) => {
     if (panelOpen && id === panel) {
@@ -435,6 +475,7 @@ export function ReaderShell(props: ReaderShellProps) {
     '--pp-card-y': px(card.y),
     '--pp-card-w': px(card.w),
     '--pp-card-h': px(card.h),
+    '--pp-trans-w': px(translationOpen ? translationWidth : 0),
   } as CSSProperties;
 
   // Distance from the window edge to the card's inner (rail-side) content edge.
@@ -446,13 +487,29 @@ export function ReaderShell(props: ReaderShellProps) {
       className="pp-reader"
       data-placement={effectivePlacement}
       data-switching={switching ?? undefined}
-      data-resizing={resizing || windowResizing ? 'true' : undefined}
+      data-resizing={resizing || windowResizing || translationDrag ? 'true' : undefined}
+      data-translation={translationOpen ? 'open' : undefined}
       style={style}
     >
       <div ref={scrollRef} className="pp-reader__paper">
         {paper}
       </div>
       <OverlayScrollbar target={scrollRef} dragLabel={`第 ${pageIndex + 1} / ${header.pageCount} 页`} />
+
+      {translationOpen && (
+        <div className="pp-reader__translation">
+          <div
+            className="pp-tr-handle"
+            role="separator"
+            aria-orientation="vertical"
+            aria-label="拖动调整译文栏宽度"
+            data-dragging={translationDrag ? 'true' : undefined}
+            onPointerDown={startTranslationDrag}
+            onDoubleClick={() => setTranslationPref(null)}
+          />
+          {props.translation!.pane}
+        </div>
+      )}
 
       <ReaderSidebar
         open={sidebarOpen}
@@ -510,6 +567,8 @@ export function ReaderShell(props: ReaderShellProps) {
         settingsRef={settingsRef}
         settingsOpen={settingsOpen}
         onSettings={props.settings ? () => setSettingsOpen((open) => !open) : undefined}
+        translationOpen={props.translation ? translationOpen : undefined}
+        onToggleTranslation={props.translation?.onToggle}
         onBack={props.onBack}
         exports={props.exports}
         onExport={props.onExport}
@@ -658,7 +717,7 @@ export function ReaderShell(props: ReaderShellProps) {
         notes={noteLayouts}
         annotations={annotations}
         container={paperElement}
-        layoutKey={`${zoomPercent}:${interaction.rotation}:${effectivePlacement}:${effectiveWidth}:${effectiveHeight}:${sidebarOpen}`}
+        layoutKey={`${zoomPercent}:${interaction.rotation}:${effectivePlacement}:${effectiveWidth}:${effectiveHeight}:${sidebarOpen}:${translationOpen ? translationWidth : 0}`}
         annotationRects={interaction.annotationRects}
         subscribeGeometry={interaction.subscribeGeometry}
         onChange={(note) => setNoteLayouts((current) => current.map((n) => (n.id === note.id ? note : n)))}
