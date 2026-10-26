@@ -24,6 +24,8 @@
 | `Button` | 文字按钮 | `variant`: plain / primary / quiet / danger；`size`: sm / md；`shape`: rounded / pill；`icon` |
 | `IconButton` | 只有图标的按钮，自带浮层提示 | `icon`、`label`（必填，也是读屏名称和提示文字）、`active`、`shortcut`、`tooltipPlacement`、`tooltip` |
 | `Segmented` | 2–4 个互斥选项 | `options`、`value`、`onChange`、`label`、`stretch` |
+| `Select` | 下拉选择：按钮显示当前项，点开是菜单 | `options`（`value`、`label`、`shortLabel` 按钮上的短名、`group` 不同组之间画分隔线、`disabled`）、`value`、`onChange`、`label`、`placeholder`、`size`、`block` |
+| `Stepper` | 一步一步调整的数值（− 值 +），方向键也能调 | `value`、`min`、`max`、`step`、`onChange`、`label`、`format` |
 | `Tooltip` | 浮层提示 | `label`、`shortcut`、`placement`、`labelsChild`（子元素已用同样文字做名称时设为 true） |
 | `Popover` | 锚定在某个元素上的非模态浮层（引用预览、小表单） | `anchorRef`、`open`、`onClose`、`label`、`placement`、`width` |
 | `Menu` | 下拉 / 右键菜单 | `entries`（普通项、勾选项、分隔线）、`anchor`（坐标）、`align`、`triggerRef`、`onSelect`、`onClose`；`multiple`：点勾选项后菜单不关，可以连续勾选 |
@@ -156,6 +158,19 @@ toast.show({ message: '翻译失败：请求超时', tone: 'error', action: { la
 - 列表显示方式（简洁 / 详细、显示哪些列、列宽）和左右两栏是否显示是 `LibraryViewPreferences`，通过 `onPrefs(patch)` 由逻辑层保存为偏好。`sidebarOpen` / `detailOpen` 不设时按窗口宽度自动决定。
 - 其余都是动作回调：标星、改字段、标签、移动、移出、文件夹增改删、导入（PDF / CSL JSON / BibTeX）、导出引用。`onCreateFolder` 需要同步返回新文件夹的 id，界面随即进入改名。
 - 拖动论文时 `dataTransfer` 里是 `application/x-paperpane-papers`（id 数组的 JSON），见 `src/ui/library/dragTypes.ts`。
+
+## 设置 `SettingsView` 与快速设置
+
+位于 `src/ui/settings/`，视图模型在 `settings/types.ts`，按设置接口草案 v0.1 对应；示例接线是 `settings/sample/useSampleSettings.ts`（偏好和配置存在 localStorage，设置页与阅读器之间同步，仅作演示）。
+
+- **两类设置**：
+  - 偏好 `Preferences`（主题、界面语言、回答语言、正文字号、深色减光、公式复制格式）：每项改了立即生效，调用 `onPreference(key, value)`，由逻辑层单字段保存并同步到其他标签页；保存失败时 `PreferencesState.local = 'failed'`，界面提示并可重试。
+  - 配置 `SettingsView`（模型服务、模型、默认模型、功能路由、提示词、运行参数、同步）：设置页编辑一份草稿，所有节共用，切换节不会丢；底部保存条整体调用 `onSave(draft, baseRevision)`，按 `SaveSettingsResult` 显示成功、需要修改（`problems` 的 `path` 对应到字段）、冲突（保留草稿，用户选择载入最新或覆盖）、失败。
+- **密钥**：快照只有 `hasKey` / `hasPassword`；草稿里用 `SecretEdit`（keep / clear / replace）。`toDraft(view)` 把快照转成草稿，所有密钥初始为 keep。
+- **外观的应用**：`applyAppearance()`（`src/ui/theme.ts`）设置主题、`--pp-read-scale` 和页面减光。正文字号只作用于批注、笔记、概览和回答正文（`--pp-text-read*`），不缩放工具栏，也不改变 PDF 缩放。
+- **节**：`SettingsSection` = general / models / features / sync / advanced / privacy；设置页地址的 `#models` 等直达对应一节。目前完成了通用和高级，其余几节下一步做。
+- **状态行** `StatusLine`：保存、同步、模型三种状态，设置页、阅读器快速设置和扩展弹窗共用，数据来自 `StatusSummary`。
+- **阅读器快速设置**：`ReaderShell` 的 `settings` prop（`ReaderSettingsProps`），工具栏设置按钮弹出：主题、正文字号、深色减光、回答语言、默认模型，加状态行和「全部设置…」。默认模型调用 `onDefaultModel(id)`，对应逻辑层的 `setDefaultModel(modelId, baseRevision)` 单项原子命令；不传 `settings` 时按钮仍调用 `onTool('settings')`。
 
 ## 修改与扩展
 

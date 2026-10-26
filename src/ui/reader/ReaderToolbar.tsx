@@ -42,6 +42,10 @@ interface ReaderToolbarProps {
   /** Turns the pages a quarter clockwise. */
   onRotate: () => void;
   onResetRotation: () => void;
+  /** Quick settings: the button's popover. Without it the button reports onTool('settings'). */
+  settingsRef?: RefObject<HTMLButtonElement | null>;
+  settingsOpen?: boolean;
+  onSettings?: () => void;
   onTool: (tool: ToolbarTool) => void;
 }
 
@@ -73,6 +77,9 @@ export function ReaderToolbar({
   rotation,
   onRotate,
   onResetRotation,
+  settingsRef,
+  settingsOpen,
+  onSettings,
   onTool,
 }: ReaderToolbarProps) {
   const [pageDraft, setPageDraft] = useState(String(pageIndex + 1));
@@ -278,7 +285,17 @@ export function ReaderToolbar({
           disabled={!canDockRight}
           onClick={onTogglePlacement}
         />
-        <IconButton icon="settings" label="设置" shape="pill" onClick={() => onTool('settings')} />
+        <IconButton
+          ref={settingsRef}
+          icon="settings"
+          label="阅读设置"
+          shape="pill"
+          aria-haspopup={onSettings ? 'dialog' : undefined}
+          aria-expanded={onSettings ? Boolean(settingsOpen) : undefined}
+          active={settingsOpen}
+          tooltip={!settingsOpen}
+          onClick={onSettings ?? (() => onTool('settings'))}
+        />
         {density === 'full' && <IconButton icon="export" label="导出" shape="pill" onClick={() => onTool('export')} />}
       </div>
 

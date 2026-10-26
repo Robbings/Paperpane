@@ -14,6 +14,7 @@ import { SampleChat } from '@/ui/reader/sample/SampleChat';
 import { SampleOverview } from '@/ui/reader/sample/SampleOverview';
 import { SamplePaper } from '@/ui/reader/sample/SamplePaper';
 import { sampleAnnotations, sampleHeader, sampleOutline } from '@/ui/reader/sample/sampleData';
+import { modelOptions, useSamplePreferences, useSampleSettings } from '@/ui/settings/sample/useSampleSettings';
 import { applyTheme } from '@/ui/theme';
 
 // Review switches: reader.html?view=gallery shows the component gallery,
@@ -34,6 +35,8 @@ function SampleReader() {
   const [pageIndex, setPageIndex] = useState(0);
   const [zoom, setZoom] = useState(100);
   const reader = useSampleReader(sampleAnnotations);
+  const preferences = useSamplePreferences();
+  const settings = useSampleSettings();
   const { annotations } = reader;
   const [note, setNote] = useState('');
   // 示例：文献库里的论文与标签，当前论文是第一篇。
@@ -117,6 +120,15 @@ function SampleReader() {
           else if (target) navigate(target.pageIndex);
         }}
         onTool={() => undefined}
+        settings={{
+          preferences: preferences.state.preferences,
+          onPreference: preferences.setPreference,
+          models: modelOptions(settings.settings),
+          defaultModelId: settings.settings.defaultModelId,
+          onDefaultModel: settings.setDefaultModel,
+          status: settings.status,
+          onOpenSettings: (section) => window.open(`./options.html${section ? `#${section}` : ''}`, '_blank', 'noopener'),
+        }}
         panels={{ discuss: <SampleChat onLocateQuote={locateQuote} />, overview: <SampleOverview onLocateQuote={locateQuote} /> }}
         library={{
           currentPaperId: current.id,

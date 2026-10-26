@@ -9,6 +9,7 @@ import {
 } from '@/ui/components';
 import { CommentNotes, NOTE_SIZE } from './notes/CommentNotes';
 import { FindBar } from './FindBar';
+import { QuickSettings, type ReaderSettingsProps } from './QuickSettings';
 import { FunctionRail, researchPanels } from './FunctionRail';
 import { ReaderLibraryNav, type ReaderLibraryData } from './library/ReaderLibraryNav';
 import { SaveToLibraryPopover, type LibraryEntryDraft } from './library/SaveToLibraryPopover';
@@ -82,6 +83,8 @@ interface ReaderShellProps {
   onTool: (tool: string) => void;
   /** Library features inside the reader: bookmark popover and the sidebar tab. */
   library?: ReaderLibraryProps;
+  /** Quick settings behind the toolbar's settings button: appearance, answer language, default model. */
+  settings?: ReaderSettingsProps;
   /** Content for research panels the page supplies itself (discussion, overview, …); the rest show a placeholder. */
   panels?: Partial<Record<ResearchPanelId, ReactNode>>;
 }
@@ -207,6 +210,8 @@ export function ReaderShell(props: ReaderShellProps) {
   // Window resizes follow the pointer directly instead of tweening behind it.
   const [saveOpen, setSaveOpen] = useState(false);
   const saveRef = useRef<HTMLButtonElement>(null);
+  const [settingsOpen, setSettingsOpen] = useState(false);
+  const settingsRef = useRef<HTMLButtonElement>(null);
   const { library } = props;
 
   const [windowResizing, setWindowResizing] = useState(false);
@@ -493,6 +498,9 @@ export function ReaderShell(props: ReaderShellProps) {
         rotation={interaction.rotation}
         onRotate={() => interaction.onRotate(nextRotation)}
         onResetRotation={() => interaction.onRotate(0)}
+        settingsRef={settingsRef}
+        settingsOpen={settingsOpen}
+        onSettings={props.settings ? () => setSettingsOpen((open) => !open) : undefined}
         onTool={props.onTool}
       />
 
@@ -561,6 +569,8 @@ export function ReaderShell(props: ReaderShellProps) {
         </div>
         <FunctionRail placement={effectivePlacement} active={panel} panelOpen={panelOpen} onSelect={selectPanel} />
       </GlassSurface>
+
+      {props.settings && <QuickSettings {...props.settings} anchorRef={settingsRef} open={settingsOpen} onClose={() => setSettingsOpen(false)} />}
 
       {library && (
         <SaveToLibraryPopover

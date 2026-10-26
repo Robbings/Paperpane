@@ -814,12 +814,12 @@
 
 .pp-annotation__quote {
   font-family: var(--pp-font-paper);
-  font-size: var(--pp-text-quote);
+  font-size: var(--pp-text-read-quote);
   line-height: 1.45;
 }
 
 .pp-annotation__note {
-  font-size: var(--pp-text-md);
+  font-size: var(--pp-text-read-sm);
   line-height: var(--pp-leading-body);
 }
 
@@ -832,7 +832,7 @@
   padding: var(--pp-space-3) 0;
   border: 0;
   background: transparent;
-  font-size: var(--pp-text-quote);
+  font-size: var(--pp-text-read-quote);
   line-height: 1.65;
   resize: none;
 }
@@ -1106,4 +1106,53 @@
 
 ::highlight(pp-find-current) {
   background-color: var(--pp-find-current);
+}
+
+/* ---- Quick settings ------------------------------------------------------------ */
+
+.pp-quick {
+  padding: 6px 14px 12px;
+}
+
+.pp-quick__rows {
+  display: flex;
+  flex-direction: column;
+}
+
+.pp-quick__row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  min-height: 40px;
+}
+
+.pp-quick__label {
+  flex-shrink: 0;
+  color: var(--pp-text);
+  font-size: var(--pp-text-md);
+}
+
+.pp-quick__model {
+  min-width: 0;
+  max-width: 172px;
+}
+
+.pp-quick__foot {
+  display: flex;
+  align-items: flex-end;
+  justify-content: space-between;
+  gap: 10px;
+  margin-top: 8px;
+  padding-top: 12px;
+  border-top: 0.5px solid var(--pp-hairline);
+}
+
+.pp-quick__foot .pp-statusline {
+  min-width: 0;
+}
+
+.pp-quick__all {
+  flex-shrink: 0;
+  margin: 0 -6px -2px 0;
 }

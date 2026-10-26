@@ -99,6 +99,11 @@
   --pp-weight-semibold: 600;
   --pp-leading-tight: 1.25;
   --pp-leading-body: 1.5;
+  /* Reading text in panels, notes and answers follows the text size preference (16 = 1). */
+  --pp-read-scale: 1;
+  --pp-text-read: calc(14px * var(--pp-read-scale));
+  --pp-text-read-quote: calc(13.5px * var(--pp-read-scale));
+  --pp-text-read-sm: calc(13px * var(--pp-read-scale));
 
   /* Spacing: 4 / 8 grid */
   --pp-space-1: 4px;
@@ -256,4 +261,9 @@
   --pp-hl-blue-dot: #4cc3e3;
   --pp-hl-pink-dot: #ec86b6;
   --pp-hl-purple-dot: #a98bee;
+}
+
+/* Page dimming in dark mode can be turned off in settings. */
+:root[data-dim-pages='off'] {
+  --pp-paper-filter: none;
 }
