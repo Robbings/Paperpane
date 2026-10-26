@@ -38,10 +38,8 @@ function textsOf(content?: OverviewContent): string[] {
   switch (content.output) {
     case 'markdown':
       return [content.markdown];
-    case 'tags':
-      return [];
-    case 'points':
-      return content.points.map((p) => p.text);
+    case 'list':
+      return content.items.map((item) => item.text);
     case 'fields':
       return content.fields.map((f) => f.value);
   }
@@ -53,11 +51,11 @@ function toMarkdown(card: OverviewCardDef, content: OverviewContent): string {
   const body =
     content.output === 'markdown'
       ? plain(content.markdown)
-      : content.output === 'tags'
-        ? content.tags.join('、')
-        : content.output === 'points'
-          ? content.points.map((p) => `- **${p.title}**：${plain(p.text)}`).join('\n')
-          : content.fields.map((f) => `- **${f.label}**：${plain(f.value)}`).join('\n');
+      : content.output === 'list'
+        ? card.listStyle === 'tags'
+          ? content.items.map((item) => item.text).join('、')
+          : content.items.map((item) => `- ${item.title ? `**${item.title}**：` : ''}${plain(item.text)}`).join('\n')
+        : content.fields.map((f) => `- **${f.label}**：${plain(f.value)}`).join('\n');
   return card.display === 'lead' ? body : `## ${card.name}\n\n${body}`;
 }
 

@@ -3,6 +3,7 @@ export { cleanCopyHandlers, stripSourceMarkers } from './cleanCopy';
 export { Dialog } from './Dialog';
 export { Badge, EmptyState, ProgressBar, Skeleton, Spinner } from './Feedback';
 export { GlassSurface } from './GlassSurface';
+export { HintLabel } from './HintLabel';
 export { Icon, iconNames, type IconName } from './Icon';
 export { IconButton } from './IconButton';
 export { Kbd } from './Kbd';

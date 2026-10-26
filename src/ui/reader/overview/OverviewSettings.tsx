@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { Button, Dialog, Icon, ScrollArea, Segmented, Switch, TextArea, TextField } from '@/ui/components';
+import { Button, Dialog, HintLabel, ScrollArea, Segmented, Switch, TextArea, TextField } from '@/ui/components';
 import { SchemaFields, fieldsToSchema, schemaProblem } from './SchemaFields';
 import type { OverviewCardDef, OverviewOutput } from './types';
 
@@ -16,15 +16,16 @@ interface OverviewSettingsProps {
 
 const outputOptions: { value: OverviewOutput; label: string }[] = [
   { value: 'markdown', label: '文本' },
-  { value: 'tags', label: '关键词' },
-  { value: 'points', label: '要点' },
+  { value: 'list', label: '列表' },
   { value: 'fields', label: '结构化' },
 ];
-const outputName = Object.fromEntries(outputOptions.map((o) => [o.value, o.label])) as Record<OverviewOutput, string>;
+
+const kindOf = (card: OverviewCardDef) =>
+  card.display === 'lead' ? '开头概括' : card.output === 'list' ? (card.listStyle === 'tags' ? '列表 · 标签' : '列表') : card.output === 'fields' ? '结构化' : '文本';
 
 const CARD_DRAG = 'application/x-paperpane-overview-card';
 
-/** What is wrong with a card, if anything; shown in the editor and marked in the list. */
+/** What is wrong with a card, if anything; marked in the list and blocks saving. */
 function problemOf(card: OverviewCardDef): string | undefined {
   if (!card.name.trim()) return '请填写名称。';
   if (!card.prompt.trim()) return '请填写提示词。';
@@ -87,13 +88,22 @@ export function OverviewSettings({ open, onClose, cards, defaults, onSave }: Ove
     if (original) setDraft((all) => all.map((card) => (card.id === id ? { ...original, visible: card.visible } : card)));
   };
 
+  const changeOutput = (card: OverviewCardDef, output: OverviewOutput) =>
+    patch(card.id, {
+      output,
+      display: output === 'markdown' ? card.display : undefined,
+      listStyle: output === 'list' ? (card.listStyle ?? 'items') : undefined,
+      // Switching to structured starts from one empty field rather than nothing.
+      schema: output === 'fields' && !card.schema ? fieldsToSchema([{ key: 'field1', title: '', description: '' }]) : card.schema,
+    });
+
   return (
     <Dialog
       open={open}
       onClose={onClose}
       size="lg"
       title="概览内容"
-      description="决定概览里有哪些部分、按什么顺序、让模型怎么写。保存后，下次生成概览时生效；已有结果会标为可能过时。"
+      description="保存后，下次生成概览时生效。"
       footer={
         <>
           <Button onClick={onClose}>取消</Button>
@@ -143,7 +153,7 @@ export function OverviewSettings({ open, onClose, cards, defaults, onSave }: Ove
                     {problems.get(card.id) && <span className="pp-ov-settings__problem" aria-label="有内容需要补充" />}
                   </span>
                   <span className="pp-ov-settings__kind">
-                    {card.display === 'lead' ? '开头概括' : outputName[card.output]}
+                    {kindOf(card)}
                     {card.builtIn ? ' · 内置' : ''}
                   </span>
                 </button>
@@ -162,47 +172,53 @@ export function OverviewSettings({ open, onClose, cards, defaults, onSave }: Ove
           ) : (
             <>
               <TextField label="名称" value={selected.name} onChange={(name) => patch(selected.id, { name })} error={selected.name.trim() ? undefined : '请填写名称。'} />
+
               <div className="pp-ov-settings__field">
-                <span className="pp-field__label">输出形式</span>
-                <Segmented
-                  label="输出形式"
-                  size="sm"
-                  stretch
-                  options={outputOptions}
-                  value={selected.output}
-                  onChange={(output) =>
-                    patch(selected.id, {
-                      output,
-                      display: output === 'markdown' ? selected.display : undefined,
-                      // Switching to structured starts from one empty field rather than nothing.
-                      schema: output === 'fields' && !selected.schema ? fieldsToSchema([{ key: 'field1', title: '', description: '' }]) : selected.schema,
-                    })
-                  }
+                <HintLabel htmlFor="pp-ov-prompt" hint="对整篇论文的要求，会和正文一起发给模型">
+                  提示词
+                </HintLabel>
+                <TextArea
+                  id="pp-ov-prompt"
+                  label="提示词"
+                  hideLabel
+                  value={selected.prompt}
+                  onChange={(prompt) => patch(selected.id, { prompt })}
+                  rows={3}
+                  maxRows={10}
+                  placeholder="例如：列出这篇论文的主要贡献，每条一句话"
+                  error={selected.prompt.trim() ? undefined : '请填写提示词。'}
                 />
               </div>
-              {selected.output === 'markdown' && (
-                <Switch
-                  label="作为概览开头"
-                  description="不论在列表中的位置，都放在概览最上方、不带标题。只能有一张卡片这样显示。"
-                  checked={selected.display === 'lead'}
-                  onChange={(lead) => patch(selected.id, { display: lead ? 'lead' : undefined })}
-                />
+
+              <div className="pp-ov-settings__field">
+                <HintLabel hint="文本是一段话；列表是逐条内容；结构化按你定义的字段逐行填写">输出形式</HintLabel>
+                <Segmented label="输出形式" size="sm" stretch options={outputOptions} value={selected.output} onChange={(output) => changeOutput(selected, output)} />
+              </div>
+
+              {selected.output === 'list' && (
+                <div className="pp-ov-settings__field">
+                  <HintLabel hint="条目：每条一句，可以用加粗的短标题开头。标签：一排短词，适合关键词、数据集、方法名">显示为</HintLabel>
+                  <Segmented
+                    label="列表显示为"
+                    size="sm"
+                    stretch
+                    options={[
+                      { value: 'items', label: '条目' },
+                      { value: 'tags', label: '标签' },
+                    ]}
+                    value={selected.listStyle ?? 'items'}
+                    onChange={(listStyle) => patch(selected.id, { listStyle })}
+                  />
+                </div>
               )}
-              <TextArea
-                label="提示词"
-                value={selected.prompt}
-                onChange={(prompt) => patch(selected.id, { prompt })}
-                rows={4}
-                maxRows={10}
-                error={selected.prompt.trim() ? undefined : '请填写提示词。'}
-                description={
-                  selected.output === 'points'
-                    ? '对整篇论文的要求，会和正文一起发给模型。要点会按"短标题 + 一句说明"输出。'
-                    : selected.output === 'tags'
-                      ? '对整篇论文的要求，会和正文一起发给模型。关键词会按短词输出。'
-                      : '对整篇论文的要求，会和正文一起发给模型。'
-                }
-              />
+
+              {selected.output === 'markdown' && (
+                <div className="pp-ov-settings__row">
+                  <HintLabel hint="显示在概览最上方，不带标题；只能有一张">作为概览开头</HintLabel>
+                  <Switch label="作为概览开头" hideLabel checked={selected.display === 'lead'} onChange={(lead) => patch(selected.id, { display: lead ? 'lead' : undefined })} />
+                </div>
+              )}
+
               {selected.output === 'fields' && <SchemaFields key={selected.id} schema={selected.schema} onChange={(schema) => patch(selected.id, { schema })} />}
 
               <div className="pp-ov-settings__card-actions">
@@ -215,12 +231,7 @@ export function OverviewSettings({ open, onClose, cards, defaults, onSave }: Ove
                     删除这张卡片
                   </Button>
                 )}
-                {!selected.visible && (
-                  <span className="pp-ov-settings__note">
-                    <Icon name="alert" size={13} />
-                    已隐藏，不会显示也不会生成
-                  </span>
-                )}
+                {!selected.visible && <span className="pp-ov-settings__note">已隐藏，不会显示也不会生成</span>}
               </div>
             </>
           )}

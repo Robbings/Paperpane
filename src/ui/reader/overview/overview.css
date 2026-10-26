@@ -468,6 +468,14 @@
   gap: 6px;
 }
 
+/* A label on the left, its switch on the right. */
+.pp-ov-settings__row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
+
 .pp-ov-settings__card-actions {
   display: flex;
   align-items: center;
@@ -494,17 +502,6 @@
   display: flex;
   flex-direction: column;
   gap: 6px;
-}
-
-.pp-ov-fields-edit__head {
-  display: flex;
-  align-items: baseline;
-  gap: 8px;
-}
-
-.pp-ov-fields-edit__hint {
-  color: var(--pp-text-3);
-  font-size: var(--pp-text-xs);
 }
 
 .pp-ov-fields-edit__list {

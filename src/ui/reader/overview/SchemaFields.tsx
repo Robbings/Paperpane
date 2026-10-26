@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { Button, IconButton, TextArea } from '@/ui/components';
+import { Button, HintLabel, IconButton, TextArea } from '@/ui/components';
 
 /** One row of a structured card: shown as its title, described to the model by its description. */
 export interface SchemaField {
@@ -83,7 +83,7 @@ export function SchemaFields({ schema, onChange }: SchemaFieldsProps) {
           maxRows={16}
           spellCheck={false}
           error={schema ? schemaProblem(schema) : undefined}
-          description={fields === null ? '这个 Schema 含有列表或嵌套等结构，只能直接编辑。每个顶层字段显示为一行。' : '每个顶层字段显示为一行，字段的 title 作为名称。'}
+          description={fields === null ? '含有列表或嵌套结构，只能直接编辑' : undefined}
         />
         {fields !== null && (
           <Button size="sm" variant="quiet" className="pp-ov-fields-edit__switch" onClick={() => setRaw(false)}>
@@ -96,10 +96,7 @@ export function SchemaFields({ schema, onChange }: SchemaFieldsProps) {
 
   return (
     <div className="pp-ov-fields-edit">
-      <div className="pp-ov-fields-edit__head">
-        <span className="pp-field__label">字段</span>
-        <span className="pp-ov-fields-edit__hint">每个字段在概览里显示为一行；说明写给模型看。</span>
-      </div>
+      <HintLabel hint="每个字段在概览里显示为一行；说明是写给模型看的">字段</HintLabel>
       <ol className="pp-ov-fields-edit__list">
         {fields.map((field, index) => (
           <li

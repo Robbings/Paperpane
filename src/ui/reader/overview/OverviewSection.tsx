@@ -17,13 +17,12 @@ interface OverviewSectionProps {
   onLocate: (source: OverviewSourceView) => void;
 }
 
-const skeletonLines: Record<OverviewCardDef['output'], number> = { markdown: 3, tags: 1, points: 4, fields: 4 };
+const skeletonLines = (card: OverviewCardDef) => (card.output === 'list' ? (card.listStyle === 'tags' ? 1 : 4) : card.output === 'fields' ? 4 : 3);
 
 /** What a collapsed section still says about itself. */
-function summary(content?: OverviewContent): string | null {
+function summary(card: OverviewCardDef, content?: OverviewContent): string | null {
   if (!content) return null;
-  if (content.output === 'tags') return content.tags.join(' · ');
-  if (content.output === 'points') return `${content.points.length} 条`;
+  if (content.output === 'list') return card.listStyle === 'tags' ? content.items.map((i) => i.text).join(' · ') : `${content.items.length} 条`;
   if (content.output === 'fields') return content.fields.map((f) => f.label).join(' · ');
   return null;
 }
@@ -48,24 +47,28 @@ export function OverviewSection(props: OverviewSectionProps) {
 
   let body: ReactNode;
   if (!content) {
-    body = running || result.state === 'empty' ? <Skeleton lines={lead ? 2 : skeletonLines[card.output]} /> : null;
+    body = running || result.state === 'empty' ? <Skeleton lines={lead ? 2 : skeletonLines(card)} /> : null;
   } else if (content.output === 'markdown') {
     body = <Markdown text={content.markdown} renderCitation={marker} className={lead ? 'pp-ov-lead' : 'pp-ov-prose'} />;
-  } else if (content.output === 'tags') {
+  } else if (content.output === 'list' && card.listStyle === 'tags') {
     body = (
       <ul className="pp-ov-tags">
-        {content.tags.map((tag) => (
-          <li key={tag}>{tag}</li>
+        {content.items.map((item) => (
+          <li key={item.text}>{item.text}</li>
         ))}
       </ul>
     );
-  } else if (content.output === 'points') {
+  } else if (content.output === 'list') {
     body = (
       <ol className="pp-ov-points">
-        {content.points.map((point) => (
-          <li key={point.title}>
-            <strong className="pp-ov-points__title">{point.title}</strong>：
-            <MarkdownInline text={point.text} renderCitation={marker} />
+        {content.items.map((item, index) => (
+          <li key={index}>
+            {item.title && (
+              <>
+                <strong className="pp-ov-points__title">{item.title}</strong>：
+              </>
+            )}
+            <MarkdownInline text={item.text} renderCitation={marker} />
           </li>
         ))}
       </ol>
@@ -123,7 +126,7 @@ export function OverviewSection(props: OverviewSectionProps) {
     );
   }
 
-  const folded = summary(content);
+  const folded = summary(card, content);
   return (
     <section
       className="pp-ov-section"

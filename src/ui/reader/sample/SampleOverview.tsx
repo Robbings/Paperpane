@@ -9,7 +9,7 @@ import type { OverviewCardDef, OverviewContent, OverviewResultView, OverviewSour
 
 const cards: OverviewCardDef[] = [
   { id: 'gist', name: '概括', prompt: '用一两句话说清这篇论文做了什么、为什么重要。', output: 'markdown', display: 'lead', builtIn: true, visible: true },
-  { id: 'keywords', name: '关键词', prompt: '列出 5–8 个能概括论文主题和方法的关键词。', output: 'tags', builtIn: true, visible: true },
+  { id: 'keywords', name: '关键词', prompt: '列出 5–8 个能概括论文主题和方法的关键词。', output: 'list', listStyle: 'tags', builtIn: true, visible: true },
   {
     id: 'summary',
     name: '结构化摘要',
@@ -25,7 +25,7 @@ const cards: OverviewCardDef[] = [
     builtIn: true,
     visible: true,
   },
-  { id: 'points', name: '要点', prompt: '用 3–5 条要点概括论文最值得记住的内容：每条一个短标题，加一句说明。', output: 'points', builtIn: true, visible: true },
+  { id: 'points', name: '要点', prompt: '用 3–5 条要点概括论文最值得记住的内容：每条一个短标题，加一句说明。', output: 'list', listStyle: 'items', builtIn: true, visible: true },
 ];
 
 const source = (label: string, quote: string, verified = true): OverviewSourceView => ({ label, quote, pageLabel: verified ? '第 1 页' : undefined, verified });
@@ -39,7 +39,7 @@ const finished: Record<string, { content: OverviewContent; sources: OverviewSour
     },
     sources: [source('1', 'text is stored in drawing order rather than reading order'), source('2', 'keeps every block linked to its position on the page')],
   },
-  keywords: { content: { output: 'tags', tags: ['阅读顺序', '双栏版面', '文本块', '几何规则', '稳定标识', '可追溯性'] }, sources: [] },
+  keywords: { content: { output: 'list', items: ['阅读顺序', '双栏版面', '文本块', '几何规则', '稳定标识', '可追溯性'].map((text) => ({ text })) }, sources: [] },
   summary: {
     content: {
       output: 'fields',
@@ -61,8 +61,8 @@ const finished: Record<string, { content: OverviewContent; sources: OverviewSour
   },
   points: {
     content: {
-      output: 'points',
-      points: [
+      output: 'list',
+      items: [
         { title: 'PDF 不保证阅读顺序', text: '文件可能先画第二栏，或把图注夹在一段话中间[^1]。' },
         { title: '块是一切的基础', text: '块模型把文字、类型和几何位置放在一起[^2]，排序和定位都建立在它上面。' },
         { title: '每一步都可追溯', text: '每个排序决定都有记录，顺序错了可以找到产生它的那条规则[^3]。' },
@@ -89,19 +89,16 @@ function partial(content: OverviewContent, step: number): OverviewContent {
     if (open >= 0 && content.markdown.indexOf(']', open) >= end) end = open;
     return { output: 'markdown', markdown: content.markdown.slice(0, end) };
   }
-  if (content.output === 'tags') return { output: 'tags', tags: content.tags.slice(0, step) };
-  if (content.output === 'points') return { output: 'points', points: content.points.slice(0, step) };
+  if (content.output === 'list') return { output: 'list', items: content.items.slice(0, step) };
   return { output: 'fields', fields: content.fields.slice(0, step) };
 }
 
 const steps = (content: OverviewContent) =>
   content.output === 'markdown'
     ? Math.ceil(content.markdown.length / 6)
-    : content.output === 'tags'
-      ? content.tags.length
-      : content.output === 'points'
-        ? content.points.length
-        : content.fields.length;
+    : content.output === 'list'
+      ? content.items.length
+      : content.fields.length;
 
 export function SampleOverview({ onLocateQuote }: { onLocateQuote: (quote: string) => void }) {
   const [defs, setDefs] = useState(cards);
