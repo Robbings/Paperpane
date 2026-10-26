@@ -11,6 +11,7 @@ import { ReaderShell } from '@/ui/reader/ReaderShell';
 import { findQuote } from '@/ui/reader/sample/findQuote';
 import { pageToView } from '@/ui/reader/sample/pageFrame';
 import { useSampleReader } from '@/ui/reader/sample/useSampleReader';
+import { useSampleTranslation } from '@/ui/reader/sample/useSampleTranslation';
 import { SampleChat } from '@/ui/reader/sample/SampleChat';
 import { SampleOverview } from '@/ui/reader/sample/SampleOverview';
 import { SamplePaper } from '@/ui/reader/sample/SamplePaper';
@@ -89,6 +90,8 @@ function SampleReader() {
     window.setTimeout(() => setFlash((current) => (current?.key === key ? null : current)), 2000);
   };
 
+  const translation = useSampleTranslation((quote) => locateQuote(quote));
+
   const navigate = (index: number) => {
     const container = scroller();
     const page = container?.querySelector<HTMLElement>(`[data-page-index="${index}"]`);
@@ -115,6 +118,7 @@ function SampleReader() {
           if (next !== undefined) setZoom(next);
         }}
         onZoomTo={setZoom}
+        translation={translation}
         interaction={reader.interaction}
         onLocateAnnotation={(id) => {
           const target = annotations.find((item) => item.id === id);

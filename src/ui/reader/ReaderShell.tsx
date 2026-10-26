@@ -1,4 +1,4 @@
-import { useEffect, useLayoutEffect, useRef, useState, type CSSProperties, type ReactNode } from 'react';
+import { useEffect, useLayoutEffect, useRef, useState, type CSSProperties, type PointerEvent as ReactPointerEvent, type ReactNode } from 'react';
 import {
   GlassSurface,
   SelectionMenu,
@@ -10,6 +10,7 @@ import {
 import { CommentNotes, NOTE_SIZE } from './notes/CommentNotes';
 import { FindBar } from './FindBar';
 import { QuickSettings, type ReaderSettingsProps } from './QuickSettings';
+import { TranslationDockContext } from './translation/dock';
 import { DEFAULT_SELECTION_BAR } from '@/ui/settings/types';
 import { FunctionRail, researchPanels } from './FunctionRail';
 import { ReaderLibraryNav, type ReaderLibraryData } from './library/ReaderLibraryNav';
@@ -89,6 +90,8 @@ interface ReaderShellProps {
   /** What the toolbar's 导出 offers (e.g. the original PDF); without it the button calls onTool('export'). */
   exports?: readonly ExportOption[];
   onExport?: (id: string) => void;
+  /** The translation beside the paper: the toolbar's 译文 button toggles it; the page supplies the pane. */
+  translation?: { open: boolean; onToggle: () => void; pane: ReactNode };
   /** Quick settings behind the toolbar's settings button: appearance, answer language, default model. */
   settings?: ReaderSettingsProps;
   /** Content for research panels the page supplies itself (discussion, overview, …); the rest show a placeholder. */
@@ -127,6 +130,24 @@ const placeholderText: Partial<Record<ResearchPanelId, string>> = {
 
 const px = (value: number) => `${value}px`;
 
+/** The translation pane's narrowest width, and the room the paper keeps beside it. */
+const TRANSLATION_MIN = 300;
+const TRANSLATION_DEFAULT = 360;
+const PAPER_BESIDE_TRANSLATION = 360;
+const FLOAT_MIN = { w: 300, h: 240 };
+
+/** Keeps the floating translation inside the window, with its header reachable. */
+function clampFloat(r: { x: number; y: number; w: number; h: number }, viewport: { width: number; height: number }) {
+  const w = Math.min(Math.max(r.w, FLOAT_MIN.w), viewport.width - 2 * GAP);
+  const h = Math.min(Math.max(r.h, FLOAT_MIN.h), viewport.height - 2 * GAP);
+  return {
+    w,
+    h,
+    x: Math.round(Math.min(Math.max(r.x, GAP), viewport.width - GAP - w)),
+    y: Math.round(Math.min(Math.max(r.y, GAP), viewport.height - GAP - h)),
+  };
+}
+
 export function ReaderShell(props: ReaderShellProps) {
   const { header, outline, pageIndex, zoomPercent, annotations, annotationStatus, notes, document: paper } = props;
   const viewport = useViewport();
@@ -155,7 +176,13 @@ export function ReaderShell(props: ReaderShellProps) {
   const space = (docked: boolean, at: DockPlacement) =>
     paperWidth({ viewportWidth: viewport.width, sidebarDocked: docked, placement: at, panelOpen: true, width: effectiveWidth });
   const sidebarFits = space(true, placement) >= PAPER_MIN_WIDTH;
-  const sidebarOpen = sidebarPref ?? space(true, placement) >= PAPER_COMFORT_WIDTH;
+  // A docked translation takes room from the paper: the sidebar folds away first when it no longer fits.
+  const translationOpen = Boolean(props.translation?.open);
+  const [translationFloating, setTranslationFloating] = useState(false);
+  const [translationPref, setTranslationPref] = useState<number | null>(null);
+  const translationDocked = translationOpen && !translationFloating;
+  const translationRoom = translationDocked ? (translationPref ?? TRANSLATION_DEFAULT) : 0;
+  const sidebarOpen = sidebarPref ?? space(true, placement) - translationRoom >= PAPER_COMFORT_WIDTH;
   const sidebarDocked = sidebarOpen && sidebarFits;
   const canDockRight = space(sidebarDocked, 'right') >= PAPER_MIN_WIDTH;
   const compact = !canDockRight;
@@ -257,7 +284,86 @@ export function ReaderShell(props: ReaderShellProps) {
     onLayoutChange?.({ placement, width, height, showTitle });
   }, [onLayoutChange, placement, width, height, showTitle]);
 
-  const density = toolbarDensity(viewport.width - edges.left - edges.right, showTitle);
+
+  // ---- Translation beside the paper ------------------------------------------
+  // Docked: a full-height column right of the paper; the paper, toolbar and find bar
+  // move over to make room. Floating: a card over the paper the reader can move and size.
+  const readingWidth = viewport.width - edges.left - edges.right;
+  const translationWidth = Math.round(
+    Math.min(Math.max(translationPref ?? TRANSLATION_DEFAULT, TRANSLATION_MIN), Math.max(TRANSLATION_MIN, readingWidth - PAPER_BESIDE_TRANSLATION)),
+  );
+  const [floatPref, setFloatPref] = useState<{ x: number; y: number; w: number; h: number } | null>(null);
+  const floatRect = clampFloat(
+    floatPref ?? {
+      w: 380,
+      h: Math.min(620, Math.round(viewport.height * 0.62)),
+      x: viewport.width - edges.right - 380 - 16,
+      y: GAP + 44 + 16,
+    },
+    viewport,
+  );
+  const [translationDrag, setTranslationDrag] = useState(false);
+  /** Follows one pointer gesture on the pane: docked width, or moving / sizing the floating card. */
+  const startTranslationGesture = (kind: string) => (event: ReactPointerEvent<HTMLElement>) => {
+    if (event.button !== 0) return;
+    event.preventDefault();
+    const handle = event.currentTarget;
+    handle.setPointerCapture(event.pointerId);
+    setTranslationDrag(true);
+    const start = { x: event.clientX, y: event.clientY, rect: floatRect };
+    const right = viewport.width - edges.right;
+    const move = (e: PointerEvent) => {
+      if (kind === 'dock') {
+        setTranslationPref(right - e.clientX);
+        return;
+      }
+      const dx = e.clientX - start.x;
+      const dy = e.clientY - start.y;
+      const r = { ...start.rect };
+      if (kind === 'move') {
+        r.x += dx;
+        r.y += dy;
+      } else {
+        if (kind.includes('e')) r.w += dx;
+        if (kind.includes('s')) r.h += dy;
+        if (kind.includes('w')) {
+          r.w -= dx;
+          r.x += dx;
+        }
+        if (kind.includes('n')) {
+          r.h -= dy;
+          r.y += dy;
+        }
+        // Growing past the limits must not drag the opposite edge along.
+        if (r.w < FLOAT_MIN.w) {
+          if (kind.includes('w')) r.x -= FLOAT_MIN.w - r.w;
+          r.w = FLOAT_MIN.w;
+        }
+        if (r.h < FLOAT_MIN.h) {
+          if (kind.includes('n')) r.y -= FLOAT_MIN.h - r.h;
+          r.h = FLOAT_MIN.h;
+        }
+      }
+      setFloatPref(clampFloat(r, viewport));
+    };
+    const end = () => {
+      setTranslationDrag(false);
+      handle.removeEventListener('pointermove', move);
+      handle.removeEventListener('pointerup', end);
+      handle.removeEventListener('pointercancel', end);
+    };
+    handle.addEventListener('pointermove', move);
+    handle.addEventListener('pointerup', end);
+    handle.addEventListener('pointercancel', end);
+  };
+  const translationDock = {
+    floating: translationFloating,
+    onToggleFloating: () => setTranslationFloating((value) => !value),
+    onHeaderPointerDown: startTranslationGesture('move'),
+  };
+  // The paper's own right edge: past the docked translation when it is open.
+  const paperRight = edges.right + (translationDocked ? translationWidth : 0);
+  const density = toolbarDensity(viewport.width - edges.left - paperRight, showTitle);
 
   const selectPanel = (id: ResearchPanelId) => {
     if (panelOpen && id === panel) {
@@ -422,7 +528,8 @@ export function ReaderShell(props: ReaderShellProps) {
   // ---- Layout variables ----------------------------------------------------
   const style = {
     '--pp-edge-left': px(edges.left),
-    '--pp-edge-right': px(edges.right),
+    '--pp-edge-right': px(paperRight),
+    '--pp-trans-right': px(edges.right),
     '--pp-edge-bottom': px(edges.bottom),
     '--pp-research-w': px(effectiveWidth),
     '--pp-research-h': px(effectiveHeight),
@@ -435,6 +542,7 @@ export function ReaderShell(props: ReaderShellProps) {
     '--pp-card-y': px(card.y),
     '--pp-card-w': px(card.w),
     '--pp-card-h': px(card.h),
+    '--pp-trans-w': px(translationWidth),
   } as CSSProperties;
 
   // Distance from the window edge to the card's inner (rail-side) content edge.
@@ -446,13 +554,41 @@ export function ReaderShell(props: ReaderShellProps) {
       className="pp-reader"
       data-placement={effectivePlacement}
       data-switching={switching ?? undefined}
-      data-resizing={resizing || windowResizing ? 'true' : undefined}
+      data-resizing={resizing || windowResizing || translationDrag ? 'true' : undefined}
+      data-translation={translationOpen ? (translationFloating ? 'floating' : 'docked') : undefined}
       style={style}
     >
       <div ref={scrollRef} className="pp-reader__paper">
         {paper}
       </div>
       <OverlayScrollbar target={scrollRef} dragLabel={`第 ${pageIndex + 1} / ${header.pageCount} 页`} />
+
+      {translationOpen && (
+        <TranslationDockContext.Provider value={translationDock}>
+          <div
+            className="pp-reader__translation"
+            data-floating={translationFloating ? 'true' : undefined}
+            style={translationFloating ? { left: floatRect.x, top: floatRect.y, width: floatRect.w, height: floatRect.h } : undefined}
+          >
+            {translationFloating ? (
+              (['n', 's', 'e', 'w', 'ne', 'nw', 'se', 'sw'] as const).map((dir) => (
+                <span key={dir} className="pp-tr-resize" data-dir={dir} aria-hidden="true" onPointerDown={startTranslationGesture(dir)} />
+              ))
+            ) : (
+              <div
+                className="pp-tr-handle"
+                role="separator"
+                aria-orientation="vertical"
+                aria-label="拖动调整译文栏宽度，双击恢复"
+                data-dragging={translationDrag ? 'true' : undefined}
+                onPointerDown={startTranslationGesture('dock')}
+                onDoubleClick={() => setTranslationPref(null)}
+              />
+            )}
+            {props.translation!.pane}
+          </div>
+        </TranslationDockContext.Provider>
+      )}
 
       <ReaderSidebar
         open={sidebarOpen}
@@ -510,6 +646,8 @@ export function ReaderShell(props: ReaderShellProps) {
         settingsRef={settingsRef}
         settingsOpen={settingsOpen}
         onSettings={props.settings ? () => setSettingsOpen((open) => !open) : undefined}
+        translationOpen={props.translation ? translationOpen : undefined}
+        onToggleTranslation={props.translation?.onToggle}
         onBack={props.onBack}
         exports={props.exports}
         onExport={props.onExport}
@@ -658,7 +796,7 @@ export function ReaderShell(props: ReaderShellProps) {
         notes={noteLayouts}
         annotations={annotations}
         container={paperElement}
-        layoutKey={`${zoomPercent}:${interaction.rotation}:${effectivePlacement}:${effectiveWidth}:${effectiveHeight}:${sidebarOpen}`}
+        layoutKey={`${zoomPercent}:${interaction.rotation}:${effectivePlacement}:${effectiveWidth}:${effectiveHeight}:${sidebarOpen}:${translationDocked ? translationWidth : 0}`}
         annotationRects={interaction.annotationRects}
         subscribeGeometry={interaction.subscribeGeometry}
         onChange={(note) => setNoteLayouts((current) => current.map((n) => (n.id === note.id ? note : n)))}

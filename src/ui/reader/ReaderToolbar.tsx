@@ -46,6 +46,9 @@ interface ReaderToolbarProps {
   settingsRef?: RefObject<HTMLButtonElement | null>;
   settingsOpen?: boolean;
   onSettings?: () => void;
+  /** The 译文 button; omit translationOpen to hide it. */
+  translationOpen?: boolean;
+  onToggleTranslation?: () => void;
   /** A back button at the start, to the library the paper was opened from. */
   onBack?: () => void;
   /** What 导出 offers; without it the button reports onTool('export'). */
@@ -91,6 +94,8 @@ export function ReaderToolbar({
   settingsRef,
   settingsOpen,
   onSettings,
+  translationOpen,
+  onToggleTranslation,
   onBack,
   exports,
   onExport,
@@ -274,6 +279,16 @@ export function ReaderToolbar({
 
       <div className="pp-toolbar__group pp-toolbar__tools">
         <IconButton icon="search" label={findOpen ? '关闭查找' : '查找'} shortcut="⌘F" shape="pill" active={findOpen} aria-pressed={findOpen} onClick={onFind} />
+        {translationOpen !== undefined && onToggleTranslation && (
+          <IconButton
+            icon="translate"
+            label={translationOpen ? '关闭译文' : '译文'}
+            shape="pill"
+            active={translationOpen}
+            aria-pressed={translationOpen}
+            onClick={onToggleTranslation}
+          />
+        )}
         <IconButton icon="marker" label="自动高亮" shape="pill" active={autoHighlight} aria-pressed={autoHighlight} onClick={onToggleAutoHighlight} />
         {density === 'full' ? (
           <>
