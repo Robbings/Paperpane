@@ -3,3 +3,5 @@ engineStrict: true
 saveExact: true
 allowBuilds:
   esbuild: true
+patchedDependencies:
+  pdfjs-dist@6.4.299: patches/pdfjs-dist@6.4.299.patch
