@@ -1,7 +1,20 @@
-/* Comment notes: small glass notes floating over the paper. */
+/* Comment notes: small glass notes pinned to the paper. They live inside the
+   scroll container, so they move with the text. */
+
+.pp-notes-layer {
+  position: absolute;
+  top: 0;
+  left: 0;
+  z-index: 3;
+  width: 0;
+  height: 0;
+}
 
 .pp-note {
-  position: fixed;
+  /* They sit on top of paper text, so near-opaque like dialogs, not see-through glass. */
+  --pp-glass-bg: var(--pp-glass-float-solid);
+
+  position: absolute;
   display: flex;
   flex-direction: column;
   overflow: hidden;
@@ -127,4 +140,46 @@
 
 .pp-note-connector__end {
   fill: var(--pp-accent);
+}
+
+/* Folded: a small titled pill that still sits by its passage. */
+.pp-note--pill {
+  overflow: visible;
+  border-radius: var(--pp-radius-pill);
+}
+
+.pp-note__pill {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  height: 100%;
+  max-width: 260px;
+  padding: 0 4px 0 12px;
+  cursor: grab;
+  touch-action: none;
+  user-select: none;
+}
+
+.pp-note__pill:active {
+  cursor: grabbing;
+}
+
+.pp-note__pill-icon {
+  flex-shrink: 0;
+  color: var(--pp-text-2);
+}
+
+.pp-note__pill-title {
+  min-width: 0;
+  overflow: hidden;
+  font-size: var(--pp-text-md);
+  font-weight: var(--pp-weight-medium);
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.pp-note__pill .pp-icon-btn {
+  width: 26px;
+  height: 26px;
+  color: var(--pp-text-3);
 }

@@ -65,6 +65,8 @@ export function useSampleReader(initial: readonly AnnotationView[]) {
   useEffect(() => {
     if (!container) return;
     const onPointerUp = (event: MouseEvent) => {
+      // Notes and other overlays inside the paper are not part of the text.
+      if ((event.target as Element | null)?.closest?.('[data-pp-overlay]')) return;
       // Let the selection settle first.
       window.setTimeout(() => {
         const selection = window.getSelection();
@@ -110,6 +112,10 @@ export function useSampleReader(initial: readonly AnnotationView[]) {
         const text = ranges.current.get(selectionId)?.text ?? '';
         if (action === 'copy') void navigator.clipboard?.writeText(text).then(() => toast.show({ message: '已复制' }));
         else toast.show({ message: `示例：${{ translate: '翻译', explain: '解释', ask: '提问' }[action] ?? action}「${text.slice(0, 24)}…」` });
+      },
+      onAnnotationAction: (id, action) => {
+        const quote = latest.current.annotations.find((a) => a.id === id)?.quote ?? '';
+        toast.show({ message: `示例：${{ translate: '翻译', explain: '解释', ask: '提问' }[action] ?? action}「${quote.slice(0, 24)}…」` });
       },
       onAnnotationColor: (id, color) => {
         lastColor.current = color;

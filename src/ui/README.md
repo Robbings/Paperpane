@@ -117,8 +117,9 @@ toast.show({ message: '翻译失败：请求超时', tone: 'error', action: { la
 - `menuTarget`：浮动菜单对谁显示。`{ kind: 'selection', id, text, rects }` 是新选区；`{ kind: 'annotation', annotationId, rects }` 是点中的已有高亮。`rects` 是窗口坐标，每行一个。关闭（Esc、点别处、滚动）时外壳调用 `onDismissMenu`。
 - `tool` / `onToolChange`：`'auto-highlight'` 时，选完文字由运行时立即用上一次的颜色创建高亮，并把 `menuTarget` 设为这条新高亮。
 - 新选区：选颜色调用 `onCreateHighlight(id, color)`；"评论"调用不带颜色的 `onCreateHighlight(id)`（用上一次的颜色），外壳随即打开这条高亮的评论便签；翻译、解释、提问、复制调用 `onSelectionAction`。
-- 已有高亮：改色 `onAnnotationColor`，评论 `onAnnotationComment`（便签和批注列表都会调用），删除 `onAnnotationDelete`，删除后的「撤销」调用 `onAnnotationRestore`。
-- `annotationRects(id)`：这条批注现在在屏幕上的位置（窗口坐标），便签画虚线连接时读取；页面未渲染时返回 null。
+- 已有高亮：菜单和新选区相同（翻译、解释、提问走 `onAnnotationAction`，复制由界面完成），另有当前颜色和删除；改色 `onAnnotationColor`，评论 `onAnnotationComment`（便签和批注列表都会调用），删除 `onAnnotationDelete`，删除后的「撤销」调用 `onAnnotationRestore`。
+- `annotationRects(id)`：这条批注现在在屏幕上的位置（窗口坐标），便签定位和画虚线连接时读取；页面未渲染时返回 null。
+- 评论便签放在滚动容器里、钉在原文旁边，随论文滚动和缩放；可以拖动、调大小、收起成标题小条、关闭后再打开（保持原位置）。标题就是评论的第一行。便签所在的层带 `data-pp-overlay`，运行时捕获选区和点击时应忽略来自这里的事件。
 - PDF 页面的外观（纸张、阴影、页间距、深色模式减光）由界面在 `.pp-pdf-surface .page` 上定义。高亮色点（`--pp-hl-*-dot`）与页面高亮（`--pp-hl-*-fill`，与 PDF.js 使用的颜色一致）同色相。
 
 ## 讨论面板 `ChatPanel`

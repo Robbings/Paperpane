@@ -70,6 +70,8 @@ export interface ReaderInteraction {
   onCreateHighlight: (selectionId: string, color?: HighlightColor) => Promise<string | null>;
   /** Other menu actions on a selection: translate, explain, ask, copy. */
   onSelectionAction: (selectionId: string, action: string) => void;
+  /** Translate, explain or ask about an existing highlight's text. */
+  onAnnotationAction: (annotationId: string, action: string) => void;
   onAnnotationColor: (annotationId: string, color: HighlightColor) => void;
   onAnnotationComment: (annotationId: string, comment: string) => void;
   onAnnotationDelete: (annotationId: string) => void;

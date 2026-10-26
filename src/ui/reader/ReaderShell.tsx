@@ -7,7 +7,7 @@ import {
   type SelectionMenuAction,
   type SyncState,
 } from '@/ui/components';
-import { CommentNotes, NOTE_SIZE, type OpenNote } from './notes/CommentNotes';
+import { CommentNotes, NOTE_SIZE, type NoteLayout } from './notes/CommentNotes';
 import { FunctionRail, researchPanels } from './FunctionRail';
 import { ReaderLibraryNav, type ReaderLibraryData } from './library/ReaderLibraryNav';
 import { SaveToLibraryPopover, type LibraryEntryDraft } from './library/SaveToLibraryPopover';
@@ -264,7 +264,9 @@ export function ReaderShell(props: ReaderShellProps) {
 
   // Hand the scroll container to the runtime: its viewer mounts and listens there.
   const onScrollContainer = interaction.onScrollContainer;
+  const [paperElement, setPaperElement] = useState<HTMLDivElement | null>(null);
   useEffect(() => {
+    setPaperElement(scrollRef.current);
     onScrollContainer(scrollRef.current);
     return () => onScrollContainer(null);
   }, [onScrollContainer]);
@@ -311,38 +313,27 @@ export function ReaderShell(props: ReaderShellProps) {
   }, [target, dismiss]);
 
   // ---- Comment notes ---------------------------------------------------------
-  const [openNotes, setOpenNotes] = useState<OpenNote[]>([]);
+  // Pinned to their passages on the paper. Closed notes keep their layout for when they reopen.
+  const [noteLayouts, setNoteLayouts] = useState<NoteLayout[]>([]);
   const topZ = useRef(1);
 
-  /** Opens (or brings forward) the note for an annotation, beside its passage if there is room. */
+  /** Opens (or unfolds and brings forward) the note for an annotation; a new one opens just below its passage. */
   const openNote = (id: string) =>
-    setOpenNotes((current) => {
+    setNoteLayouts((current) => {
       const z = ++topZ.current;
-      if (current.some((n) => n.id === id)) return current.map((n) => (n.id === id ? { ...n, z } : n));
+      if (current.some((n) => n.id === id)) return current.map((n) => (n.id === id ? { ...n, open: true, collapsed: false, z } : n));
       const rects = interaction.annotationRects(id) ?? [];
-      const { width, height } = NOTE_SIZE;
-      const paperLeft = edges.left + 8;
-      const paperRight = window.innerWidth - edges.right - 8;
-      const toolbarBottom = (document.querySelector('.pp-toolbar')?.getBoundingClientRect().bottom ?? GAP) + 8;
-      // Just below the passage, starting where it starts, so the line itself stays visible;
-      // above it when there is no room below.
-      const left = rects.length ? Math.min(...rects.map((r) => r.left)) : (paperLeft + paperRight - width) / 2;
-      const top = rects.length ? Math.min(...rects.map((r) => r.top)) : 140;
-      const bottom = rects.length ? Math.max(...rects.map((r) => r.top + r.height)) : 140;
-      let x = Math.min(Math.max(left, paperLeft), paperRight - width);
-      let y = bottom + 12 + height <= window.innerHeight - 8 ? bottom + 12 : top - 12 - height;
-      y = Math.min(Math.max(y, toolbarBottom), window.innerHeight - height - 8);
-      // Open notes cascade instead of stacking exactly on top of each other.
-      while (current.some((n) => Math.abs(n.x - x) < 12 && Math.abs(n.y - y) < 12)) {
-        x += 20;
-        y += 20;
-      }
-      return [...current, { id, x, y, width, height, z }];
+      const first = rects[0];
+      const bottom = rects.length ? Math.max(...rects.map((r) => r.top + r.height)) : 0;
+      // Start under the passage, shifted left if it would run past the visible paper area.
+      const visibleRight = (scrollRef.current?.getBoundingClientRect().right ?? window.innerWidth) - 12;
+      const dx = first ? Math.min(0, visibleRight - NOTE_SIZE.width - first.left) : 0;
+      return [...current, { id, dx, dy: first ? bottom - first.top + 10 : 0, width: NOTE_SIZE.width, height: NOTE_SIZE.height, collapsed: false, open: true, z }];
     });
 
   // A deleted annotation takes its note with it.
   useEffect(() => {
-    setOpenNotes((current) => {
+    setNoteLayouts((current) => {
       const next = current.filter((n) => annotations.some((a) => a.id === n.id));
       return next.length === current.length ? current : next;
     });
@@ -546,15 +537,15 @@ export function ReaderShell(props: ReaderShellProps) {
           ) : (
             <SelectionMenu
               label="高亮操作"
-              actions={[
-                { id: 'comment', label: targetAnnotation?.note ? '查看评论' : '评论', icon: 'comment' },
-                { id: 'copy', label: '复制', icon: 'copy' },
-              ]}
+              // The same actions as a fresh selection, with the comment opening its note.
+              actions={selectionActions.map((action) => (action.id === 'comment' && targetAnnotation?.note ? { ...action, label: '查看评论' } : action))}
               currentColor={targetAnnotation?.color}
               onColor={(color) => interaction.onAnnotationColor(target.annotationId, color)}
               onAction={(action) => {
                 if (action === 'comment') openNote(target.annotationId);
-                else if (action === 'copy' && targetAnnotation?.quote) copyText(targetAnnotation.quote);
+                else if (action === 'copy') {
+                  if (targetAnnotation?.quote) copyText(targetAnnotation.quote);
+                } else interaction.onAnnotationAction(target.annotationId, action);
                 dismiss();
               }}
               onDelete={() => {
@@ -568,13 +559,14 @@ export function ReaderShell(props: ReaderShellProps) {
       )}
 
       <CommentNotes
-        notes={openNotes}
+        notes={noteLayouts}
         annotations={annotations}
-        scrollContainer={scrollRef.current}
+        container={paperElement}
+        layoutKey={`${zoomPercent}:${effectivePlacement}:${effectiveWidth}:${effectiveHeight}:${sidebarOpen}`}
         annotationRects={interaction.annotationRects}
-        onChange={(note) => setOpenNotes((current) => current.map((n) => (n.id === note.id ? note : n)))}
-        onRaise={(id) => setOpenNotes((current) => current.map((n) => (n.id === id ? { ...n, z: ++topZ.current } : n)))}
-        onClose={(id) => setOpenNotes((current) => current.filter((n) => n.id !== id))}
+        onChange={(note) => setNoteLayouts((current) => current.map((n) => (n.id === note.id ? note : n)))}
+        onRaise={(id) => setNoteLayouts((current) => current.map((n) => (n.id === id && n.z !== topZ.current ? { ...n, z: ++topZ.current } : n)))}
+        onClose={(id) => setNoteLayouts((current) => current.map((n) => (n.id === id ? { ...n, open: false } : n)))}
         onComment={interaction.onAnnotationComment}
         onLocate={props.onLocateAnnotation}
       />
