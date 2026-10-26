@@ -67,16 +67,18 @@
   --pp-shadow-panel: 0 8px 28px rgba(0, 0, 0, 0.1);
 
   /* Highlight colours: fill on the paper, dot in the interface */
-  --pp-hl-yellow-fill: rgba(240, 190, 60, 0.38);
-  --pp-hl-green-fill: rgba(100, 185, 125, 0.32);
-  --pp-hl-blue-fill: rgba(85, 155, 230, 0.28);
-  --pp-hl-pink-fill: rgba(230, 115, 145, 0.28);
-  --pp-hl-purple-fill: rgba(145, 115, 220, 0.28);
-  --pp-hl-yellow-dot: #e0ae3a;
-  --pp-hl-green-dot: #56a672;
-  --pp-hl-blue-dot: #4a90d9;
-  --pp-hl-pink-dot: #de7393;
-  --pp-hl-purple-dot: #957cd6;
+  --pp-star: #e5a823;
+  /* Fills match the PDF highlight colours on the page; dots are the same hues, deeper, for the interface. */
+  --pp-hl-yellow-fill: #ffff98;
+  --pp-hl-green-fill: #53ffbc;
+  --pp-hl-blue-fill: #80ebff;
+  --pp-hl-pink-fill: #ffcbe6;
+  --pp-hl-purple-fill: #dccbff;
+  --pp-hl-yellow-dot: #e0c21a;
+  --pp-hl-green-dot: #26c48b;
+  --pp-hl-blue-dot: #2bb4d8;
+  --pp-hl-pink-dot: #e06aa6;
+  --pp-hl-purple-dot: #9874e8;
 
   /* Typography */
   --pp-font-ui: -apple-system, BlinkMacSystemFont, 'SF Pro Text', 'PingFang SC', 'Segoe UI Variable Text',
@@ -191,11 +193,11 @@
     --pp-shadow-bar: 0 8px 28px rgba(0, 0, 0, 0.36);
     --pp-shadow-panel: 0 8px 28px rgba(0, 0, 0, 0.32);
 
-    --pp-hl-yellow-fill: rgba(240, 190, 60, 0.42);
-    --pp-hl-green-fill: rgba(100, 185, 125, 0.36);
-    --pp-hl-blue-fill: rgba(85, 155, 230, 0.32);
-    --pp-hl-pink-fill: rgba(230, 115, 145, 0.32);
-    --pp-hl-purple-fill: rgba(145, 115, 220, 0.32);
+    --pp-hl-yellow-dot: #e8cb3a;
+    --pp-hl-green-dot: #3ed39a;
+    --pp-hl-blue-dot: #4cc3e3;
+    --pp-hl-pink-dot: #ec86b6;
+    --pp-hl-purple-dot: #a98bee;
   }
 }
 
@@ -246,9 +248,9 @@
   --pp-shadow-bar: 0 8px 28px rgba(0, 0, 0, 0.36);
   --pp-shadow-panel: 0 8px 28px rgba(0, 0, 0, 0.32);
 
-  --pp-hl-yellow-fill: rgba(240, 190, 60, 0.42);
-  --pp-hl-green-fill: rgba(100, 185, 125, 0.36);
-  --pp-hl-blue-fill: rgba(85, 155, 230, 0.32);
-  --pp-hl-pink-fill: rgba(230, 115, 145, 0.32);
-  --pp-hl-purple-fill: rgba(145, 115, 220, 0.32);
+  --pp-hl-yellow-dot: #e8cb3a;
+  --pp-hl-green-dot: #3ed39a;
+  --pp-hl-blue-dot: #4cc3e3;
+  --pp-hl-pink-dot: #ec86b6;
+  --pp-hl-purple-dot: #a98bee;
 }

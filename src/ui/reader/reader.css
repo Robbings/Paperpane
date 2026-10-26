@@ -880,3 +880,82 @@
     opacity: 0;
   }
 }
+
+/* ---- Annotation list: hover tools, inline comment editing ----------------------- */
+
+.pp-annotation-item {
+  position: relative;
+}
+
+.pp-annotation__tools {
+  position: absolute;
+  top: 8px;
+  right: 0;
+  display: flex;
+  align-items: center;
+  gap: 0;
+  padding: 1px;
+  border-radius: var(--pp-radius-pill);
+  background: var(--pp-reading-surface);
+  box-shadow: 0 0 0 0.5px var(--pp-hairline-strong);
+  opacity: 0;
+  transition: opacity var(--pp-dur-fast) var(--pp-ease-out);
+}
+
+.pp-annotation-item:hover .pp-annotation__tools,
+.pp-annotation__tools:focus-within,
+.pp-annotation__tools[data-open='true'] {
+  opacity: 1;
+}
+
+.pp-annotation-item[data-editing='true'] .pp-annotation__tools {
+  display: none;
+}
+
+@media (hover: none) {
+  .pp-annotation__tools {
+    opacity: 1;
+  }
+}
+
+.pp-annotation__tools .pp-icon-btn {
+  width: 24px;
+  height: 24px;
+  color: var(--pp-text-2);
+}
+
+.pp-annotation__colors {
+  display: flex;
+}
+
+.pp-annotation__edit {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  padding: 0 4px var(--pp-space-3);
+}
+
+.pp-annotation__edit-bar {
+  display: flex;
+  justify-content: flex-end;
+  gap: 6px;
+}
+
+/* ---- PDF pages rendered by the runtime ---------------------------------------------
+ * The runtime mounts its viewer as `.pp-pdf-surface` inside the paper's scroll
+ * container and owns geometry only; the page's look (paper, shadow, spacing,
+ * dimming in dark mode) is defined here, matching the sample pages. */
+
+.pp-pdf-surface .page {
+  margin: 0 auto 24px;
+  border: 0;
+  background: #ffffff;
+  box-shadow:
+    0 1px 2px rgba(0, 0, 0, 0.06),
+    0 8px 28px rgba(0, 0, 0, 0.08);
+  filter: var(--pp-paper-filter);
+}
+
+.pp-pdf-surface .page:last-child {
+  margin-bottom: 0;
+}

@@ -109,6 +109,21 @@ toast.show({ message: '翻译失败：请求超时', tone: 'error', action: { la
 
 论文区的滚动容器是 `.pp-reader__paper`；外壳在它上面监听选区并显示选区菜单、绘制浮动滚动条。
 
+## 阅读与批注的接口 `ReaderInteraction`
+
+`ReaderShell` 的 `interaction` 由运行时提供（类型在 `src/ui/reader/types.ts`）。界面负责浮动菜单、评论便签和批注列表的外观与交互；选区捕获、点中已有高亮的判断、坐标和保存都在运行时。演示页的 `reader/sample/useSampleReader.tsx` 是按同一接口写的示例运行时。
+
+- `onScrollContainer(el)`：论文滚动容器挂载后交给运行时，viewer 挂在里面，选区也在这里监听。不要修改它的样式和内边距。
+- `menuTarget`：浮动菜单对谁显示。`{ kind: 'selection', id, text, rects }` 是新选区；`{ kind: 'annotation', annotationId, rects }` 是点中的已有高亮。`rects` 是窗口坐标，每行一个。关闭（Esc、点别处、滚动）时外壳调用 `onDismissMenu`。
+- `tool` / `onToolChange`：`'auto-highlight'` 时，选完文字由运行时立即用上一次的颜色创建高亮，并把 `menuTarget` 设为这条新高亮。
+- 新选区：选颜色调用 `onCreateHighlight(id, color)`；"评论"调用不带颜色的 `onCreateHighlight(id)`（用上一次的颜色），外壳随即打开这条高亮的评论便签；翻译、解释、提问、复制调用 `onSelectionAction`。
+- 已有高亮：菜单和新选区相同（翻译、解释、提问走 `onAnnotationAction`，复制由界面完成），另有当前颜色和删除；改色 `onAnnotationColor`，评论 `onAnnotationComment`（便签和批注列表都会调用），删除 `onAnnotationDelete`，删除后的「撤销」调用 `onAnnotationRestore`。
+- `annotationRects(id)`：这条批注现在在屏幕上的位置（窗口坐标），便签定位和画虚线连接时读取；页面未渲染时返回 null。
+- `subscribeGeometry(listener)`：批注位置可能变化时通知（页面渲染完成、缩放、旋转、重排），便签据此重新定位；建议直接接 `AnchorService.subscribeProjection`。
+- `onAnnotationComment`：便签每次输入都会立即调用，不做延迟；由运行时持有草稿、合并写入，并在关闭或切换文档时写完。
+- 评论便签放在滚动容器里、钉在原文旁边，随论文滚动和缩放；可以拖动、调大小、收起成标题小条、关闭后再打开（保持原位置）。标题就是评论的第一行。便签所在的层带 `data-pp-overlay`，运行时捕获选区和点击时应忽略来自这里的事件。
+- PDF 页面的外观（纸张、阴影、页间距、深色模式减光）由界面在 `.pp-pdf-surface .page` 上定义。高亮色点（`--pp-hl-*-dot`）与页面高亮（`--pp-hl-*-fill`，与 PDF.js 使用的颜色一致）同色相。
+
 ## 讨论面板 `ChatPanel`
 
 位于 `src/ui/reader/chat/`，视图模型在 `chat/types.ts`，与 PR #7 的会话契约一一对应；示例接线是 `reader/sample/SampleChat.tsx`。解释面板以后复用同一组件（`title="解释"`，用 `source` 显示被解释的段落或截图）。

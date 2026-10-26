@@ -1,12 +1,13 @@
-import { useCallback, useEffect, useLayoutEffect, useRef, useState, type CSSProperties, type ReactNode } from 'react';
+import { useEffect, useLayoutEffect, useRef, useState, type CSSProperties, type ReactNode } from 'react';
 import {
   GlassSurface,
   SelectionMenu,
-  type HighlightColor,
+  toast,
   type LocalSaveState,
   type SelectionMenuAction,
   type SyncState,
 } from '@/ui/components';
+import { CommentNotes, NOTE_SIZE, type NoteLayout } from './notes/CommentNotes';
 import { FunctionRail, researchPanels } from './FunctionRail';
 import { ReaderLibraryNav, type ReaderLibraryData } from './library/ReaderLibraryNav';
 import { SaveToLibraryPopover, type LibraryEntryDraft } from './library/SaveToLibraryPopover';
@@ -39,7 +40,7 @@ import type {
   DocumentHeaderView,
   OutlineItemView,
   ResearchPanelId,
-  TextSelectionSnapshot,
+  ReaderInteraction,
 } from './types';
 import { useViewport } from './useViewport';
 import type { TagView } from '@/ui/library/types';
@@ -70,8 +71,8 @@ interface ReaderShellProps {
   onLayoutChange?: (layout: ReaderLayout) => void;
   onNavigate: (pageIndex: number) => void;
   onZoom: (direction: 'in' | 'out') => void;
-  onHighlight: (color: HighlightColor, selection: TextSelectionSnapshot) => void;
-  onSelectionAction: (action: string, selection: TextSelectionSnapshot) => void;
+  /** Selection, highlights, comments: driven by the runtime (see ReaderInteraction). */
+  interaction: ReaderInteraction;
   onLocateAnnotation: (id: string) => void;
   onTool: (tool: string) => void;
   /** Library features inside the reader: bookmark popover and the sidebar tab. */
@@ -125,7 +126,6 @@ export function ReaderShell(props: ReaderShellProps) {
   // Panels stay mounted once opened, so drafts and running tasks survive switching.
   const [visited, setVisited] = useState<ReadonlySet<ResearchPanelId>>(() => new Set(['annotations']));
   const [sidebarPref, setSidebarPref] = useState<boolean | null>(null);
-  const [autoHighlight, setAutoHighlight] = useState(false);
   const [resizing, setResizing] = useState(false);
   // Dock change phases: 'out' while content fades and the card moves,
   // 'settling' while content fades back in near the end of the move.
@@ -253,63 +253,105 @@ export function ReaderShell(props: ReaderShellProps) {
     setVisited((current) => (current.has(id) ? current : new Set(current).add(id)));
   };
 
-  // ---- Text selection menu -------------------------------------------------
+  // ---- Floating menu: for a new selection or an existing highlight -----------
+  // The runtime decides what the menu is for and where it is; the shell shows it.
+  const { interaction } = props;
+  const target = interaction.menuTarget;
   const scrollRef = useRef<HTMLDivElement>(null);
   const menuRef = useRef<HTMLDivElement>(null);
-  const [selection, setSelection] = useState<TextSelectionSnapshot | null>(null);
   const [menuPosition, setMenuPosition] = useState<{ top: number; left: number } | null>(null);
+  const targetAnnotation = target?.kind === 'annotation' ? annotations.find((a) => a.id === target.annotationId) : undefined;
 
-  const closeMenu = useCallback(() => {
-    setSelection(null);
-    setMenuPosition(null);
-  }, []);
-
-  // Take a snapshot when the selection settles, so menu actions never read a
-  // selection that has already gone.
-  const captureSelection = () => {
-    const current = window.getSelection();
-    const container = scrollRef.current;
-    if (!current || current.isCollapsed || current.rangeCount === 0 || !container) return;
-    const range = current.getRangeAt(0);
-    if (!container.contains(range.commonAncestorContainer)) return;
-    const text = current.toString().trim();
-    if (!text) return;
-    const box = range.getBoundingClientRect();
-    setSelection({ text, rect: { top: box.top, left: box.left, bottom: box.bottom, right: box.right } });
-  };
+  // Hand the scroll container to the runtime: its viewer mounts and listens there.
+  const onScrollContainer = interaction.onScrollContainer;
+  const [paperElement, setPaperElement] = useState<HTMLDivElement | null>(null);
+  useEffect(() => {
+    setPaperElement(scrollRef.current);
+    onScrollContainer(scrollRef.current);
+    return () => onScrollContainer(null);
+  }, [onScrollContainer]);
 
   useLayoutEffect(() => {
     const menu = menuRef.current;
-    if (!selection || !menu) return;
+    if (!target || !menu || target.rects.length === 0) {
+      setMenuPosition(null);
+      return;
+    }
     const { width: w, height: h } = menu.getBoundingClientRect();
+    const top = Math.min(...target.rects.map((r) => r.top));
+    const bottom = Math.max(...target.rects.map((r) => r.top + r.height));
+    const left = Math.min(...target.rects.map((r) => r.left));
+    const right = Math.max(...target.rects.map((r) => r.left + r.width));
     const toolbarBottom = (document.querySelector('.pp-toolbar')?.getBoundingClientRect().bottom ?? GAP) + 8;
-    const above = selection.rect.top - h - 8;
-    const top = above >= toolbarBottom ? above : selection.rect.bottom + 8;
-    const center = (selection.rect.left + selection.rect.right) / 2;
-    const left = Math.min(Math.max(center - w / 2, 8), window.innerWidth - w - 8);
-    setMenuPosition({ top, left });
-  }, [selection]);
+    const above = top - h - 8;
+    setMenuPosition({
+      top: above >= toolbarBottom ? above : bottom + 8,
+      left: Math.min(Math.max((left + right) / 2 - w / 2, 8), window.innerWidth - w - 8),
+    });
+  }, [target]);
 
+  const dismiss = interaction.onDismissMenu;
   useEffect(() => {
-    if (!selection) return;
+    if (!target) return;
     const onPointerDown = (event: PointerEvent) => {
-      if (!menuRef.current?.contains(event.target as Node)) closeMenu();
+      if (!menuRef.current?.contains(event.target as Node)) dismiss();
     };
     const onKey = (event: KeyboardEvent) => {
-      if (event.key === 'Escape') closeMenu();
+      if (event.key === 'Escape') dismiss();
     };
     const container = scrollRef.current;
     window.addEventListener('pointerdown', onPointerDown, true);
     window.addEventListener('keydown', onKey);
-    window.addEventListener('resize', closeMenu);
-    container?.addEventListener('scroll', closeMenu, { passive: true });
+    window.addEventListener('resize', dismiss);
+    container?.addEventListener('scroll', dismiss, { passive: true });
     return () => {
       window.removeEventListener('pointerdown', onPointerDown, true);
       window.removeEventListener('keydown', onKey);
-      window.removeEventListener('resize', closeMenu);
-      container?.removeEventListener('scroll', closeMenu);
+      window.removeEventListener('resize', dismiss);
+      container?.removeEventListener('scroll', dismiss);
     };
-  }, [selection, closeMenu]);
+  }, [target, dismiss]);
+
+  // ---- Comment notes ---------------------------------------------------------
+  // Pinned to their passages on the paper. Closed notes keep their layout for when they reopen.
+  const [noteLayouts, setNoteLayouts] = useState<NoteLayout[]>([]);
+  const topZ = useRef(1);
+
+  /** Opens (or unfolds and brings forward) the note for an annotation; a new one opens just below its passage. */
+  const openNote = (id: string) =>
+    setNoteLayouts((current) => {
+      const z = ++topZ.current;
+      if (current.some((n) => n.id === id)) return current.map((n) => (n.id === id ? { ...n, open: true, collapsed: false, z } : n));
+      const rects = interaction.annotationRects(id) ?? [];
+      const first = rects[0];
+      const bottom = rects.length ? Math.max(...rects.map((r) => r.top + r.height)) : 0;
+      // Start under the passage, shifted left if it would run past the visible paper area.
+      const visibleRight = (scrollRef.current?.getBoundingClientRect().right ?? window.innerWidth) - 12;
+      const dx = first ? Math.min(0, visibleRight - NOTE_SIZE.width - first.left) : 0;
+      return [...current, { id, dx, dy: first ? bottom - first.top + 10 : 0, width: NOTE_SIZE.width, height: NOTE_SIZE.height, collapsed: false, open: true, z }];
+    });
+
+  // A deleted annotation takes its note with it.
+  useEffect(() => {
+    setNoteLayouts((current) => {
+      const next = current.filter((n) => annotations.some((a) => a.id === n.id));
+      return next.length === current.length ? current : next;
+    });
+  }, [annotations]);
+
+  const deleteAnnotation = (id: string) => {
+    interaction.onAnnotationDelete(id);
+    toast.show({
+      message: '已删除批注',
+      action: interaction.onAnnotationRestore ? { label: '撤销', onAction: () => interaction.onAnnotationRestore?.(id) } : undefined,
+    });
+  };
+
+  const copyText = (text: string) =>
+    void navigator.clipboard?.writeText(text).then(
+      () => toast.show({ message: '已复制' }),
+      () => toast.show({ message: '无法访问剪贴板', tone: 'warning' }),
+    );
 
   // ---- Layout variables ----------------------------------------------------
   const style = {
@@ -341,14 +383,7 @@ export function ReaderShell(props: ReaderShellProps) {
       data-resizing={resizing || windowResizing ? 'true' : undefined}
       style={style}
     >
-      <div
-        ref={scrollRef}
-        className="pp-reader__paper"
-        onMouseUp={captureSelection}
-        onKeyUp={(event) => {
-          if (event.shiftKey) captureSelection();
-        }}
-      >
+      <div ref={scrollRef} className="pp-reader__paper">
         {paper}
       </div>
       <OverlayScrollbar target={scrollRef} dragLabel={`第 ${pageIndex + 1} / ${header.pageCount} 页`} />
@@ -390,7 +425,7 @@ export function ReaderShell(props: ReaderShellProps) {
         sidebarOpen={sidebarOpen}
         placement={effectivePlacement}
         canDockRight={!compact}
-        autoHighlight={autoHighlight}
+        autoHighlight={interaction.tool === 'auto-highlight'}
         onToggleSidebar={() => setSidebarPref(!sidebarOpen)}
         saved={library?.saved}
         saveRef={saveRef}
@@ -399,7 +434,7 @@ export function ReaderShell(props: ReaderShellProps) {
         onPageSubmit={props.onNavigate}
         onZoom={props.onZoom}
         onTogglePlacement={togglePlacement}
-        onToggleAutoHighlight={() => setAutoHighlight((value) => !value)}
+        onToggleAutoHighlight={() => interaction.onToolChange(interaction.tool === 'auto-highlight' ? 'select' : 'auto-highlight')}
         onTool={props.onTool}
       />
 
@@ -439,6 +474,9 @@ export function ReaderShell(props: ReaderShellProps) {
                     sync={annotationStatus.sync}
                     simulated={annotationStatus.simulated}
                     onLocate={props.onLocateAnnotation}
+                    onColor={interaction.onAnnotationColor}
+                    onComment={interaction.onAnnotationComment}
+                    onDelete={deleteAnnotation}
                     onCopyAll={() => props.onTool('copy-annotations')}
                     onExport={() => props.onTool('export-annotations')}
                   />
@@ -469,7 +507,7 @@ export function ReaderShell(props: ReaderShellProps) {
         />
       )}
 
-      {selection && (
+      {target && (
         <div
           ref={menuRef}
           className="pp-reader__selmenu"
@@ -477,21 +515,62 @@ export function ReaderShell(props: ReaderShellProps) {
           // Keep the text selection while the pointer is on the menu.
           onMouseDown={(event) => event.preventDefault()}
         >
-          <SelectionMenu
-            label="选区操作"
-            actions={selectionActions}
-            onColor={(color) => {
-              props.onHighlight(color, selection);
-              closeMenu();
-            }}
-            onAction={(action) => {
-              props.onSelectionAction(action, selection);
-              closeMenu();
-            }}
-            onDismiss={closeMenu}
-          />
+          {target.kind === 'selection' ? (
+            <SelectionMenu
+              label="选区操作"
+              actions={selectionActions}
+              onColor={(color) => {
+                void interaction.onCreateHighlight(target.id, color);
+                dismiss();
+              }}
+              onAction={(action) => {
+                if (action === 'comment') {
+                  // A comment starts as a highlight in the last colour, with its note open.
+                  void interaction.onCreateHighlight(target.id).then((id) => id && openNote(id));
+                } else {
+                  interaction.onSelectionAction(target.id, action);
+                }
+                dismiss();
+              }}
+              onDismiss={dismiss}
+            />
+          ) : (
+            <SelectionMenu
+              label="高亮操作"
+              // The same actions as a fresh selection, with the comment opening its note.
+              actions={selectionActions.map((action) => (action.id === 'comment' && targetAnnotation?.note ? { ...action, label: '查看评论' } : action))}
+              currentColor={targetAnnotation?.color}
+              onColor={(color) => interaction.onAnnotationColor(target.annotationId, color)}
+              onAction={(action) => {
+                if (action === 'comment') openNote(target.annotationId);
+                else if (action === 'copy') {
+                  if (targetAnnotation?.quote) copyText(targetAnnotation.quote);
+                } else interaction.onAnnotationAction(target.annotationId, action);
+                dismiss();
+              }}
+              onDelete={() => {
+                deleteAnnotation(target.annotationId);
+                dismiss();
+              }}
+              onDismiss={dismiss}
+            />
+          )}
         </div>
       )}
+
+      <CommentNotes
+        notes={noteLayouts}
+        annotations={annotations}
+        container={paperElement}
+        layoutKey={`${zoomPercent}:${effectivePlacement}:${effectiveWidth}:${effectiveHeight}:${sidebarOpen}`}
+        annotationRects={interaction.annotationRects}
+        subscribeGeometry={interaction.subscribeGeometry}
+        onChange={(note) => setNoteLayouts((current) => current.map((n) => (n.id === note.id ? note : n)))}
+        onRaise={(id) => setNoteLayouts((current) => current.map((n) => (n.id === id && n.z !== topZ.current ? { ...n, z: ++topZ.current } : n)))}
+        onClose={(id) => setNoteLayouts((current) => current.map((n) => (n.id === id ? { ...n, open: false } : n)))}
+        onComment={interaction.onAnnotationComment}
+        onLocate={props.onLocateAnnotation}
+      />
     </div>
   );
 }

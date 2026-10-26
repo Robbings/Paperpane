@@ -9,9 +9,22 @@ const fill = (color: HighlightColor) => ({ background: `var(--pp-hl-${color}-fil
 interface SamplePaperProps {
   pageCount: number;
   zoomPercent: number;
+  /** Current colour of each built-in highlight by annotation id; missing means deleted (plain text). */
+  highlights: Readonly<Record<string, HighlightColor>>;
 }
 
-export function SamplePaper({ pageCount, zoomPercent }: SamplePaperProps) {
+export function SamplePaper({ pageCount, zoomPercent, highlights }: SamplePaperProps) {
+  // A built-in highlight: a <mark> the demo runtime can hit-test by id, or plain text once deleted.
+  const mark = (id: string, text: string) => {
+    const color = highlights[id];
+    return color ? (
+      <mark data-annotation-id={id} style={fill(color)}>
+        {text}
+      </mark>
+    ) : (
+      text
+    );
+  };
   const scale = zoomPercent / 100;
   const style = { '--pp-sample-scale': scale } as CSSProperties;
 
@@ -24,11 +37,11 @@ export function SamplePaper({ pageCount, zoomPercent }: SamplePaperProps) {
         <p className="pp-sample__heading pp-sample__heading--center">Abstract</p>
         <p className="pp-sample__abstract">
           Scientific papers are distributed as PDF files whose{' '}
-          <mark style={fill('yellow')}>text is stored in drawing order rather than reading order</mark>. For two-column
+          {mark('a1', 'text is stored in drawing order rather than reading order')}. For two-column
           layouts, figures, footnotes and equations interleave with body text, so naive extraction produces sentences that
           jump between columns. We describe a layout-aware procedure that groups glyphs into blocks, assigns each block to a
           column, and orders blocks with a small set of geometric rules. The procedure needs no training data and{' '}
-          <mark style={fill('blue')}>keeps every block linked to its position on the page</mark>, which lets downstream tools
+          {mark('a2', 'keeps every block linked to its position on the page')}, which lets downstream tools
           such as search, highlighting and translation point back to the exact source.
         </p>
         <div className="pp-sample__columns">
@@ -57,7 +70,7 @@ export function SamplePaper({ pageCount, zoomPercent }: SamplePaperProps) {
             <p className="pp-sample__heading pp-sample__heading--spaced">2  Related Work</p>
             <p>
               Earlier approaches fall into rule-based segmentation and learned layout models.{' '}
-              <mark style={fill('green')}>Rule-based methods are transparent but fragile on unusual templates</mark>;
+              {mark('a3', 'Rule-based methods are transparent but fragile on unusual templates')};
               learned models are robust but require labelled pages and can hide why a block was placed where it was.
             </p>
             <p className="pp-sample__indent">

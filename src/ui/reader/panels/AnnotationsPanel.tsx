@@ -1,5 +1,5 @@
 import { useState, type CSSProperties } from 'react';
-import { IconButton, SaveStatus, Tooltip, Segmented, highlightColors, type HighlightColor, type LocalSaveState, type SyncState } from '@/ui/components';
+import { Button, IconButton, SaveStatus, TextArea, Tooltip, Segmented, highlightColors, type HighlightColor, type LocalSaveState, type SyncState } from '@/ui/components';
 import type { AnnotationView } from '../types';
 import { PanelBody } from './PanelBody';
 import { PanelHeader } from './PanelHeader';
@@ -22,11 +22,14 @@ interface AnnotationsPanelProps {
   sync: SyncState;
   simulated?: boolean;
   onLocate: (id: string) => void;
+  onColor: (id: string, color: HighlightColor) => void;
+  onComment: (id: string, comment: string) => void;
+  onDelete: (id: string) => void;
   onCopyAll: () => void;
   onExport: () => void;
 }
 
-export function AnnotationsPanel({ items, local, sync, simulated, onLocate, onCopyAll, onExport }: AnnotationsPanelProps) {
+export function AnnotationsPanel({ items, local, sync, simulated, onLocate, onColor, onComment, onDelete, onCopyAll, onExport }: AnnotationsPanelProps) {
   const [kind, setKind] = useState<KindFilter>('all');
   const [color, setColor] = useState<HighlightColor | null>(null);
 
@@ -79,16 +82,14 @@ export function AnnotationsPanel({ items, local, sync, simulated, onLocate, onCo
         ) : (
           <ul className="pp-annotations__list">
             {visible.map((item) => (
-              <li key={item.id}>
-                <button type="button" className="pp-annotation" onClick={() => onLocate(item.id)}>
-                  <span className="pp-annotation__meta">
-                    <span className="pp-annotation__dot" style={dot(item.color)} aria-hidden="true" />
-                    {item.kind === 'highlight' ? '高亮' : '页面评论'} · 第 {item.pageIndex + 1} 页
-                  </span>
-                  {item.quote && <span className="pp-annotation__quote">{item.quote}</span>}
-                  {item.note && <span className="pp-annotation__note">{item.note}</span>}
-                </button>
-              </li>
+              <AnnotationItem
+                key={item.id}
+                item={item}
+                onLocate={() => onLocate(item.id)}
+                onColor={(c) => onColor(item.id, c)}
+                onComment={(text) => onComment(item.id, text)}
+                onDelete={() => onDelete(item.id)}
+              />
             ))}
           </ul>
         )}
@@ -99,5 +100,99 @@ export function AnnotationsPanel({ items, local, sync, simulated, onLocate, onCo
       </div>
       </PanelBody>
     </div>
+  );
+}
+
+interface AnnotationItemProps {
+  item: AnnotationView;
+  onLocate: () => void;
+  onColor: (color: HighlightColor) => void;
+  onComment: (text: string) => void;
+  onDelete: () => void;
+}
+
+/** One annotation: click to go to it; hover for recolour, edit comment and delete. */
+function AnnotationItem({ item, onLocate, onColor, onComment, onDelete }: AnnotationItemProps) {
+  const [picking, setPicking] = useState(false);
+  const [editing, setEditing] = useState<string | null>(null);
+
+  const save = () => {
+    if (editing !== null && editing.trim() !== (item.note ?? '').trim()) onComment(editing.trim());
+    setEditing(null);
+  };
+
+  return (
+    <li className="pp-annotation-item" data-editing={editing !== null ? 'true' : undefined}>
+      <button type="button" className="pp-annotation" onClick={onLocate}>
+        <span className="pp-annotation__meta">
+          <span className="pp-annotation__dot" style={dot(item.color)} aria-hidden="true" />
+          {item.kind === 'highlight' ? '高亮' : '页面评论'} · 第 {item.pageIndex + 1} 页
+        </span>
+        {item.quote && <span className="pp-annotation__quote">{item.quote}</span>}
+        {item.note && editing === null && <span className="pp-annotation__note">{item.note}</span>}
+      </button>
+
+      {editing !== null && (
+        <div className="pp-annotation__edit">
+          <TextArea
+            label="评论"
+            hideLabel
+            value={editing}
+            onChange={setEditing}
+            rows={2}
+            maxRows={8}
+            autoFocus
+            placeholder="写下你的想法…"
+            onKeyDown={(event) => {
+              if (event.key === 'Escape') setEditing(null);
+              if (event.key === 'Enter' && (event.metaKey || event.ctrlKey)) save();
+            }}
+          />
+          <div className="pp-annotation__edit-bar">
+            <Button size="sm" variant="quiet" onClick={() => setEditing(null)}>
+              取消
+            </Button>
+            <Button size="sm" variant="primary" onClick={save}>
+              保存
+            </Button>
+          </div>
+        </div>
+      )}
+
+      <span className="pp-annotation__tools" data-open={picking ? 'true' : undefined}>
+        {picking ? (
+          <span className="pp-annotation__colors" role="group" aria-label="改变颜色">
+            {highlightColors.map((c) => (
+              <button
+                key={c}
+                type="button"
+                className="pp-annotations__color"
+                style={dot(c)}
+                aria-label={colorNames[c]}
+                aria-pressed={item.color === c}
+                onClick={() => {
+                  onColor(c);
+                  setPicking(false);
+                }}
+              >
+                <span />
+              </button>
+            ))}
+          </span>
+        ) : (
+          <>
+            {item.kind === 'highlight' && (
+              <Tooltip label="改变颜色" labelsChild>
+                <button type="button" className="pp-annotations__color" style={dot(item.color)} aria-label="改变颜色" onClick={() => setPicking(true)}>
+                  <span />
+                </button>
+              </Tooltip>
+            )}
+            <IconButton icon="edit" label={item.note ? '编辑评论' : '添加评论'} size="md" shape="pill" onClick={() => setEditing(item.note ?? '')} />
+            <IconButton icon="trash" label="删除" size="md" shape="pill" onClick={onDelete} />
+          </>
+        )}
+      </span>
+    </li>
   );
 }
