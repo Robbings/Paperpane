@@ -93,6 +93,13 @@ export function ReaderProof({ libraryItemId }: { libraryItemId?: string }) {
   }, [preferences.state.error]);
   const backToLibrary = () => location.assign(new URL('library.html', location.href).href);
   const pickFile = () => input.current?.click();
+  // Without the password: stop this open. From the library that means going back; otherwise pick another PDF.
+  const cancelPassword = () => {
+    setPassword('');
+    void owner.current?.cancelOpen();
+    if (libraryItemId) backToLibrary();
+    else setTitle('请选择 PDF');
+  };
   const subscribeGeometry = useCallback(
     (listener: () => void) => owner.current?.subscribeProjection('viewport', listener) ?? (() => {}),
     [],
@@ -298,12 +305,12 @@ export function ReaderProof({ libraryItemId }: { libraryItemId?: string }) {
       />
       <Dialog
         open={Boolean(state?.passwordRequest)}
-        onClose={() => (libraryItemId ? backToLibrary() : setPassword(''))}
+        onClose={cancelPassword}
         title="这份 PDF 需要密码"
         description="密码只用于本次打开，不会保存。"
         footer={
           <>
-            <Button onClick={() => (libraryItemId ? backToLibrary() : setPassword(''))}>{libraryItemId ? '返回文献库' : '取消'}</Button>
+            <Button onClick={cancelPassword}>{libraryItemId ? '返回文献库' : '取消'}</Button>
             <Button
               variant="primary"
               disabled={!password}

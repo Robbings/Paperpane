@@ -114,6 +114,17 @@ export class PdfjsReader implements ReaderService, AnchorService {
       this.invalidate(true);
     } catch { if (!this.disposed && this.snapshot.data.sessionId === sessionId) this.publish({ phase: 'failed', error: { code: 'CORRUPT_FILE', message: '无法打开这份 PDF，请换一份文件重试。', recovery: ['choose-file'] } }); }
   }
+  /** Gives up on the document being opened (e.g. its password is not known): back to an empty reader. */
+  async cancelOpen(): Promise<void> {
+    if (this.disposed) return;
+    this.sessionLifecycle.abort(); this.sessionLifecycle = new AbortController();
+    const task = this.task; this.task = undefined;
+    this.password = undefined; this.capturedRange = undefined; this.manager = undefined; this.pdf = undefined;
+    // A new session id: the pending open sees it and stops without publishing.
+    this.publish({ ...empty(), sessionId: crypto.randomUUID() });
+    this.links.setDocument(null); this.viewer.setDocument(null);
+    await task?.destroy().catch(() => {});
+  }
   submitPassword(requestId: string, password: string): Result<void> { if (!this.password || this.password.id !== requestId) return failure('STALE_CONFIRMATION', '密码请求已过期'); const submit = this.password.submit; this.password = undefined; this.publish({ phase: 'loading', passwordRequest: undefined }); submit(password); return success(undefined); }
   private ready(): Result<void> { return !this.disposed && this.snapshot.data.phase === 'ready' ? success(undefined) : failure('BUSY', '论文尚未就绪'); }
   async navigate(pageIndex: number): Promise<Result<void>> { const ready = this.ready(); if (!ready.ok) return ready; if (!Number.isInteger(pageIndex) || pageIndex < 0 || pageIndex >= this.snapshot.data.pageCount) return failure('INVALID_INPUT', '页码超出范围'); this.viewer.scrollPageIntoView({ pageNumber: pageIndex + 1 }); return success(undefined); }

@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import { Toaster, toast } from '@/ui/components';
 import { samplePapers } from '@/ui/library/sample/libraryData';
-import { useSamplePreferences, useSampleSettings } from '@/ui/settings/sample/useSampleSettings';
+import { useSampleSettings } from '@/ui/settings/sample/useSampleSettings';
 import { PopupView } from '../PopupView';
 import type { ActiveTabView, RecentPaperView } from '../types';
 
@@ -42,7 +42,6 @@ const recent: RecentPaperView[] = samplePapers
 const open = (path: string) => window.open(path, '_blank', 'noopener');
 
 export function SamplePopup() {
-  useSamplePreferences();
   const { status } = useSampleSettings();
   const [autoOpen, setAutoOpen] = useState(true);
   const tab = state in tabs ? tabs[state]! : tabs.pdf!;
