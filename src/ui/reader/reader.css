@@ -602,7 +602,7 @@
 /* ---- Panels ----------------------------------------------------------------- */
 
 .pp-panel {
-  --pp-pad-top: var(--pp-space-3);
+  --pp-pad-top: 6px;
   --pp-pad-end: var(--pp-space-4);
   --pp-pad-bottom: var(--pp-space-3);
   --pp-pad-start: 18px;
@@ -627,10 +627,33 @@
   flex: 1;
   flex-direction: column;
   min-height: 0;
-  margin: 10px calc(var(--pp-pad-end) * -1) calc(var(--pp-pad-bottom) * -1) calc(var(--pp-pad-start) * -1);
+  margin: 6px calc(var(--pp-pad-end) * -1) calc(var(--pp-pad-bottom) * -1) calc(var(--pp-pad-start) * -1);
   padding: 0 var(--pp-pad-end) var(--pp-pad-bottom) var(--pp-pad-start);
   border-top: 0.5px solid var(--pp-hairline-strong);
   background: var(--pp-reading-surface);
+}
+
+/* Option under review: the whole panel, header included, on the reading
+   surface; only the function rail stays glass. */
+.pp-reader[data-panel-header='white'] .pp-panel {
+  background: var(--pp-reading-surface);
+}
+
+.pp-reader[data-panel-header='white'] .pp-panel__body {
+  border-top-color: transparent;
+}
+
+.pp-reader[data-panel-header='white'][data-placement='right'] .pp-panel {
+  border-right: 0.5px solid var(--pp-hairline);
+}
+
+.pp-reader[data-panel-header='white'][data-placement='bottom'] .pp-panel {
+  border-bottom: 0.5px solid var(--pp-hairline);
+}
+
+.pp-reader[data-panel-header='white'] .pp-panel__body {
+  border-right: 0;
+  border-bottom: 0;
 }
 
 /* Where the surface meets the function rail. */
@@ -647,12 +670,12 @@
   flex-shrink: 0;
   align-items: center;
   gap: var(--pp-space-2);
-  min-height: 32px;
+  min-height: 30px;
 }
 
 .pp-panel__title {
   margin: 0;
-  font-size: var(--pp-text-lg);
+  font-size: var(--pp-text-md);
   font-weight: var(--pp-weight-semibold);
   line-height: var(--pp-leading-tight);
 }
@@ -871,4 +894,21 @@
   100% {
     opacity: 0;
   }
+}
+
+/* Temporary review switch on the demo page (remove after the choice is made). */
+.pp-review-switch {
+  position: fixed;
+  bottom: 14px;
+  left: 14px;
+  z-index: var(--pp-z-float);
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 4px 4px 4px 12px;
+  border-radius: var(--pp-radius-pill);
+  background: var(--pp-glass-float-solid);
+  box-shadow: var(--pp-shadow-float);
+  color: var(--pp-text-2);
+  font-size: var(--pp-text-xs);
 }
