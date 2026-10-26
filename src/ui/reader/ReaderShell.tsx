@@ -34,7 +34,7 @@ import { AnnotationsPanel } from './panels/AnnotationsPanel';
 import { NotesPanel } from './panels/NotesPanel';
 import { PlaceholderPanel } from './panels/PlaceholderPanel';
 import { ReaderSidebar } from './ReaderSidebar';
-import { ReaderToolbar } from './ReaderToolbar';
+import { ReaderToolbar, type ExportOption } from './ReaderToolbar';
 import { Splitter } from './Splitter';
 import type {
   AnnotationView,
@@ -83,6 +83,11 @@ interface ReaderShellProps {
   onTool: (tool: string) => void;
   /** Library features inside the reader: bookmark popover and the sidebar tab. */
   library?: ReaderLibraryProps;
+  /** A back button at the start of the toolbar, for a paper opened from the library. */
+  onBack?: () => void;
+  /** What the toolbar's 导出 offers (e.g. the original PDF); without it the button calls onTool('export'). */
+  exports?: readonly ExportOption[];
+  onExport?: (id: string) => void;
   /** Quick settings behind the toolbar's settings button: appearance, answer language, default model. */
   settings?: ReaderSettingsProps;
   /** Content for research panels the page supplies itself (discussion, overview, …); the rest show a placeholder. */
@@ -501,6 +506,9 @@ export function ReaderShell(props: ReaderShellProps) {
         settingsRef={settingsRef}
         settingsOpen={settingsOpen}
         onSettings={props.settings ? () => setSettingsOpen((open) => !open) : undefined}
+        onBack={props.onBack}
+        exports={props.exports}
+        onExport={props.onExport}
         onTool={props.onTool}
       />
 

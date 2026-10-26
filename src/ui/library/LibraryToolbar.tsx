@@ -1,5 +1,5 @@
-import { useRef, useState } from 'react';
-import { Button, Checkbox, Icon, IconButton, Menu, Popover, Segmented, Tooltip, type MenuEntry } from '@/ui/components';
+import { useRef, useState, type RefObject } from 'react';
+import { Button, Checkbox, Icon, IconButton, Menu, Popover, Segmented, Spinner, Tooltip, type MenuEntry } from '@/ui/components';
 import { columnLabels, optionalColumns } from './columns';
 import type { ColumnId, LibraryViewPreferences, SearchField } from './types';
 
@@ -28,6 +28,10 @@ interface LibraryToolbarProps {
   onPrefs: (patch: Partial<LibraryViewPreferences>) => void;
   onResetColumns: () => void;
   onImport: (kind: ImportKind, files: File[]) => void;
+  /** Adds "从网址导入 PDF…" to the import menu. */
+  onImportUrl?: () => void;
+  /** The import queue's button, shown while there are jobs. */
+  tasks?: { ref: RefObject<HTMLButtonElement | null>; active: number; failed: number; open: boolean; onToggle: () => void };
   sidebarOpen: boolean;
   onToggleSidebar: () => void;
   detailOpen: boolean;
@@ -68,6 +72,8 @@ export function LibraryToolbar(props: LibraryToolbarProps) {
   }));
   const importEntries: MenuEntry[] = [
     { id: 'pdf', label: '导入 PDF 文件…', icon: 'file' },
+    ...(props.onImportUrl ? [{ id: 'url', label: '从网址导入 PDF…', icon: 'link' } as MenuEntry] : []),
+    { kind: 'separator', id: 'sep-bib' },
     { id: 'csl', label: '导入 CSL JSON 书目…', icon: 'quote' },
     { id: 'bibtex', label: '导入 BibTeX 书目…', icon: 'quote' },
   ];
@@ -135,6 +141,23 @@ export function LibraryToolbar(props: LibraryToolbarProps) {
         tooltip={open !== 'view'}
         onClick={() => setOpen(open === 'view' ? null : 'view')}
       />
+      {props.tasks && (
+        <Tooltip label={props.tasks.active ? `导入任务：${props.tasks.active} 项进行中` : props.tasks.failed ? `导入任务：${props.tasks.failed} 项失败` : '导入任务'} labelsChild disabled={props.tasks.open}>
+          <button
+            ref={props.tasks.ref}
+            type="button"
+            className="pp-lib-tasks"
+            data-state={props.tasks.active ? 'active' : props.tasks.failed ? 'failed' : 'done'}
+            aria-label={props.tasks.active ? `导入任务，${props.tasks.active} 项进行中` : '导入任务'}
+            aria-haspopup="dialog"
+            aria-expanded={props.tasks.open}
+            onClick={props.tasks.onToggle}
+          >
+            {props.tasks.active ? <Spinner size={13} /> : <Icon name={props.tasks.failed ? 'alert' : 'check'} size={14} />}
+            {props.tasks.active > 0 && <span>{props.tasks.active}</span>}
+          </button>
+        </Tooltip>
+      )}
       <Button
         ref={importRef}
         size="sm"
@@ -191,6 +214,10 @@ export function LibraryToolbar(props: LibraryToolbarProps) {
           align="end"
           triggerRef={importRef}
           onSelect={(id) => {
+            if (id === 'url') {
+              props.onImportUrl?.();
+              return;
+            }
             setImportKind(id as ImportKind);
             // Let the accept attribute update before opening the picker.
             window.setTimeout(() => fileRef.current?.click(), 0);

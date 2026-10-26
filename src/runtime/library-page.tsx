@@ -1,7 +1,7 @@
 import { useEffect, useState, useSyncExternalStore } from 'react';
 import { LibraryView } from '@/ui/library/LibraryView';
 import type { PaperView } from '@/ui/library/types';
-import { Button, Dialog, EmptyState, ProgressBar, TextField, Toaster, toast } from '@/ui/components';
+import { Button, Dialog, EmptyState, Toaster, toast } from '@/ui/components';
 import { createLibraryService } from '@/domain/library/service';
 import { createLibraryImports } from '@/domain/library/imports';
 import { createLibraryEnrichment } from '@/domain/library/enrichment';
@@ -25,7 +25,6 @@ export function downloadFile(blob: Blob, name: string) {
   setTimeout(() => URL.revokeObjectURL(url), 30_000);
 }
 const asPaper = (row: LibraryRow): PaperView => ({ ...row, annotationCount: row.annotationCount ?? 0 });
-const phaseLabels: Record<LibraryImportJob['phase'], string> = { queued: '等待导入', reading: '读取文件', validating: '检查文件', 'password-required': '需要密码', saving: '保存到本机', completed: '已完成', failed: '导入失败', cancelled: '已取消' };
 const pending = (job: LibraryImportJob) => !['completed', 'failed', 'cancelled'].includes(job.phase);
 
 /** Connects the library service to its view, dialogs and controls. */
@@ -33,13 +32,10 @@ export function LibraryPage({ owner }: { owner: Runtime }) {
   const { service, imports } = owner;
   const snapshot = useSyncExternalStore(service.subscribe, service.getSnapshot);
   const jobs = useSyncExternalStore(imports.subscribe, imports.getSnapshot);
-  const [showImports, setShowImports] = useState(false), [url, setUrl] = useState('');
-  const [urlBusy, setUrlBusy] = useState(false);
   const [exported, setExported] = useState<{ text: string; format: 'bibtex' | 'apa' | 'csv' }>();
   const data = snapshot.data;
   const loadError = 'error' in snapshot ? snapshot.error : undefined;
   const papers = data.items.map(asPaper);
-  const remaining = jobs.filter(pending).length;
   useEffect(() => {
     const beforeUnload = (event: BeforeUnloadEvent) => { if (imports.getSnapshot().some(pending)) { event.preventDefault(); event.returnValue = ''; } };
     window.addEventListener('beforeunload', beforeUnload);
@@ -67,13 +63,13 @@ export function LibraryPage({ owner }: { owner: Runtime }) {
     }
     void report(service.update(id, item.revision, clean, baseline));
   }
-  return <div style={{ height: '100%', display: 'flex', flexDirection: 'column' }}>
-    <div style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '4px 16px', fontSize: 12, flexShrink: 0 }}>
-      <Button size="sm" onClick={() => setShowImports(true)}>网络导入 / 导入任务{remaining ? ` · ${remaining}` : ''}</Button>
-      <span role="status">{snapshot.state === 'loading' ? '正在读取本机文献库…' : loadError?.message ?? '文献库已接本机存储 · 批注数量与全文 / AI 搜索待接入'}</span>
-      {loadError && <Button size="sm" onClick={() => void owner.refresh()}>重新读取</Button>}
-    </div>
-    <div style={{ flex: 1, minHeight: 0 }}>
+  // A later refresh failed while the list is still shown: say so once, with a retry.
+  useEffect(() => {
+    if (loadError && snapshot.state !== 'failed')
+      toast.show({ tone: 'warning', message: loadError.message, action: { label: '重新读取', onAction: () => void owner.refresh() } });
+  }, [loadError, snapshot.state, owner]);
+  return <>
+    <div style={{ height: '100%' }}>
       {snapshot.state === 'failed' ? <EmptyState icon="exclaim" title="暂时无法读取文献库" description={snapshot.error?.message} actions={<Button onClick={() => void owner.refresh()}>重试</Button>} /> :
       snapshot.state !== 'loading' && <LibraryView
         papers={papers} total={data.total} onLoadMore={service.loadMore}
@@ -109,48 +105,24 @@ export function LibraryPage({ owner }: { owner: Runtime }) {
         onRenameFolder={(id, name) => { void report(service.renameFolder(id, name)); }}
         onMoveFolder={(id, parent) => { void report(service.moveFolder(id, parent)); }}
         onDeleteFolder={id => { void report(service.deleteFolder(id)); }}
-        onImport={(kind, files, folder) => { if (files.length) { imports.addFiles(kind, files, folder); setShowImports(true); } }}
+        onImport={(kind, files, folder) => { if (files.length) imports.addFiles(kind, files, folder); }}
+        imports={{
+          jobs,
+          onImportUrl: async (url, folder) => {
+            try { await imports.addUrl(url, folder); return null; }
+            catch (error) { return error instanceof Error ? error.message : '无法加入导入队列，请检查网址'; }
+          },
+          onCancel: id => { void imports.cancel(id).catch(errorToast); },
+          onRetry: id => { void imports.retry(id).catch(errorToast); },
+          onPassword: (id, requestId, password) => { void imports.password(id, requestId, password).catch(errorToast); },
+        }}
         onExportCitations={(ids, format) => { void exportSelected(ids, format); }}
       />}
     </div>
-    <Dialog open={showImports} onClose={() => setShowImports(false)} title="导入论文与书目" size="lg"
-      description="文件依次导入。可关闭此弹窗继续管理；导入完成前请保留本页面。已完成的条目会保存在本机。">
-      <form style={{ display: 'flex', alignItems: 'end', gap: 12 }} onSubmit={event => {
-        event.preventDefault(); setUrlBusy(true);
-        void imports.addUrl(url, data.query.collection.kind === 'folder' ? data.query.collection.folderId : null)
-          .then(() => setUrl('')).catch(errorToast).finally(() => setUrlBusy(false));
-      }}>
-        <div style={{ flex: 1 }}><TextField label="PDF 网络直链" type="url" required value={url} onChange={setUrl} placeholder="https://…/paper.pdf" /></div>
-        <Button type="submit" disabled={urlBusy}>加入队列</Button>
-      </form>
-      <div style={{ maxHeight: '50vh', overflow: 'auto', display: 'grid', gap: 18, marginTop: 20 }}>
-        {jobs.length === 0 && <p>本地 PDF、BibTeX、CSL JSON 请从文献库顶部的导入菜单选择。</p>}
-        {jobs.map(job => <ImportRow key={job.id} job={job} imports={imports} />)}
-      </div>
-    </Dialog>
     <Dialog open={!!exported} onClose={() => setExported(undefined)} title="引用已生成" description="浏览器未允许写入剪贴板，可下载后复制。"
       footer={<Button onClick={() => { if (exported) downloadFile(new Blob([exported.text], { type: 'text/plain;charset=utf-8' }), `Paperpane-citations.${exported.format === 'bibtex' ? 'bib' : 'txt'}`); }}>下载引用</Button>}>
       <pre style={{ whiteSpace: 'pre-wrap', maxHeight: '40vh', overflow: 'auto' }}>{exported?.text}</pre>
     </Dialog>
     <Toaster />
-  </div>;
-}
-function ImportRow({ job, imports }: { job: LibraryImportJob; imports: Runtime['imports'] }) {
-  const [password, setPassword] = useState('');
-  return <section aria-label={job.title} style={{ display: 'grid', gap: 8 }}>
-    <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
-      <strong style={{ flex: 1, overflowWrap: 'anywhere' }}>{job.title}</strong>
-      <span role="status">{phaseLabels[job.phase]}{job.phase === 'completed' ? ` · 新增 ${job.added}，复用 ${job.reused}` : ''}</span>
-      {pending(job) && job.phase !== 'saving' && <Button size="sm" onClick={() => { void imports.cancel(job.id).catch(errorToast); }}>取消</Button>}
-      {['failed', 'cancelled'].includes(job.phase) && <Button size="sm" onClick={() => { void imports.retry(job.id).catch(errorToast); }}>重试</Button>}
-    </div>
-    {['reading', 'validating', 'saving'].includes(job.phase) && <ProgressBar label={phaseLabels[job.phase]} value={job.progress?.total ? job.progress.completed / job.progress.total : undefined} />}
-    {job.error && <p role="alert">{job.error}</p>}
-    {job.passwordRequest && <form style={{ display: 'flex', alignItems: 'end', gap: 12 }} onSubmit={event => {
-      event.preventDefault(); void imports.password(job.id, job.passwordRequest!.requestId, password).catch(errorToast); setPassword('');
-    }}>
-      <TextField label={job.passwordRequest.incorrect ? '密码不正确，请重新输入' : 'PDF 密码'} type="password" autoComplete="off" value={password} onChange={setPassword} />
-      <Button type="submit">解锁</Button>
-    </form>}
-  </section>;
+  </>;
 }
