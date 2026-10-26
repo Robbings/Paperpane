@@ -21,7 +21,6 @@ export interface NoteLayout {
 }
 
 export const NOTE_SIZE = { width: 260, height: 168, minWidth: 220, minHeight: 124, maxWidth: 520, maxHeight: 520 };
-const SAVE_PAUSE = 700;
 const PILL_HEIGHT = 34;
 
 interface CommentNotesProps {
@@ -32,6 +31,8 @@ interface CommentNotesProps {
   /** Changes when the paper is laid out anew (zoom, docking), so passages are measured again. */
   layoutKey: string;
   annotationRects: (id: string) => readonly ViewRect[] | null;
+  /** Geometry updates from the runtime (pages rendered, zoom, relayout). */
+  subscribeGeometry: (listener: () => void) => () => void;
   onChange: (note: NoteLayout) => void;
   onRaise: (id: string) => void;
   onClose: (id: string) => void;
@@ -68,18 +69,22 @@ export function CommentNotes(props: CommentNotesProps) {
   const [hovered, setHovered] = useState<string | null>(null);
   const [, setTick] = useState(0);
   const openIds = notes.filter((n) => n.open).map((n) => n.id).join(',');
+  // Observers and subscriptions call measure later: read the latest props, not the ones they closed over.
+  const latest = useRef(props);
+  latest.current = props;
 
   // Where each open note's passage starts, in the paper's own coordinates. A passage on
-  // a page that is not rendered keeps its last known place.
+  // a page that is not rendered keeps its last known place until it renders.
   const measure = () => {
-    if (!container) return;
-    const box = container.getBoundingClientRect();
+    const { container: el, notes: list, annotationRects } = latest.current;
+    if (!el) return;
+    const box = el.getBoundingClientRect();
     const next = new Map<string, { x: number; y: number }>();
-    for (const note of notes) {
+    for (const note of list) {
       if (!note.open) continue;
-      const first = props.annotationRects(note.id)?.[0];
+      const first = annotationRects(note.id)?.[0];
       const point = first
-        ? { x: first.left - box.left - container.clientLeft + container.scrollLeft, y: first.top - box.top - container.clientTop + container.scrollTop }
+        ? { x: first.left - box.left - el.clientLeft + el.scrollLeft, y: first.top - box.top - el.clientTop + el.scrollTop }
         : known.current.get(note.id);
       if (point) {
         known.current.set(note.id, point);
@@ -91,7 +96,10 @@ export function CommentNotes(props: CommentNotesProps) {
 
   useLayoutEffect(measure, [openIds, props.layoutKey, props.annotations, container]);
 
-  // The paper changes size as pages render or the window resizes: measure again.
+  // Measure again when the runtime says positions changed (a page rendered, zoom, relayout)
+  // and when the paper changes size.
+  const subscribeGeometry = props.subscribeGeometry;
+  useEffect(() => subscribeGeometry(() => measure()), [subscribeGeometry]);
   useEffect(() => {
     if (!container) return;
     const observer = new ResizeObserver(() => measure());
@@ -195,25 +203,13 @@ interface CommentNoteProps {
 
 function CommentNote({ note, anchor, bounds, annotation, register, onHover, onChange, onRaise, onClose, onComment, onLocate }: CommentNoteProps) {
   const [draft, setDraft] = useState(annotation.note ?? '');
-  const saved = useRef(annotation.note ?? '');
-  const timer = useRef<number | undefined>(undefined);
   const gesture = useRef<{ kind: 'move' | 'resize'; x: number; y: number; start: NoteLayout; moved: boolean } | null>(null);
   const textRef = useRef<HTMLTextAreaElement>(null);
 
   // Take outside changes (e.g. edited in the annotation list) unless typing here.
   useEffect(() => {
     if (document.activeElement !== textRef.current) setDraft(annotation.note ?? '');
-    saved.current = annotation.note ?? '';
   }, [annotation.note]);
-
-  useEffect(() => () => window.clearTimeout(timer.current), []);
-
-  const commit = (text: string) => {
-    window.clearTimeout(timer.current);
-    if (text.trim() === saved.current.trim()) return;
-    saved.current = text;
-    onComment(text.trim());
-  };
 
   const left = anchor.x + note.dx;
   const top = anchor.y + note.dy;
@@ -294,20 +290,14 @@ function CommentNote({ note, anchor, bounds, annotation, register, onHover, onCh
               label="收起"
               size="md"
               shape="pill"
-              onClick={() => {
-                commit(draft);
-                onChange({ ...note, collapsed: true });
-              }}
+              onClick={() => onChange({ ...note, collapsed: true })}
             />
             <IconButton
               icon="close"
               label="关闭评论"
               size="md"
               shape="pill"
-              onClick={() => {
-                commit(draft);
-                onClose();
-              }}
+              onClick={onClose}
             />
           </header>
           <textarea
@@ -317,17 +307,13 @@ function CommentNote({ note, anchor, bounds, annotation, register, onHover, onCh
             placeholder={'第一行是标题\n然后写下你的想法…'}
             value={draft}
             onChange={(event) => {
-              const text = event.target.value;
-              setDraft(text);
-              window.clearTimeout(timer.current);
-              timer.current = window.setTimeout(() => commit(text), SAVE_PAUSE);
+              // Every edit goes to the runtime at once; it batches durable writes and
+              // flushes them, so closing the reader mid-sentence loses nothing.
+              setDraft(event.target.value);
+              onComment(event.target.value);
             }}
-            onBlur={() => commit(draft)}
             onKeyDown={(event) => {
-              if (event.key === 'Escape') {
-                commit(draft);
-                onChange({ ...note, collapsed: true });
-              }
+              if (event.key === 'Escape') onChange({ ...note, collapsed: true });
             }}
           />
           <span className="pp-note__resize" aria-hidden="true" onPointerDown={begin('resize')} onPointerMove={move} onPointerUp={end} onPointerCancel={end} />

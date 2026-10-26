@@ -73,10 +73,21 @@ export interface ReaderInteraction {
   /** Translate, explain or ask about an existing highlight's text. */
   onAnnotationAction: (annotationId: string, action: string) => void;
   onAnnotationColor: (annotationId: string, color: HighlightColor) => void;
+  /**
+   * The comment as typed, on every edit (the note does not wait or batch).
+   * The runtime keeps it, debounces durable writes, and flushes on close or
+   * document switch; a deleted annotation simply ignores later calls.
+   */
   onAnnotationComment: (annotationId: string, comment: string) => void;
   onAnnotationDelete: (annotationId: string) => void;
   /** Undoes a delete (offered right after deleting). */
   onAnnotationRestore?: (annotationId: string) => void;
   /** Where an annotation's text is on screen now, or null when its page is not rendered. Read while drawing a note's connector. */
   annotationRects: (annotationId: string) => readonly ViewRect[] | null;
+  /**
+   * Notifies when annotation positions may have changed without the window
+   * changing: a page finished rendering, zoom, rotation, relayout. Notes measure
+   * again. Returns the unsubscribe function (backed by AnchorService.subscribeProjection).
+   */
+  subscribeGeometry: (listener: () => void) => () => void;
 }

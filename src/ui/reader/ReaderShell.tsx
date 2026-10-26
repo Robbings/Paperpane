@@ -564,6 +564,7 @@ export function ReaderShell(props: ReaderShellProps) {
         container={paperElement}
         layoutKey={`${zoomPercent}:${effectivePlacement}:${effectiveWidth}:${effectiveHeight}:${sidebarOpen}`}
         annotationRects={interaction.annotationRects}
+        subscribeGeometry={interaction.subscribeGeometry}
         onChange={(note) => setNoteLayouts((current) => current.map((n) => (n.id === note.id ? note : n)))}
         onRaise={(id) => setNoteLayouts((current) => current.map((n) => (n.id === id && n.z !== topZ.current ? { ...n, z: ++topZ.current } : n)))}
         onClose={(id) => setNoteLayouts((current) => current.map((n) => (n.id === id ? { ...n, open: false } : n)))}

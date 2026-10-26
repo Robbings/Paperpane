@@ -28,6 +28,7 @@ export function useSampleReader(initial: readonly AnnotationView[]) {
   const ranges = useRef(new Map<string, { range: Range; text: string }>());
   const deleted = useRef(new Map<string, { item: AnnotationView; index: number }>());
   const counter = useRef(0);
+  const geometryListeners = useRef(new Set<() => void>());
   // Read inside listeners without re-subscribing.
   const latest = useRef({ annotations, overlays, tool });
   latest.current = { annotations, overlays, tool };
@@ -60,6 +61,21 @@ export function useSampleReader(initial: readonly AnnotationView[]) {
     window.getSelection()?.removeAllRanges();
     return id;
   }, []);
+
+  // Positions change when pages resize (zoom, relayout): tell the subscribers, as a
+  // real runtime does when PDF pages finish rendering.
+  const subscribeGeometry = useCallback((listener: () => void) => {
+    geometryListeners.current.add(listener);
+    return () => {
+      geometryListeners.current.delete(listener);
+    };
+  }, []);
+  useEffect(() => {
+    if (!container) return;
+    const observer = new ResizeObserver(() => geometryListeners.current.forEach((listener) => listener()));
+    container.querySelectorAll('[data-page-index]').forEach((page) => observer.observe(page));
+    return () => observer.disconnect();
+  }, [container]);
 
   // Capture selections and hit-test clicks in the scroll container the shell hands over.
   useEffect(() => {
@@ -139,8 +155,9 @@ export function useSampleReader(initial: readonly AnnotationView[]) {
         });
       },
       annotationRects,
+      subscribeGeometry,
     }),
-    [menuTarget, tool, highlight, annotationRects],
+    [menuTarget, tool, highlight, annotationRects, subscribeGeometry],
   );
 
   // Built-in highlights on the sample paper follow the annotations' colours, or vanish when deleted.
