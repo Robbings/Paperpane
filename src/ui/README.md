@@ -172,6 +172,17 @@ toast.show({ message: '翻译失败：请求超时', tone: 'error', action: { la
 - **状态行** `StatusLine`：保存、同步、模型三种状态，设置页、阅读器快速设置和扩展弹窗共用，数据来自 `StatusSummary`。
 - **阅读器快速设置**：`ReaderShell` 的 `settings` prop（`ReaderSettingsProps`），工具栏设置按钮弹出：主题、正文字号、深色减光、回答语言、默认模型，加状态行和「全部设置…」。默认模型调用 `onDefaultModel(id)`，对应逻辑层的 `setDefaultModel(modelId, baseRevision)` 单项原子命令；不传 `settings` 时按钮仍调用 `onTool('settings')`。
 
+## 扩展弹窗 `PopupView`
+
+位于 `src/ui/popup/`，视图模型在 `popup/types.ts`；示例接线是 `popup/sample/SamplePopup.tsx`，`popup.html?state=pdf|local|checking|not-pdf|restricted|file-access|in-reader` 切换当前标签页的几种情况。
+
+- 弹窗是独立的小窗口，背后没有页面可透，所以 `popup.css` 自己画一层柔和的彩色底，玻璃层叠在上面；宽 348px，高度随内容。
+- **当前页面**：`activeTab: ActiveTabView | null`（null 表示正在识别）。可打开时显示首页缩略、标题、`displayUrl`（不含查询参数）和「在纸窗中打开」→ `onOpenInReader(tabId)`；不能打开时按 `block` 说明原因：`not-pdf`、`restricted`、`file-access`（附「打开扩展详情」→ `onAllowFileAccess`）、`in-reader`。`inLibrary` 为真时标「已在文献库」。
+- **自动打开**：`autoOpen.enabled` / `onAutoOpen`；当前页是可打开的 PDF 且有站点时，多一行按网站的开关（`excludedHere` / `onExcludeHere`），本地文件显示为「本地 PDF 也自动打开」。
+- **继续阅读**：`recent` 最多 3 篇，`onOpenRecent(id)`。
+- **状态行**：与设置页共用 `StatusLine`（单行），点击跳到设置的对应一节。
+- **底部**：文献库 `onOpenLibrary`、打开文件 `onOpenFile`（弹窗里直接选文件会让弹窗关闭，所以交给阅读器页弹出文件选择）、设置 `onOpenSettings(section?)`。
+
 ## 修改与扩展
 
 - 需要新组件或新的 prop：在 PR 里提出；不要在页面里另写一套样式相近的组件。

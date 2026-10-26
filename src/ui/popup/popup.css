@@ -1,0 +1,372 @@
+/* Extension popup: glass over a soft wash of colour. The popup is its own small
+   window, so the wash is drawn here; without it the glass would have nothing to show. */
+
+html:has(body[data-page='popup']),
+body[data-page='popup'],
+body[data-page='popup'] #root {
+  height: auto;
+}
+
+body[data-page='popup'] {
+  width: 348px;
+  background: var(--pp-popup-ground);
+}
+
+:root {
+  --pp-popup-ground: #e6eaf1;
+  --pp-popup-wash:
+    radial-gradient(70% 42% at 0% 4%, rgba(112, 156, 236, 0.62), transparent 72%),
+    radial-gradient(60% 38% at 100% 34%, rgba(244, 184, 132, 0.5), transparent 74%),
+    radial-gradient(70% 36% at 12% 78%, rgba(126, 194, 176, 0.42), transparent 72%),
+    radial-gradient(50% 30% at 96% 100%, rgba(152, 176, 232, 0.36), transparent 72%);
+  --pp-popup-glass: rgba(255, 255, 255, 0.44);
+  --pp-popup-glass-hover: rgba(255, 255, 255, 0.7);
+}
+
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme='light']) {
+    --pp-popup-ground: #141518;
+    --pp-popup-wash:
+      radial-gradient(70% 42% at 0% 4%, rgba(70, 108, 196, 0.5), transparent 72%),
+      radial-gradient(60% 38% at 100% 34%, rgba(168, 108, 60, 0.34), transparent 74%),
+      radial-gradient(70% 36% at 12% 78%, rgba(52, 128, 110, 0.34), transparent 72%),
+      radial-gradient(50% 30% at 96% 100%, rgba(80, 100, 170, 0.3), transparent 72%);
+    --pp-popup-glass: rgba(40, 40, 44, 0.46);
+    --pp-popup-glass-hover: rgba(70, 70, 76, 0.6);
+  }
+}
+
+:root[data-theme='dark'] {
+  --pp-popup-ground: #141518;
+  --pp-popup-wash:
+    radial-gradient(70% 42% at 0% 4%, rgba(70, 108, 196, 0.5), transparent 72%),
+    radial-gradient(60% 38% at 100% 34%, rgba(168, 108, 60, 0.34), transparent 74%),
+    radial-gradient(70% 36% at 12% 78%, rgba(52, 128, 110, 0.34), transparent 72%),
+    radial-gradient(50% 30% at 96% 100%, rgba(80, 100, 170, 0.3), transparent 72%);
+  --pp-popup-glass: rgba(40, 40, 44, 0.46);
+  --pp-popup-glass-hover: rgba(70, 70, 76, 0.6);
+}
+
+.pp-popup {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  padding: 14px 12px 12px;
+  isolation: isolate;
+}
+
+.pp-popup__wash {
+  position: absolute;
+  inset: 0;
+  z-index: -1;
+  background: var(--pp-popup-wash);
+}
+
+/* Glass here is thinner than in the reader: the wash is the only thing behind it. */
+.pp-popup .pp-glass {
+  --pp-glass-bg: var(--pp-popup-glass);
+}
+
+/* ---- Header -------------------------------------------------------------------- */
+
+.pp-popup__head {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 0 4px 2px;
+}
+
+.pp-popup__logo {
+  flex-shrink: 0;
+}
+
+.pp-popup__name {
+  color: var(--pp-text);
+  font-size: var(--pp-text-lg);
+  font-weight: var(--pp-weight-semibold);
+  letter-spacing: 0.02em;
+}
+
+.pp-popup__name-en {
+  color: var(--pp-text-2);
+  font-size: var(--pp-text-sm);
+}
+
+/* ---- Current tab --------------------------------------------------------------- */
+
+.pp-popup__tab {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  padding: 14px;
+  border-radius: var(--pp-radius-panel);
+}
+
+.pp-popup__tab-row {
+  display: flex;
+  align-items: flex-start;
+  gap: 12px;
+}
+
+.pp-popup__tab-text {
+  flex: 1;
+  min-width: 0;
+  padding-top: 1px;
+}
+
+.pp-popup__tab-title {
+  display: -webkit-box;
+  margin: 0;
+  overflow: hidden;
+  color: var(--pp-text);
+  font-size: 13.5px;
+  font-weight: var(--pp-weight-semibold);
+  line-height: 1.4;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 2;
+}
+
+.pp-popup__tab-meta {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  margin: 4px 0 0;
+  min-width: 0;
+}
+
+.pp-popup__tab-url {
+  min-width: 0;
+  overflow: hidden;
+  color: var(--pp-text-2);
+  font-size: var(--pp-text-sm);
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.pp-popup__tab-detail {
+  margin: 3px 0 0;
+  color: var(--pp-text-2);
+  font-size: var(--pp-text-sm);
+  line-height: var(--pp-leading-body);
+}
+
+/* A first page in miniature: paper, a few lines of text, a small tag. */
+.pp-popup__thumb {
+  position: relative;
+  flex-shrink: 0;
+  width: 38px;
+  height: 49px;
+  border-radius: 4px;
+  background: #fff;
+  box-shadow:
+    0 0 0 0.5px rgba(0, 0, 0, 0.12),
+    0 2px 6px rgba(0, 0, 0, 0.1);
+  filter: var(--pp-paper-filter);
+}
+
+.pp-popup__thumb--empty {
+  background: var(--pp-fill);
+  box-shadow: none;
+}
+
+.pp-popup__thumb-lines {
+  position: absolute;
+  inset: 8px 7px auto;
+  height: 22px;
+  background: repeating-linear-gradient(180deg, rgba(0, 0, 0, 0.16) 0 1.5px, transparent 1.5px 5px);
+  -webkit-mask: linear-gradient(90deg, #000 70%, transparent 100%);
+  mask: linear-gradient(90deg, #000 70%, transparent 100%);
+}
+
+.pp-popup__thumb-tag {
+  position: absolute;
+  right: 4px;
+  bottom: 4px;
+  padding: 0 3px;
+  border-radius: 2px;
+  background: var(--pp-accent);
+  color: #fff;
+  font-size: 8px;
+  font-weight: var(--pp-weight-semibold);
+  line-height: 12px;
+  letter-spacing: 0.04em;
+  -webkit-font-smoothing: antialiased;
+}
+
+.pp-popup__badge-icon {
+  display: flex;
+  flex-shrink: 0;
+  align-items: center;
+  justify-content: center;
+  width: 36px;
+  height: 36px;
+  border-radius: 10px;
+  background: var(--pp-fill);
+  color: var(--pp-text-2);
+}
+
+.pp-popup__badge-icon[data-block='in-reader'] {
+  background: color-mix(in srgb, var(--pp-ok) 14%, transparent);
+  color: var(--pp-ok);
+}
+
+.pp-popup__badge-icon[data-block='file-access'] {
+  background: color-mix(in srgb, var(--pp-warn) 14%, transparent);
+  color: var(--pp-warn);
+}
+
+.pp-popup__primary {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  height: 34px;
+  border: 0;
+  border-radius: var(--pp-radius-control);
+  background: var(--pp-accent);
+  box-shadow:
+    inset 0 0.5px 0 rgba(255, 255, 255, 0.28),
+    0 1px 2px rgba(0, 0, 0, 0.12);
+  color: var(--pp-on-accent);
+  font-size: var(--pp-text-md);
+  font-weight: var(--pp-weight-medium);
+  -webkit-font-smoothing: antialiased;
+  transition: filter var(--pp-dur-fast) var(--pp-ease-out);
+}
+
+.pp-popup__primary:hover {
+  filter: brightness(1.06);
+}
+
+.pp-popup__primary:active {
+  filter: brightness(0.94);
+}
+
+.pp-popup__primary--soft {
+  background: var(--pp-popup-glass-hover);
+  box-shadow: inset 0 0 0 0.5px var(--pp-hairline);
+  color: var(--pp-text);
+  -webkit-font-smoothing: auto;
+}
+
+/* ---- Auto-open ------------------------------------------------------------------- */
+
+.pp-popup__group {
+  border-radius: var(--pp-radius-panel);
+}
+
+.pp-popup__row {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  min-height: 52px;
+  padding: 9px 14px;
+}
+
+.pp-popup__row--sub {
+  min-height: 40px;
+  border-top: 0.5px solid var(--pp-hairline);
+}
+
+.pp-popup__row-text {
+  display: flex;
+  flex: 1;
+  flex-direction: column;
+  gap: 1px;
+  min-width: 0;
+}
+
+.pp-popup__row-label {
+  color: var(--pp-text);
+  font-size: var(--pp-text-md);
+}
+
+.pp-popup__row-detail {
+  color: var(--pp-text-2);
+  font-size: var(--pp-text-sm);
+}
+
+/* ---- Recent ---------------------------------------------------------------------- */
+
+.pp-popup__recent h2 {
+  margin: 4px 6px 4px;
+  color: var(--pp-text-2);
+  font-size: var(--pp-text-sm);
+  font-weight: var(--pp-weight-semibold);
+}
+
+.pp-popup__recent ul {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.pp-popup__recent button {
+  display: flex;
+  align-items: baseline;
+  gap: 10px;
+  width: 100%;
+  padding: 7px 8px;
+  border: 0;
+  border-radius: var(--pp-radius-control);
+  background: transparent;
+  text-align: left;
+}
+
+.pp-popup__recent button:hover {
+  background: var(--pp-popup-glass);
+}
+
+.pp-popup__recent-title {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  color: var(--pp-text);
+  font-size: var(--pp-text-md);
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.pp-popup__recent-meta {
+  flex-shrink: 0;
+  color: var(--pp-text-2);
+  font-size: var(--pp-text-xs);
+  font-variant-numeric: tabular-nums;
+}
+
+/* ---- Status and dock --------------------------------------------------------------- */
+
+.pp-popup__status {
+  padding: 0 8px;
+}
+
+.pp-popup__dock {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 2px;
+  padding: 4px;
+  border-radius: var(--pp-radius-panel);
+}
+
+.pp-popup__dock button {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  height: 34px;
+  border: 0;
+  border-radius: 10px;
+  background: transparent;
+  color: var(--pp-text);
+  font-size: var(--pp-text-md);
+  transition: background var(--pp-dur-fast) var(--pp-ease-out);
+}
+
+.pp-popup__dock button svg {
+  color: var(--pp-text-2);
+}
+
+.pp-popup__dock button:hover {
+  background: var(--pp-popup-glass-hover);
+}

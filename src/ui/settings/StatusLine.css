@@ -9,6 +9,11 @@
   list-style: none;
 }
 
+.pp-statusline[data-inline='true'] {
+  flex-flow: row wrap;
+  column-gap: 14px;
+}
+
 .pp-statusline li {
   display: flex;
   align-items: center;
