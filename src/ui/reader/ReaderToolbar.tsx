@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState, type FormEvent, type MouseEvent } from 'react';
+import { useEffect, useRef, useState, type FormEvent, type MouseEvent, type RefObject } from 'react';
 import { GlassSurface, Icon, IconButton, Menu, Tooltip, type MenuEntry } from '@/ui/components';
 import type { DocumentHeaderView, DockPlacement } from './types';
 
@@ -23,6 +23,11 @@ interface ReaderToolbarProps {
   canDockRight: boolean;
   autoHighlight: boolean;
   onToggleSidebar: () => void;
+  /** In the library? Shown by the bookmark next to the title; omit to hide it. */
+  saved?: boolean;
+  saveRef?: RefObject<HTMLButtonElement | null>;
+  saveOpen?: boolean;
+  onSave?: () => void;
   onToggleTitle: () => void;
   onPageSubmit: (pageIndex: number) => void;
   onZoom: (direction: 'in' | 'out') => void;
@@ -44,6 +49,10 @@ export function ReaderToolbar({
   canDockRight,
   autoHighlight,
   onToggleSidebar,
+  saved,
+  saveRef,
+  saveOpen,
+  onSave,
   onToggleTitle,
   onPageSubmit,
   onZoom,
@@ -133,6 +142,19 @@ export function ReaderToolbar({
         </Tooltip>
       ) : (
         <span className="pp-visually-hidden">{header.title}</span>
+      )}
+
+      {onSave && (
+        <IconButton
+          ref={saveRef}
+          icon={saved ? 'bookmarkFilled' : 'bookmark'}
+          label={saved ? '已在文献库，点按编辑' : '收藏到文献库'}
+          shape="pill"
+          aria-haspopup="dialog"
+          aria-expanded={saveOpen}
+          tooltip={!saveOpen}
+          onClick={onSave}
+        />
       )}
 
       <div className="pp-toolbar__group">

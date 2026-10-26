@@ -1,6 +1,7 @@
 import { useState, type CSSProperties } from 'react';
 import { IconButton, SaveStatus, Tooltip, Segmented, highlightColors, type HighlightColor, type LocalSaveState, type SyncState } from '@/ui/components';
 import type { AnnotationView } from '../types';
+import { PanelBody } from './PanelBody';
 import { PanelHeader } from './PanelHeader';
 
 type KindFilter = 'all' | 'highlight' | 'comment';
@@ -69,6 +70,7 @@ export function AnnotationsPanel({ items, local, sync, simulated, onLocate, onCo
         </div>
       </div>
 
+      <PanelBody>
       <div className="pp-panel__scroll">
         {items.length === 0 ? (
           <p className="pp-panel__empty">还没有批注。选中论文里的文字，就可以高亮或写评论。</p>
@@ -95,6 +97,7 @@ export function AnnotationsPanel({ items, local, sync, simulated, onLocate, onCo
       <div className="pp-panel__footer">
         <SaveStatus local={local} sync={sync} simulated={simulated} />
       </div>
+      </PanelBody>
     </div>
   );
 }

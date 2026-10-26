@@ -86,3 +86,12 @@ export function useAnchoredPosition(
 
   return position;
 }
+
+/**
+ * Where a floating layer should mount: inside the open <dialog> its anchor is
+ * in (dialogs sit in the top layer, above anything placed in the body), else
+ * in the body.
+ */
+export function layerFor(anchor: Element | null | undefined): HTMLElement {
+  return (anchor?.closest('dialog[open]') as HTMLElement | null) ?? document.body;
+}

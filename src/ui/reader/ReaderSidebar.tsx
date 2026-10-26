@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, type ReactNode } from 'react';
 import { GlassSurface, Segmented } from '@/ui/components';
 import type { OutlineItemView } from './types';
 
@@ -12,15 +12,19 @@ interface ReaderSidebarProps {
   /** Floating over the paper on narrow windows. */
   overlay: boolean;
   onNavigate: (pageIndex: number) => void;
+  /** Library navigation for the third tab; the tab is hidden without it. */
+  library?: ReactNode;
 }
 
-const tabs = [
-  { value: 'thumbs', label: '缩略图' },
-  { value: 'outline', label: '目录' },
-] as const;
+type SidebarTab = 'thumbs' | 'outline' | 'library';
 
-export function ReaderSidebar({ open, outline, pageCount, pageIndex, overlay, onNavigate }: ReaderSidebarProps) {
-  const [tab, setTab] = useState<'thumbs' | 'outline'>('outline');
+export function ReaderSidebar({ open, outline, pageCount, pageIndex, overlay, onNavigate, library }: ReaderSidebarProps) {
+  const [tab, setTab] = useState<SidebarTab>('outline');
+  const tabs: { value: SidebarTab; label: string }[] = [
+    { value: 'thumbs', label: '缩略图' },
+    { value: 'outline', label: '目录' },
+    ...(library ? [{ value: 'library' as const, label: '文献' }] : []),
+  ];
   // The current section is the last outline entry that starts at or before the current page.
   const currentId = [...outline].reverse().find((item) => item.pageIndex <= pageIndex)?.id;
 
@@ -37,7 +41,9 @@ export function ReaderSidebar({ open, outline, pageCount, pageIndex, overlay, on
     >
       <Segmented label="侧栏内容" options={tabs} value={tab} onChange={setTab} stretch />
 
-      {tab === 'outline' ? (
+      {tab === 'library' && library ? (
+        library
+      ) : tab === 'outline' ? (
         outline.length > 0 ? (
           <nav aria-label="目录" className="pp-sidebar__scroll pp-outline">
             {outline.map((item) => {

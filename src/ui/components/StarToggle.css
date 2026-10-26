@@ -1,0 +1,37 @@
+.pp-star {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: 3px;
+  border: 0;
+  border-radius: var(--pp-radius-pill);
+  background: transparent;
+  color: var(--pp-text-3);
+}
+
+button.pp-star:hover {
+  background: var(--pp-fill-hover);
+  color: var(--pp-text-2);
+}
+
+.pp-star__icon {
+  fill: none;
+  stroke: currentColor;
+  stroke-width: 1.6;
+  stroke-linejoin: round;
+  transition:
+    fill var(--pp-dur-fast) var(--pp-ease-out),
+    transform var(--pp-dur-fast) var(--pp-ease-spring);
+}
+
+.pp-star[data-on='true'] {
+  color: var(--pp-hl-yellow-dot);
+}
+
+.pp-star[data-on='true'] .pp-star__icon {
+  fill: currentColor;
+}
+
+button.pp-star:active .pp-star__icon {
+  transform: scale(0.88);
+}

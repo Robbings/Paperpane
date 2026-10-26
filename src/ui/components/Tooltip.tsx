@@ -1,7 +1,7 @@
 import { useEffect, useId, useRef, useState, type ReactNode } from 'react';
 import { createPortal } from 'react-dom';
 import { Kbd } from './Kbd';
-import { useAnchoredPosition, type Placement } from './useAnchoredPosition';
+import { layerFor, useAnchoredPosition, type Placement } from './useAnchoredPosition';
 import './Tooltip.css';
 
 interface TooltipProps {
@@ -84,7 +84,7 @@ export function Tooltip({ label, shortcut, placement = 'bottom', labelsChild, di
             <span>{label}</span>
             {shortcut && <Kbd>{shortcut}</Kbd>}
           </div>,
-          document.body,
+          layerFor(anchorRef.current),
         )}
     </span>
   );

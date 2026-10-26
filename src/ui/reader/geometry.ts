@@ -30,8 +30,9 @@ export const clampHeight = (value: number, viewportHeight: number) =>
  * natural size at each density, with and without the title.
  */
 export function toolbarDensity(room: number, showTitle: boolean): 'full' | 'compact' | 'tight' {
-  const full = showTitle ? 640 : 520;
-  const compact = showTitle ? 500 : 420;
+  // Measured with the bookmark button; the title keeps at least ~96px.
+  const full = showTitle ? 720 : 610;
+  const compact = showTitle ? 640 : 540;
   return room >= full ? 'full' : room >= compact ? 'compact' : 'tight';
 }
 

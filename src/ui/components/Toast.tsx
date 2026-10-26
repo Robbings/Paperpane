@@ -1,4 +1,4 @@
-import { useEffect, useRef, useSyncExternalStore } from 'react';
+import { useEffect, useRef, useState, useSyncExternalStore } from 'react';
 import { createPortal } from 'react-dom';
 import { Icon, type IconName } from './Icon';
 import { IconButton } from './IconButton';
@@ -11,7 +11,7 @@ export interface ToastOptions {
   tone?: ToastTone;
   /** One action, e.g. "撤销" after a delete or "重试" after a failure. */
   action?: { label: string; onAction: () => void };
-  /** Milliseconds; errors stay until dismissed unless one is given. */
+  /** Milliseconds before it starts to fade; errors stay until dismissed unless one is given. */
   duration?: number;
 }
 
@@ -55,14 +55,19 @@ const toneIcon: Record<ToastTone, IconName | null> = {
   error: 'close',
 };
 
+/** How long a toast takes to fade out once its time is up. */
+const FADE = 900;
+
 function defaultDuration(entry: ToastEntry): number | null {
   if (entry.duration !== undefined) return entry.duration;
   if (entry.tone === 'error') return null;
-  return entry.action ? 6000 : 3500;
+  return entry.action ? 4000 : 1800;
 }
 
 function ToastItem({ entry }: { entry: ToastEntry }) {
   const timer = useRef<number | undefined>(undefined);
+  const fadeTimer = useRef<number | undefined>(undefined);
+  const [fading, setFading] = useState(false);
   const remaining = useRef(defaultDuration(entry));
   const startedAt = useRef(0);
   const running = useRef(false);
@@ -71,17 +76,23 @@ function ToastItem({ entry }: { entry: ToastEntry }) {
   const hovered = useRef(false);
   const focused = useRef(false);
 
+  // Hovering or focusing a fading toast brings it back; leaving lets it fade again.
   const pause = () => {
     if (!running.current || remaining.current === null) return;
     window.clearTimeout(timer.current);
+    window.clearTimeout(fadeTimer.current);
     running.current = false;
-    remaining.current = Math.max(800, remaining.current - (performance.now() - startedAt.current));
+    setFading(false);
+    remaining.current = Math.max(1200, remaining.current - (performance.now() - startedAt.current));
   };
   const resume = () => {
     if (running.current || remaining.current === null) return;
     running.current = true;
     startedAt.current = performance.now();
-    timer.current = window.setTimeout(() => toast.dismiss(entry.id), remaining.current);
+    timer.current = window.setTimeout(() => {
+      setFading(true);
+      fadeTimer.current = window.setTimeout(() => toast.dismiss(entry.id), FADE);
+    }, remaining.current);
   };
   const update = () => (hovered.current || focused.current ? pause() : resume());
 
@@ -89,6 +100,7 @@ function ToastItem({ entry }: { entry: ToastEntry }) {
     resume();
     return () => {
       window.clearTimeout(timer.current);
+      window.clearTimeout(fadeTimer.current);
       running.current = false;
     };
   }, []); // once per toast
@@ -98,6 +110,7 @@ function ToastItem({ entry }: { entry: ToastEntry }) {
     <div
       className="pp-glass pp-toast"
       data-tone-kind={entry.tone}
+      data-fading={fading ? 'true' : undefined}
       data-tone="float"
       role={entry.tone === 'error' ? 'alert' : 'status'}
       onPointerEnter={() => {

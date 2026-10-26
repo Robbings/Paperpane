@@ -1,4 +1,4 @@
-import { useId, useLayoutEffect, useRef, type ComponentPropsWithRef, type ReactNode } from 'react';
+import { useCallback, useEffect, useId, useLayoutEffect, useRef, type ComponentPropsWithRef, type ReactNode } from 'react';
 import { Icon, type IconName } from './Icon';
 import './TextField.css';
 
@@ -109,16 +109,35 @@ export function TextArea({ label, hideLabel, value, onChange, description, error
   const fieldId = id ?? autoId;
   const ref = useRef<HTMLTextAreaElement>(null);
 
-  useLayoutEffect(() => {
+  const fit = useCallback(() => {
     const el = ref.current;
-    if (!el) return;
+    // Not laid out (e.g. inside a dialog that is still closed): measuring now
+    // would give 0, so wait until it is shown.
+    if (!el || el.getClientRects().length === 0) return;
     const style = getComputedStyle(el);
     const line = parseFloat(style.lineHeight) || 20;
     const max = line * maxRows + parseFloat(style.paddingTop) + parseFloat(style.paddingBottom);
     el.style.height = 'auto';
     el.style.height = `${Math.min(el.scrollHeight, max)}px`;
     el.style.overflowY = el.scrollHeight > max ? 'auto' : 'hidden';
-  }, [value, maxRows]);
+  }, [maxRows]);
+
+  useLayoutEffect(fit, [value, fit]);
+
+  // Fit again when it becomes visible or its width changes (which re-wraps the text).
+  useEffect(() => {
+    const el = ref.current;
+    if (!el) return;
+    let width = -1;
+    const observer = new ResizeObserver(([entry]) => {
+      const next = entry?.contentRect.width ?? 0;
+      if (next === width) return;
+      width = next;
+      fit();
+    });
+    observer.observe(el);
+    return () => observer.disconnect();
+  }, [fit]);
 
   return (
     <FieldFrame

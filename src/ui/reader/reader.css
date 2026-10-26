@@ -5,7 +5,7 @@
   position: relative;
   height: 100%;
   overflow: hidden;
-  background: var(--pp-ground);
+  background: var(--pp-backdrop);
 }
 
 /* ---- Paper scroll area: scrolls underneath the floating chrome ---------- */
@@ -141,7 +141,7 @@
 .pp-toolbar__title-wrap {
   /* The flex item is the tooltip wrapper: it must be allowed to shrink. */
   flex: 0 1 auto;
-  min-width: 0;
+  min-width: 96px;
   max-width: 320px;
   margin-right: 6px;
 }
@@ -550,16 +550,17 @@
 .pp-splitter[data-placement='right'] {
   top: calc(var(--pp-gap) + 18px);
   bottom: calc(var(--pp-gap) + 18px);
-  right: calc(var(--pp-gap) + var(--pp-rail) + var(--pp-research-w) - 5px);
-  width: 10px;
+  /* Mostly in the gap, so the pointer over the card's content keeps its normal cursor. */
+  right: calc(var(--pp-gap) + var(--pp-rail) + var(--pp-research-w) - 2px);
+  width: 8px;
   cursor: col-resize;
 }
 
 .pp-splitter[data-placement='bottom'] {
-  bottom: calc(var(--pp-gap) + var(--pp-rail) + var(--pp-research-h) - 5px);
+  bottom: calc(var(--pp-gap) + var(--pp-rail) + var(--pp-research-h) - 2px);
   left: calc(var(--pp-edge-left) + 18px);
   right: calc(var(--pp-gap) + 18px);
-  height: 10px;
+  height: 8px;
   cursor: row-resize;
 }
 
@@ -574,14 +575,14 @@
 
 .pp-splitter[data-placement='right']::after {
   top: 50%;
-  left: 4px;
+  left: 3px;
   width: 2px;
   height: 40px;
   transform: translateY(-50%);
 }
 
 .pp-splitter[data-placement='bottom']::after {
-  top: 4px;
+  top: 3px;
   left: 50%;
   width: 40px;
   height: 2px;
@@ -601,30 +602,67 @@
 /* ---- Panels ----------------------------------------------------------------- */
 
 .pp-panel {
+  --pp-pad-top: 6px;
+  --pp-pad-end: var(--pp-space-4);
+  --pp-pad-bottom: var(--pp-space-3);
+  --pp-pad-start: 18px;
+
   display: flex;
   flex: 1;
   flex-direction: column;
   min-height: 0;
-  padding: var(--pp-space-3) var(--pp-space-4) var(--pp-space-3) 18px;
+  padding: var(--pp-pad-top) var(--pp-pad-end) var(--pp-pad-bottom) var(--pp-pad-start);
 }
 
 .pp-reader[data-placement='bottom'] .pp-panel {
-  padding-inline: var(--pp-space-6);
+  --pp-pad-start: var(--pp-space-6);
+  --pp-pad-end: var(--pp-space-6);
 }
 
+/* The whole panel sits on the reading surface, header included; only the
+   function rail stays glass, meeting the panel at one hairline. */
+.pp-panel {
+  background: var(--pp-reading-surface);
+}
+
+.pp-reader[data-placement='right'] .pp-panel {
+  border-right: 0.5px solid var(--pp-hairline);
+}
+
+.pp-reader[data-placement='bottom'] .pp-panel {
+  border-bottom: 0.5px solid var(--pp-hairline);
+}
+
+/* The content below the header and filters. */
+.pp-panel__body {
+  display: flex;
+  flex: 1;
+  flex-direction: column;
+  min-height: 0;
+  margin-top: 2px;
+}
+
+/* A slim, quiet header: it names the panel without competing with the content. */
 .pp-panel__header {
   display: flex;
   flex-shrink: 0;
   align-items: center;
-  gap: var(--pp-space-2);
-  min-height: 32px;
+  gap: 6px;
+  min-height: 28px;
+  margin-right: -6px;
 }
 
 .pp-panel__title {
   margin: 0;
-  font-size: var(--pp-text-lg);
+  color: var(--pp-text-2);
+  font-size: 12.5px;
   font-weight: var(--pp-weight-semibold);
   line-height: var(--pp-leading-tight);
+}
+
+.pp-panel__header .pp-icon-btn {
+  width: var(--pp-control-sm);
+  height: var(--pp-control-sm);
 }
 
 .pp-panel__meta {
@@ -816,4 +854,29 @@
 .pp-reader[data-resizing='true'] .pp-toolbar,
 .pp-reader[data-resizing='true'] .pp-sidebar {
   transition: none;
+}
+
+/* ---- Locating a source: a brief mark on the passage ----------------------------- */
+
+.pp-locate-flash {
+  position: absolute;
+  z-index: 2;
+  border-radius: 3px;
+  background: color-mix(in srgb, var(--pp-accent) 22%, transparent);
+  box-shadow: 0 0 0 1.5px color-mix(in srgb, var(--pp-accent) 45%, transparent);
+  pointer-events: none;
+  animation: pp-locate 1.9s var(--pp-ease-out) forwards;
+}
+
+@keyframes pp-locate {
+  0% {
+    opacity: 0;
+  }
+  12%,
+  65% {
+    opacity: 1;
+  }
+  100% {
+    opacity: 0;
+  }
 }
