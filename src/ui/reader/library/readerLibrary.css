@@ -1,0 +1,263 @@
+/* ---- Save to library popover ------------------------------------------------- */
+
+.pp-save {
+  display: flex;
+  flex-direction: column;
+  gap: var(--pp-space-3);
+  padding: 4px 0;
+}
+
+.pp-save__head {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.pp-save__head strong {
+  font-size: var(--pp-text-lg);
+  font-weight: var(--pp-weight-semibold);
+}
+
+.pp-save__head span {
+  color: var(--pp-text-2);
+  font-size: var(--pp-text-sm);
+}
+
+.pp-save__pair {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 80px;
+  gap: var(--pp-space-3);
+}
+
+.pp-save__field {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.pp-save__folder {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  height: 32px;
+  padding: 0 10px;
+  border: 0;
+  border-radius: var(--pp-radius-control);
+  background: var(--pp-surface);
+  box-shadow: inset 0 0 0 0.5px var(--pp-hairline-strong);
+  color: var(--pp-text);
+  text-align: left;
+}
+
+.pp-save__folder span {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.pp-save__folder svg {
+  flex-shrink: 0;
+  color: var(--pp-text-2);
+}
+
+.pp-save__new-folder {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  height: 34px;
+  padding: 0 3px 0 10px;
+  border-radius: var(--pp-radius-control);
+  background: var(--pp-surface);
+  box-shadow:
+    inset 0 0 0 1px var(--pp-accent),
+    0 0 0 3px var(--pp-accent-soft);
+}
+
+.pp-save__new-folder svg {
+  flex-shrink: 0;
+  color: var(--pp-text-2);
+}
+
+.pp-save__new-folder input {
+  flex: 1;
+  min-width: 0;
+  height: 100%;
+  padding: 0 4px;
+  border: 0;
+  background: transparent;
+  font-size: var(--pp-text-md);
+}
+
+.pp-save__new-folder input:focus-visible {
+  outline: none;
+}
+
+.pp-save__foot {
+  display: flex;
+  align-items: center;
+  gap: var(--pp-space-2);
+  margin-top: var(--pp-space-1);
+}
+
+.pp-save__spacer {
+  flex: 1;
+}
+
+/* ---- Library tab in the reader sidebar --------------------------------------------- */
+
+.pp-rlib {
+  display: flex;
+  flex: 1;
+  flex-direction: column;
+  min-height: 0;
+  gap: var(--pp-space-2);
+}
+
+.pp-rlib__head {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  min-height: 28px;
+  padding: 0 4px;
+}
+
+.pp-rlib__head-icon {
+  margin: 0 6px 0 4px;
+  color: var(--pp-text-2);
+}
+
+.pp-rlib__back svg {
+  transform: rotate(180deg);
+}
+
+.pp-rlib__title {
+  min-width: 0;
+  overflow: hidden;
+  font-weight: var(--pp-weight-semibold);
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.pp-rlib__scroll {
+  flex: 1;
+  margin: 0 -4px;
+}
+
+.pp-rlib__viewport {
+  padding: 0 4px;
+}
+
+/* Four rows tall (one-line titles); the rest scroll inside. */
+.pp-rlib__recent .pp-scrollarea__viewport {
+  max-height: 199px;
+}
+
+.pp-rlib__recent .pp-rlib__paper-title {
+  -webkit-line-clamp: 1;
+}
+
+.pp-rlib__section + .pp-rlib__section {
+  margin-top: var(--pp-space-3);
+}
+
+.pp-rlib__label {
+  margin: 0 0 4px;
+  padding: 0 8px;
+  color: var(--pp-text-2);
+  font-size: var(--pp-text-xs);
+  font-weight: var(--pp-weight-semibold);
+}
+
+.pp-rlib__list {
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.pp-rlib__folder,
+.pp-rlib__paper {
+  display: flex;
+  width: 100%;
+  gap: 8px;
+  padding: 6px 8px;
+  border: 0;
+  border-radius: var(--pp-radius-control);
+  background: transparent;
+  color: var(--pp-text);
+  text-align: left;
+}
+
+.pp-rlib__folder {
+  align-items: center;
+}
+
+.pp-rlib__folder span {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.pp-rlib__folder svg,
+.pp-rlib__paper > svg {
+  flex-shrink: 0;
+  color: var(--pp-text-2);
+}
+
+.pp-rlib__paper > svg {
+  margin-top: 1px;
+}
+
+.pp-rlib__folder:hover,
+.pp-rlib__paper:hover {
+  background: var(--pp-fill-hover);
+}
+
+.pp-rlib__paper[aria-current='page'] {
+  background: var(--pp-accent-soft);
+}
+
+.pp-rlib__paper[aria-current='page'] > svg,
+.pp-rlib__paper[aria-current='page'] .pp-rlib__paper-title {
+  color: var(--pp-accent);
+}
+
+.pp-rlib__paper-text {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
+}
+
+.pp-rlib__paper-title {
+  display: -webkit-box;
+  overflow: hidden;
+  font-size: var(--pp-text-md);
+  line-height: 1.35;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 2;
+}
+
+.pp-rlib__paper-meta {
+  color: var(--pp-text-2);
+  font-size: var(--pp-text-xs);
+}
+
+.pp-rlib__more {
+  margin: 4px 0 0 4px;
+}
+
+.pp-rlib__foot {
+  display: flex;
+  flex-shrink: 0;
+  flex-wrap: wrap;
+  gap: 6px;
+  padding-top: var(--pp-space-2);
+  border-top: 0.5px solid var(--pp-hairline);
+}

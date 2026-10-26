@@ -1,0 +1,583 @@
+/* Overview panel: text sits directly on the research card's reading surface,
+   with a clear type scale and no boxes inside boxes. */
+
+.pp-ov__scroll {
+  flex: 1;
+  margin: var(--pp-space-2) -6px 0;
+}
+
+.pp-ov__viewport {
+  padding: 4px 6px var(--pp-space-5);
+}
+
+/* Docked at the bottom the panel is wide: keep a readable column. */
+.pp-reader[data-placement='bottom'] .pp-ov__viewport > * {
+  max-width: 720px;
+  margin-inline: auto;
+}
+
+.pp-ov__status {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  color: var(--pp-text-2);
+  font-size: var(--pp-text-xs);
+}
+
+.pp-ov__notice {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 4px;
+  margin: 0 0 var(--pp-space-4);
+  color: var(--pp-text-2);
+  font-size: var(--pp-text-sm);
+}
+
+.pp-ov__page {
+  display: flex;
+  flex-direction: column;
+}
+
+/* ---- Sections -------------------------------------------------------------------- */
+
+.pp-ov-section {
+  display: flex;
+  flex-direction: column;
+  padding: 12px 0;
+}
+
+.pp-ov-section + .pp-ov-section {
+  border-top: 0.5px solid var(--pp-hairline);
+}
+
+.pp-ov-section[data-lead='true'] {
+  padding: 0 0 14px;
+}
+
+.pp-ov-section:last-child {
+  padding-bottom: 0;
+}
+
+.pp-ov-section__head {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  min-height: 26px;
+  margin: -3px -6px 0 -6px;
+}
+
+.pp-ov-section__toggle {
+  display: flex;
+  flex: 1;
+  align-items: center;
+  gap: 6px;
+  min-width: 0;
+  height: 26px;
+  padding: 0 6px;
+  border: 0;
+  border-radius: var(--pp-radius-inner);
+  background: transparent;
+  color: var(--pp-text);
+  text-align: left;
+}
+
+.pp-ov-section__toggle:hover {
+  background: var(--pp-fill);
+}
+
+.pp-ov-section__toggle h3 {
+  flex-shrink: 0;
+  margin: 0;
+  font-size: 12.5px;
+  font-weight: var(--pp-weight-semibold);
+}
+
+.pp-ov-section__chevron {
+  flex-shrink: 0;
+  color: var(--pp-text-3);
+  transform: rotate(90deg);
+  transition: transform var(--pp-dur-layout) var(--pp-ease-layout);
+}
+
+.pp-ov-section[data-collapsed='true'] .pp-ov-section__chevron {
+  transform: rotate(0deg);
+}
+
+/* Folded: one quiet line saying what is inside. */
+.pp-ov-section__summary {
+  min-width: 0;
+  overflow: hidden;
+  color: var(--pp-text-2);
+  font-size: var(--pp-text-sm);
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  animation: pp-fade-in var(--pp-dur-med) var(--pp-ease-out);
+}
+
+@keyframes pp-fade-in {
+  from {
+    opacity: 0;
+  }
+}
+
+.pp-ov-section__actions {
+  display: flex;
+  flex-shrink: 0;
+  opacity: 0;
+  transition: opacity var(--pp-dur-fast) var(--pp-ease-out);
+}
+
+.pp-ov-section:hover .pp-ov-section__actions,
+.pp-ov-section__actions:focus-within {
+  opacity: 1;
+}
+
+@media (hover: none) {
+  .pp-ov-section__actions {
+    opacity: 1;
+  }
+}
+
+.pp-ov-section__actions .pp-icon-btn {
+  transform: scale(0.88);
+}
+
+/* Folding animates the row height and fades the content. */
+.pp-ov-section__body {
+  display: grid;
+  grid-template-rows: 1fr;
+  opacity: 1;
+  transition:
+    grid-template-rows var(--pp-dur-layout) var(--pp-ease-layout),
+    opacity var(--pp-dur-layout) var(--pp-ease-layout);
+}
+
+.pp-ov-section[data-collapsed='true'] .pp-ov-section__body {
+  grid-template-rows: 0fr;
+  opacity: 0;
+}
+
+.pp-ov-section__inner {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  min-height: 0;
+  overflow: hidden;
+}
+
+/* Spacing lives inside the clipped box, so a folded part closes to nothing. */
+.pp-ov-section__inner > :first-child {
+  margin-top: 6px;
+}
+
+/* ---- Content forms ------------------------------------------------------------------ */
+
+/* The opening lines: the page's anchor. */
+/* The opening lines: same type as the rest; their place at the top is emphasis enough. */
+.pp-ov-lead {
+  font-size: 14px;
+  line-height: 1.7;
+}
+
+.pp-ov-prose {
+  font-size: 14px;
+  line-height: 1.7;
+}
+
+.pp-ov-tags {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 5px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.pp-ov-tags li {
+  padding: 2px 8px;
+  border-radius: 5px;
+  background: var(--pp-fill);
+  font-size: var(--pp-text-sm);
+  line-height: 1.55;
+}
+
+/* Points: one paragraph each, opening with a bold phrase. */
+.pp-ov-points {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.pp-ov-points li {
+  position: relative;
+  padding-left: 14px;
+  font-size: 14px;
+  line-height: 1.7;
+}
+
+.pp-ov-points li::before {
+  content: '';
+  position: absolute;
+  top: 0.75em;
+  left: 2px;
+  width: 4px;
+  height: 4px;
+  border-radius: 50%;
+  background: var(--pp-text-2);
+}
+
+.pp-ov-points__title {
+  font-weight: var(--pp-weight-semibold);
+}
+
+.pp-ov-fields {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  margin: 0;
+}
+
+.pp-ov-fields dt {
+  color: var(--pp-text-2);
+  font-size: 12.5px;
+  font-weight: var(--pp-weight-semibold);
+}
+
+.pp-ov-fields dd {
+  margin: 0;
+  font-size: 14px;
+  line-height: 1.7;
+}
+
+/* Wide panel: labels beside values. */
+@container (min-width: 560px) {
+  .pp-ov-fields > div {
+    display: grid;
+    grid-template-columns: 6em minmax(0, 1fr);
+    gap: 14px;
+  }
+
+  .pp-ov-fields dt {
+    padding-top: 2px;
+  }
+}
+
+.pp-ov {
+  container-type: inline-size;
+}
+
+/* Text still arriving ends with a quiet caret. */
+.pp-ov-section[data-running='true'] .pp-md > :last-child::after,
+.pp-ov-section[data-running='true'] .pp-ov-points li:last-child::after,
+.pp-ov-section[data-running='true'] .pp-ov-fields > div:last-child dd::after {
+  content: '';
+  display: inline-block;
+  width: 7px;
+  height: 1.05em;
+  margin-left: 2px;
+  border-radius: 1px;
+  background: var(--pp-text-3);
+  vertical-align: -0.15em;
+  animation: pp-caret 1.1s steps(2, jump-none) infinite;
+}
+
+.pp-ov-section__note {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 4px 6px;
+  margin: 0;
+  font-size: var(--pp-text-sm);
+}
+
+.pp-ov-section__note[data-tone='danger'] > svg {
+  color: var(--pp-danger);
+}
+
+.pp-ov-section__note[data-tone='warn'] > svg {
+  color: var(--pp-warn);
+}
+
+.pp-ov-section__aside {
+  margin: 0;
+  color: var(--pp-text-2);
+  font-size: var(--pp-text-xs);
+}
+
+.pp-ov__foot {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  margin-top: var(--pp-space-5);
+  padding-top: var(--pp-space-3);
+  border-top: 0.5px solid var(--pp-hairline);
+  color: var(--pp-text-2);
+  font-size: var(--pp-text-xs);
+  line-height: 1.5;
+}
+
+.pp-ov__stale {
+  color: var(--pp-warn);
+}
+
+.pp-ov__stale button {
+  padding: 0;
+  border: 0;
+  background: none;
+  color: var(--pp-accent);
+  font: inherit;
+  text-decoration: underline;
+  text-underline-offset: 2px;
+}
+
+/* ---- Settings dialog: the card list on the glass, the editor on a card ---------------- */
+
+.pp-ov-settings {
+  display: grid;
+  grid-template-columns: 216px minmax(0, 1fr);
+  gap: var(--pp-space-4);
+  height: min(500px, calc(100vh - 240px));
+  min-height: 320px;
+}
+
+.pp-ov-settings__list {
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+  margin-left: -6px;
+}
+
+.pp-ov-settings__list ol {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  margin: 0;
+  padding: 0;
+  overflow-y: auto;
+  list-style: none;
+}
+
+.pp-ov-settings__item {
+  display: flex;
+  align-items: center;
+  gap: 2px;
+  padding: 0 6px 0 2px;
+  border-radius: var(--pp-radius-control);
+}
+
+.pp-ov-settings__item:hover {
+  background: var(--pp-fill-hover);
+}
+
+.pp-ov-settings__item[aria-current='true'] {
+  background: var(--pp-accent-soft);
+}
+
+.pp-ov-settings__item[data-dragging='true'] {
+  opacity: 0.4;
+}
+
+.pp-ov-settings__item[data-hidden='true'] .pp-ov-settings__name {
+  color: var(--pp-text-3);
+}
+
+/* A grip of dots, only while hovering the row. */
+.pp-ov-settings__grip {
+  flex-shrink: 0;
+  width: 10px;
+  height: 16px;
+  background-image: radial-gradient(circle, var(--pp-text-3) 1px, transparent 1.3px);
+  background-size: 5px 5px;
+  cursor: grab;
+  opacity: 0;
+}
+
+.pp-ov-settings__item:hover .pp-ov-settings__grip {
+  opacity: 1;
+}
+
+.pp-ov-settings__open {
+  display: flex;
+  flex: 1;
+  flex-direction: column;
+  gap: 1px;
+  min-width: 0;
+  padding: 7px 4px;
+  border: 0;
+  background: transparent;
+  color: var(--pp-text);
+  text-align: left;
+}
+
+.pp-ov-settings__name {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  overflow: hidden;
+  font-size: var(--pp-text-md);
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.pp-ov-settings__problem {
+  flex-shrink: 0;
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: var(--pp-danger);
+}
+
+.pp-ov-settings__kind {
+  color: var(--pp-text-2);
+  font-size: var(--pp-text-xs);
+}
+
+.pp-ov-settings__add {
+  align-self: flex-start;
+  margin-top: 6px;
+}
+
+.pp-ov-settings__card {
+  min-height: 0;
+  overflow: hidden;
+  border-radius: var(--pp-radius-float);
+  background: var(--pp-reading-surface);
+  box-shadow: 0 0 0 0.5px var(--pp-hairline);
+}
+
+.pp-ov-settings__editor {
+  display: flex;
+  flex-direction: column;
+  gap: var(--pp-space-4);
+  padding: var(--pp-space-4) var(--pp-space-5);
+}
+
+.pp-ov-settings__empty {
+  margin: auto;
+  color: var(--pp-text-2);
+  font-size: var(--pp-text-sm);
+}
+
+.pp-ov-settings__field {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+/* A label on the left, its switch on the right. */
+.pp-ov-settings__row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
+
+.pp-ov-settings__card-actions {
+  display: flex;
+  align-items: center;
+  gap: var(--pp-space-3);
+  margin-top: auto;
+  padding-top: var(--pp-space-2);
+  border-top: 0.5px solid var(--pp-hairline);
+}
+
+.pp-ov-settings__remove {
+  color: var(--pp-danger) !important;
+}
+
+.pp-ov-settings__note {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  color: var(--pp-text-2);
+  font-size: var(--pp-text-xs);
+}
+
+/* Field list of a structured card. */
+.pp-ov-fields-edit {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.pp-ov-fields-edit__list {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.pp-ov-fields-edit__row {
+  display: grid;
+  grid-template-columns: 10px 7.5em minmax(0, 1fr) 28px;
+  align-items: center;
+  gap: 6px;
+}
+
+.pp-ov-fields-edit__row[data-dragging='true'] {
+  opacity: 0.4;
+}
+
+.pp-ov-fields-edit__grip {
+  width: 10px;
+  height: 16px;
+  background-image: radial-gradient(circle, var(--pp-text-3) 1px, transparent 1.3px);
+  background-size: 5px 5px;
+  cursor: grab;
+}
+
+.pp-ov-fields-edit__row input {
+  min-width: 0;
+  height: 30px;
+  padding: 0 9px;
+  border: 0;
+  border-radius: var(--pp-radius-control);
+  background: var(--pp-fill);
+  font-size: var(--pp-text-md);
+}
+
+.pp-ov-fields-edit__row input::placeholder {
+  color: var(--pp-text-3);
+}
+
+.pp-ov-fields-edit__row input:focus-visible {
+  outline: none;
+  background: var(--pp-surface);
+  box-shadow:
+    inset 0 0 0 1px var(--pp-accent),
+    0 0 0 3px var(--pp-accent-soft);
+}
+
+.pp-ov-fields-edit__title {
+  font-weight: var(--pp-weight-medium);
+}
+
+.pp-ov-fields-edit__row .pp-icon-btn {
+  color: var(--pp-text-3);
+}
+
+.pp-ov-fields-edit__actions {
+  display: flex;
+  align-items: center;
+  margin-left: -8px;
+}
+
+.pp-ov-fields-edit__spacer {
+  flex: 1;
+}
+
+.pp-ov-fields-edit__raw {
+  font-family: var(--pp-font-mono);
+  font-size: 12px !important;
+}
+
+.pp-ov-fields-edit__switch {
+  align-self: flex-start;
+  margin-left: -8px;
+}

@@ -1,0 +1,119 @@
+.pp-dialog {
+  max-width: calc(100vw - 32px);
+  max-height: calc(100vh - 48px);
+  margin: auto;
+  padding: 0;
+  border: 0;
+  background: transparent;
+  color: var(--pp-text);
+  overflow: visible;
+}
+
+.pp-dialog[data-size='sm'] {
+  width: 400px;
+}
+
+.pp-dialog[data-size='md'] {
+  width: 520px;
+}
+
+.pp-dialog[data-size='lg'] {
+  width: 720px;
+}
+
+.pp-dialog::backdrop {
+  background: rgba(20, 20, 24, 0.22);
+  -webkit-backdrop-filter: blur(3px);
+  backdrop-filter: blur(3px);
+}
+
+.pp-dialog[open] {
+  animation: pp-dialog-in var(--pp-dur-med) var(--pp-ease-spring);
+}
+
+.pp-dialog[open]::backdrop {
+  animation: pp-backdrop-in var(--pp-dur-med) var(--pp-ease-out);
+}
+
+.pp-dialog[data-closing='true'] {
+  animation: pp-dialog-out var(--pp-dur-fast) var(--pp-ease-out) forwards;
+}
+
+.pp-dialog[data-closing='true']::backdrop {
+  animation: pp-backdrop-out var(--pp-dur-fast) var(--pp-ease-out) forwards;
+}
+
+@keyframes pp-dialog-in {
+  from {
+    opacity: 0;
+    transform: translateY(6px) scale(0.98);
+  }
+}
+
+@keyframes pp-dialog-out {
+  to {
+    opacity: 0;
+    transform: scale(0.98);
+  }
+}
+
+@keyframes pp-backdrop-in {
+  from {
+    opacity: 0;
+  }
+}
+
+@keyframes pp-backdrop-out {
+  to {
+    opacity: 0;
+  }
+}
+
+/* Dialogs sit over arbitrary content, so they use the near-opaque float glass. */
+.pp-dialog__panel {
+  --pp-glass-bg: var(--pp-glass-float-solid);
+
+  display: flex;
+  flex-direction: column;
+  gap: var(--pp-space-3);
+  max-height: calc(100vh - 48px);
+  padding: var(--pp-space-5) var(--pp-space-6) var(--pp-space-5);
+  border-radius: var(--pp-radius-panel);
+}
+
+.pp-dialog__header {
+  display: flex;
+  align-items: flex-start;
+  gap: var(--pp-space-3);
+}
+
+.pp-dialog__title {
+  flex: 1;
+  margin: 2px 0 0;
+  font-size: var(--pp-text-lg);
+  font-weight: var(--pp-weight-semibold);
+  line-height: var(--pp-leading-tight);
+}
+
+.pp-dialog__header .pp-icon-btn {
+  margin: -4px -8px 0 0;
+}
+
+.pp-dialog__description {
+  color: var(--pp-text-2);
+  font-size: var(--pp-text-md);
+  line-height: var(--pp-leading-body);
+}
+
+.pp-dialog__body {
+  min-height: 0;
+  overflow: auto;
+}
+
+.pp-dialog__footer {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+  gap: var(--pp-space-2);
+  margin-top: var(--pp-space-2);
+}

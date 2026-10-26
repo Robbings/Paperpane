@@ -1,0 +1,27 @@
+.pp-popover {
+  position: fixed;
+  z-index: var(--pp-z-float);
+  max-width: min(420px, calc(100vw - 16px));
+  max-height: calc(100vh - 16px);
+  overflow: auto;
+  overscroll-behavior: contain;
+  padding: var(--pp-space-3) var(--pp-space-4);
+  border-radius: var(--pp-radius-float);
+  color: var(--pp-text);
+  animation: pp-popover-in var(--pp-dur-med) var(--pp-ease-spring);
+}
+
+.pp-popover[data-side='top'] {
+  transform-origin: 50% 100%;
+}
+
+.pp-popover[data-side='bottom'] {
+  transform-origin: 50% 0;
+}
+
+@keyframes pp-popover-in {
+  from {
+    opacity: 0;
+    transform: scale(0.97);
+  }
+}

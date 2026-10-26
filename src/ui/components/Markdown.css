@@ -1,0 +1,74 @@
+.pp-md {
+  font-size: var(--pp-text-md);
+  line-height: 1.65;
+  overflow-wrap: anywhere;
+}
+
+.pp-md > * {
+  margin: 0;
+}
+
+.pp-md > * + * {
+  margin-top: 0.6em;
+}
+
+.pp-md__heading {
+  margin-top: 1em !important;
+  font-size: var(--pp-text-md);
+  font-weight: var(--pp-weight-semibold);
+}
+
+.pp-md ul,
+.pp-md ol {
+  padding-left: 1.4em;
+}
+
+.pp-md li + li {
+  margin-top: 0.25em;
+}
+
+.pp-md li::marker {
+  color: var(--pp-text-3);
+}
+
+.pp-md blockquote {
+  padding-left: 10px;
+  border-left: 2px solid var(--pp-hairline-strong);
+  color: var(--pp-text-2);
+}
+
+.pp-md code {
+  padding: 1px 4px;
+  border-radius: 4px;
+  background: var(--pp-fill);
+  font-family: var(--pp-font-mono);
+  font-size: 0.92em;
+}
+
+.pp-md pre {
+  overflow-x: auto;
+  padding: 8px 10px;
+  border-radius: var(--pp-radius-control);
+  background: var(--pp-fill);
+  line-height: 1.5;
+}
+
+.pp-md pre code {
+  padding: 0;
+  background: none;
+  white-space: pre;
+}
+
+.pp-md a {
+  color: var(--pp-accent);
+  text-decoration: underline;
+  text-decoration-color: color-mix(in srgb, var(--pp-accent) 40%, transparent);
+  text-underline-offset: 2px;
+}
+
+/* The caret used while generated text is still arriving. */
+@keyframes pp-caret {
+  50% {
+    opacity: 0;
+  }
+}

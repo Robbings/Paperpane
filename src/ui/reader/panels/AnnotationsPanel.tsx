@@ -1,6 +1,7 @@
 import { useState, type CSSProperties } from 'react';
-import { IconButton, SaveStatus, Segmented, highlightColors, type HighlightColor, type LocalSaveState, type SyncState } from '@/ui/components';
+import { IconButton, SaveStatus, Tooltip, Segmented, highlightColors, type HighlightColor, type LocalSaveState, type SyncState } from '@/ui/components';
 import type { AnnotationView } from '../types';
+import { PanelBody } from './PanelBody';
 import { PanelHeader } from './PanelHeader';
 
 type KindFilter = 'all' | 'highlight' | 'comment';
@@ -53,22 +54,23 @@ export function AnnotationsPanel({ items, local, sync, simulated, onLocate, onCo
         <Segmented label="按类型筛选" options={kindOptions} value={kind} onChange={setKind} size="sm" />
         <div className="pp-annotations__colors" role="group" aria-label="按颜色筛选">
           {highlightColors.map((c) => (
-            <button
-              key={c}
-              type="button"
-              className="pp-annotations__color"
-              style={dot(c)}
-              aria-label={`只看${colorNames[c]}`}
-              title={`只看${colorNames[c]}`}
-              aria-pressed={color === c}
-              onClick={() => setColor(color === c ? null : c)}
-            >
-              <span />
-            </button>
+            <Tooltip key={c} label={`只看${colorNames[c]}`} labelsChild>
+              <button
+                type="button"
+                className="pp-annotations__color"
+                style={dot(c)}
+                aria-label={`只看${colorNames[c]}`}
+                aria-pressed={color === c}
+                onClick={() => setColor(color === c ? null : c)}
+              >
+                <span />
+              </button>
+            </Tooltip>
           ))}
         </div>
       </div>
 
+      <PanelBody>
       <div className="pp-panel__scroll">
         {items.length === 0 ? (
           <p className="pp-panel__empty">还没有批注。选中论文里的文字，就可以高亮或写评论。</p>
@@ -95,6 +97,7 @@ export function AnnotationsPanel({ items, local, sync, simulated, onLocate, onCo
       <div className="pp-panel__footer">
         <SaveStatus local={local} sync={sync} simulated={simulated} />
       </div>
+      </PanelBody>
     </div>
   );
 }
