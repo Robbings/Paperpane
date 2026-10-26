@@ -1,18 +1,13 @@
-/* Overview panel: the header stays on the glass; the content is an opaque
-   sheet with a clear type scale, so generated text reads crisply. */
+/* Overview panel: text sits directly on the research card's reading surface,
+   with a clear type scale and no boxes inside boxes. */
 
-.pp-ov__sheet {
+.pp-ov__scroll {
   flex: 1;
-  margin-top: var(--pp-space-2);
-  border-radius: 10px;
-  background: var(--pp-surface);
-  box-shadow:
-    0 0 0 0.5px var(--pp-hairline),
-    0 1px 2px rgba(0, 0, 0, 0.04);
+  margin: var(--pp-space-2) -6px 0;
 }
 
 .pp-ov__viewport {
-  padding: 18px 18px 20px;
+  padding: 4px 6px var(--pp-space-5);
 }
 
 /* Docked at the bottom the panel is wide: keep a readable column. */
@@ -49,7 +44,7 @@
 .pp-ov-section {
   display: flex;
   flex-direction: column;
-  padding: 14px 0;
+  padding: 12px 0;
 }
 
 .pp-ov-section + .pp-ov-section {
@@ -57,7 +52,7 @@
 }
 
 .pp-ov-section[data-lead='true'] {
-  padding: 0 0 18px;
+  padding: 0 0 14px;
 }
 
 .pp-ov-section:last-child {
@@ -94,7 +89,7 @@
 .pp-ov-section__toggle h3 {
   flex-shrink: 0;
   margin: 0;
-  font-size: var(--pp-text-md);
+  font-size: 12.5px;
   font-weight: var(--pp-weight-semibold);
 }
 
@@ -173,7 +168,7 @@
 
 /* Spacing lives inside the clipped box, so a folded part closes to nothing. */
 .pp-ov-section__inner > :first-child {
-  margin-top: 10px;
+  margin-top: 6px;
 }
 
 /* ---- Content forms ------------------------------------------------------------------ */
@@ -186,73 +181,75 @@
 }
 
 .pp-ov-prose {
-  font-size: 13.5px;
-  line-height: 1.75;
+  font-size: 14px;
+  line-height: 1.7;
 }
 
 .pp-ov-tags {
   display: flex;
   flex-wrap: wrap;
-  gap: 6px;
+  gap: 5px;
   margin: 0;
   padding: 0;
   list-style: none;
 }
 
 .pp-ov-tags li {
-  padding: 3px 9px;
-  border-radius: 6px;
+  padding: 2px 8px;
+  border-radius: 5px;
   background: var(--pp-fill);
-  box-shadow: inset 0 0 0 0.5px var(--pp-hairline);
   font-size: var(--pp-text-sm);
-  line-height: 1.5;
+  line-height: 1.55;
 }
 
+/* Points: one paragraph each, opening with a bold phrase. */
 .pp-ov-points {
   display: flex;
   flex-direction: column;
-  gap: 12px;
+  gap: 8px;
   margin: 0;
   padding: 0;
   list-style: none;
 }
 
 .pp-ov-points li {
-  display: flex;
-  flex-direction: column;
-  gap: 2px;
-  padding-left: 12px;
-  border-left: 2px solid var(--pp-hairline-strong);
+  position: relative;
+  padding-left: 14px;
+  font-size: 14px;
+  line-height: 1.7;
+}
+
+.pp-ov-points li::before {
+  content: '';
+  position: absolute;
+  top: 0.75em;
+  left: 2px;
+  width: 4px;
+  height: 4px;
+  border-radius: 50%;
+  background: var(--pp-text-2);
 }
 
 .pp-ov-points__title {
-  font-size: 13.5px;
   font-weight: var(--pp-weight-semibold);
-  line-height: 1.5;
-}
-
-.pp-ov-points__text {
-  font-size: 13.5px;
-  line-height: 1.7;
 }
 
 .pp-ov-fields {
   display: flex;
   flex-direction: column;
-  gap: 12px;
+  gap: 10px;
   margin: 0;
 }
 
 .pp-ov-fields dt {
-  margin-bottom: 2px;
   color: var(--pp-text-2);
-  font-size: var(--pp-text-sm);
+  font-size: 12.5px;
   font-weight: var(--pp-weight-semibold);
 }
 
 .pp-ov-fields dd {
   margin: 0;
-  font-size: 13.5px;
+  font-size: 14px;
   line-height: 1.7;
 }
 
@@ -275,7 +272,7 @@
 
 /* Text still arriving ends with a quiet caret. */
 .pp-ov-section[data-running='true'] .pp-md > :last-child::after,
-.pp-ov-section[data-running='true'] .pp-ov-points li:last-child .pp-ov-points__text::after,
+.pp-ov-section[data-running='true'] .pp-ov-points li:last-child::after,
 .pp-ov-section[data-running='true'] .pp-ov-fields > div:last-child dd::after {
   content: '';
   display: inline-block;

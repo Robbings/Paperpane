@@ -88,10 +88,8 @@ export function OverviewSection(props: OverviewSectionProps) {
       <ol className="pp-ov-points">
         {content.points.map((point) => (
           <li key={point.title}>
-            <strong className="pp-ov-points__title">{point.title}</strong>
-            <span className="pp-ov-points__text">
-              <MarkdownInline text={point.text} renderCitation={marker} />
-            </span>
+            <strong className="pp-ov-points__title">{point.title}</strong>：
+            <MarkdownInline text={point.text} renderCitation={marker} />
           </li>
         ))}
       </ol>

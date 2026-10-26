@@ -17,9 +17,25 @@ body {
   font-family: var(--pp-font-ui);
   font-size: var(--pp-text-md);
   line-height: var(--pp-leading-body);
+  text-rendering: optimizeLegibility;
+}
+
+/* Dark text on light surfaces keeps the system's default smoothing, which reads
+   fuller on macOS. Light text on dark or accent fills uses grayscale smoothing
+   so it does not bloom. */
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme='light']) body {
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
+  }
+}
+
+:root[data-theme='dark'] body,
+.pp-btn[data-variant='primary'],
+.pp-composer__send,
+.pp-lib-tag[aria-pressed='true'] {
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
-  text-rendering: optimizeLegibility;
 }
 
 button,

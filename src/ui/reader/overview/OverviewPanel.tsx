@@ -180,8 +180,7 @@ export function OverviewPanel(props: OverviewPanelProps) {
   return (
     <div className="pp-panel pp-ov">
       {header}
-      {/* Long generated text sits on an opaque sheet, not on the glass. */}
-      <ScrollArea className="pp-ov__sheet" viewportClassName="pp-ov__viewport" {...cleanCopyHandlers}>
+      <ScrollArea className="pp-ov__scroll" viewportClassName="pp-ov__viewport" {...cleanCopyHandlers}>
         {!props.modelReady && (
           <p className="pp-ov__notice">
             模型暂不可用，下面是上次整理的结果。

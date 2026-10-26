@@ -18,6 +18,8 @@
   --pp-ground: #e4e4e9;
   --pp-surface: #ffffff;
   --pp-paper-filter: none;
+  /* Where long text is read (the research area): opaque, near white. */
+  --pp-reading-surface: #ffffff;
 
   /* Text */
   --pp-text: #1d1d1f;
@@ -149,6 +151,7 @@
     --pp-ground: #161618;
     --pp-surface: #2a2a2e;
     --pp-paper-filter: brightness(0.9);
+    --pp-reading-surface: #232326;
 
     --pp-text: #f2f2f4;
     --pp-text-2: #a8a8ae;
@@ -203,6 +206,7 @@
   --pp-ground: #161618;
   --pp-surface: #2a2a2e;
   --pp-paper-filter: brightness(0.9);
+  --pp-reading-surface: #232326;
 
   --pp-text: #f2f2f4;
   --pp-text-2: #a8a8ae;
