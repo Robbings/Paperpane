@@ -1,6 +1,7 @@
 import { useMemo, useRef, useState } from 'react';
 import { Button, EmptyState, IconButton, Menu, ScrollArea, Spinner, cleanCopyHandlers, stripSourceMarkers, toast } from '@/ui/components';
 import { formatDate } from '@/ui/library/columns';
+import { PanelBody } from '../panels/PanelBody';
 import { PanelHeader } from '../panels/PanelHeader';
 import { OverviewSection } from './OverviewSection';
 import type { OverviewCardDef, OverviewContent, OverviewResultView, OverviewSourceView } from './types';
@@ -162,6 +163,7 @@ export function OverviewPanel(props: OverviewPanelProps) {
     return (
       <div className="pp-panel pp-ov">
         {header}
+        <PanelBody>
         <EmptyState
           icon="overview"
           title="还没有可用的模型"
@@ -172,6 +174,7 @@ export function OverviewPanel(props: OverviewPanelProps) {
             </Button>
           }
         />
+        </PanelBody>
         {menuEl}
       </div>
     );
@@ -180,6 +183,7 @@ export function OverviewPanel(props: OverviewPanelProps) {
   return (
     <div className="pp-panel pp-ov">
       {header}
+      <PanelBody>
       <ScrollArea className="pp-ov__scroll" viewportClassName="pp-ov__viewport" {...cleanCopyHandlers}>
         {!props.modelReady && (
           <p className="pp-ov__notice">
@@ -237,6 +241,7 @@ export function OverviewPanel(props: OverviewPanelProps) {
           </footer>
         )}
       </ScrollArea>
+      </PanelBody>
       {menuEl}
     </div>
   );

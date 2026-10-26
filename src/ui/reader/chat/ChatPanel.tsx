@@ -1,5 +1,6 @@
 import { useEffect, useLayoutEffect, useRef, useState, type ReactNode } from 'react';
 import { Badge, Button, Dialog, EmptyState, IconButton, ScrollArea, Skeleton, cleanCopyHandlers } from '@/ui/components';
+import { PanelBody } from '../panels/PanelBody';
 import { PanelHeader } from '../panels/PanelHeader';
 import { ChatAnswer, ChatQuestion } from './ChatMessage';
 import { ChatComposer } from './ChatComposer';
@@ -132,6 +133,7 @@ export function ChatPanel(props: ChatPanelProps) {
     return (
       <div className="pp-panel pp-chat">
         {header}
+        <PanelBody>
         <EmptyState
           icon="discuss"
           title="还没有可用的模型"
@@ -142,6 +144,7 @@ export function ChatPanel(props: ChatPanelProps) {
             </Button>
           }
         />
+        </PanelBody>
       </div>
     );
   }
@@ -150,6 +153,8 @@ export function ChatPanel(props: ChatPanelProps) {
     <div className="pp-panel pp-chat">
       {header}
 
+      {view === 'chat' && session && <div className="pp-chat__title">{session.title}</div>}
+      <PanelBody>
       {view === 'history' ? (
         <ChatHistory
           sessions={props.sessions}
@@ -163,7 +168,6 @@ export function ChatPanel(props: ChatPanelProps) {
         />
       ) : (
         <>
-          {session && <div className="pp-chat__title">{session.title}</div>}
           <ScrollArea className="pp-chat__scroll" viewportClassName="pp-chat__viewport" viewportRef={scroll.ref} onScroll={scroll.onScroll} {...cleanCopyHandlers}>
             {props.source}
             {messages.length === 0 ? (
@@ -246,6 +250,7 @@ export function ChatPanel(props: ChatPanelProps) {
           />
         </>
       )}
+      </PanelBody>
 
       <Dialog
         open={props.modelChange !== null}

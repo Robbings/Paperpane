@@ -432,14 +432,6 @@
   flex-direction: column;
 }
 
-/* Open, the card holds long text: an opaque reading surface, like the content
-   area of a document app. Collapsed to its rail it is glass chrome again. */
-.pp-research.pp-glass[data-open='true'] {
-  background: var(--pp-reading-surface);
-  -webkit-backdrop-filter: none;
-  backdrop-filter: none;
-}
-
 .pp-research[data-open='false'] {
   border-radius: calc(var(--pp-rail) / 2);
 }
@@ -610,15 +602,44 @@
 /* ---- Panels ----------------------------------------------------------------- */
 
 .pp-panel {
+  --pp-pad-top: var(--pp-space-3);
+  --pp-pad-end: var(--pp-space-4);
+  --pp-pad-bottom: var(--pp-space-3);
+  --pp-pad-start: 18px;
+
   display: flex;
   flex: 1;
   flex-direction: column;
   min-height: 0;
-  padding: var(--pp-space-3) var(--pp-space-4) var(--pp-space-3) 18px;
+  padding: var(--pp-pad-top) var(--pp-pad-end) var(--pp-pad-bottom) var(--pp-pad-start);
 }
 
 .pp-reader[data-placement='bottom'] .pp-panel {
-  padding-inline: var(--pp-space-6);
+  --pp-pad-start: var(--pp-space-6);
+  --pp-pad-end: var(--pp-space-6);
+}
+
+/* The header and filters stay on the glass with the rest of the chrome; the
+   text below sits on an opaque surface that runs to the card's edges, like a
+   window's content area meeting its toolbar at one hairline. */
+.pp-panel__body {
+  display: flex;
+  flex: 1;
+  flex-direction: column;
+  min-height: 0;
+  margin: 10px calc(var(--pp-pad-end) * -1) calc(var(--pp-pad-bottom) * -1) calc(var(--pp-pad-start) * -1);
+  padding: 0 var(--pp-pad-end) var(--pp-pad-bottom) var(--pp-pad-start);
+  border-top: 0.5px solid var(--pp-hairline-strong);
+  background: var(--pp-reading-surface);
+}
+
+/* Where the surface meets the function rail. */
+.pp-reader[data-placement='right'] .pp-panel__body {
+  border-right: 0.5px solid var(--pp-hairline);
+}
+
+.pp-reader[data-placement='bottom'] .pp-panel__body {
+  border-bottom: 0.5px solid var(--pp-hairline);
 }
 
 .pp-panel__header {
