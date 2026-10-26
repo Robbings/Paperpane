@@ -1,4 +1,4 @@
-import type { LocalSaveState, SyncState } from '@/ui/components';
+import type { LocalSaveState, SelectionMenuLook, SyncState } from '@/ui/components';
 
 // 设置界面的视图模型。字段按设置接口草案（v0.1）对应；正式契约确认后由容器映射，
 // 界面只认这里的形状。
@@ -6,6 +6,23 @@ import type { LocalSaveState, SyncState } from '@/ui/components';
 // ---- A. Preferences: this device, applied at once, kept in step across tabs ----------
 
 export type UiLocale = 'zh-CN' | 'en';
+
+/** What the bar over selected text can hold: the highlight colours and the actions. */
+export type SelectionBarItem = 'colors' | 'comment' | 'translate' | 'explain' | 'ask' | 'copy';
+
+export interface SelectionBarPrefs {
+  /** Every item, in the order shown. */
+  order: SelectionBarItem[];
+  /** Items left out of the bar. */
+  hidden: SelectionBarItem[];
+  look: SelectionMenuLook;
+}
+
+export const DEFAULT_SELECTION_BAR: SelectionBarPrefs = {
+  order: ['colors', 'comment', 'translate', 'explain', 'ask', 'copy'],
+  hidden: [],
+  look: 'text',
+};
 
 export interface Preferences {
   theme: 'system' | 'light' | 'dark';
@@ -21,6 +38,8 @@ export interface Preferences {
   dimPagesInDark: boolean;
   /** How copied formulas are delimited: \(…\) \[…\], $…$ $$…$$, or bare LaTeX. */
   mathDelimiter: 'brackets' | 'dollars' | 'none';
+  /** The bar over selected text and highlights: what it shows, in what order, and how. */
+  selectionBar: SelectionBarPrefs;
 }
 
 export interface PreferencesState {
@@ -38,6 +57,7 @@ export const DEFAULT_PREFERENCES: Preferences = {
   translationFontSize: null,
   dimPagesInDark: true,
   mathDelimiter: 'brackets',
+  selectionBar: DEFAULT_SELECTION_BAR,
 };
 
 export const FONT_SIZE = { min: 14, max: 24, default: 16 } as const;

@@ -1,0 +1,83 @@
+.pp-selbar-demo {
+  height: 100%;
+  overflow: auto;
+  padding: 32px 40px 64px;
+  background: var(--pp-backdrop);
+}
+
+.pp-selbar-demo header {
+  max-width: 760px;
+  margin: 0 auto 24px;
+}
+
+.pp-selbar-demo h1 {
+  margin: 0;
+  font-size: var(--pp-text-xl);
+  font-weight: var(--pp-weight-semibold);
+}
+
+.pp-selbar-demo header p {
+  margin: 6px 0 0;
+  color: var(--pp-text-2);
+}
+
+.pp-selbar-demo__case {
+  display: grid;
+  grid-template-columns: 220px minmax(0, 1fr);
+  gap: 24px;
+  max-width: 1060px;
+  margin: 0 auto 20px;
+}
+
+.pp-selbar-demo__label h2 {
+  margin: 14px 0 4px;
+  font-size: var(--pp-text-md);
+  font-weight: var(--pp-weight-semibold);
+}
+
+.pp-selbar-demo__label p {
+  margin: 0;
+  color: var(--pp-text-2);
+  font-size: var(--pp-text-sm);
+  line-height: var(--pp-leading-body);
+}
+
+/* A strip of paper, so the glass bar is seen over text as in the reader. */
+.pp-selbar-demo__paper {
+  padding: 18px 28px 22px;
+  border-radius: 4px;
+  background: #fff;
+  color: #1a1a1a;
+  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.06), 0 8px 28px rgba(0, 0, 0, 0.08);
+  font-family: var(--pp-font-paper);
+  font-size: 14px;
+  line-height: 1.6;
+}
+
+/* Dimmed like the reader's pages in dark mode, without dimming the bars on top. */
+:root[data-theme='dark'] .pp-selbar-demo__paper {
+  background: #e6e6e6;
+}
+
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme='light']) .pp-selbar-demo__paper {
+    background: #e6e6e6;
+  }
+}
+
+.pp-selbar-demo__bars {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 16px;
+  margin-bottom: 10px;
+  font-family: var(--pp-font-ui);
+}
+
+.pp-selbar-demo__paper p {
+  margin: 0;
+}
+
+.pp-selbar-demo__selection {
+  background: var(--pp-selection);
+  color: inherit;
+}

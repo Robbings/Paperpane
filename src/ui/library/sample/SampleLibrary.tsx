@@ -5,12 +5,14 @@ import { LibraryView } from '../LibraryView';
 import type { CollectionCounts } from '../LibrarySidebar';
 import type { FolderView, LibraryQuery, LibraryViewPreferences, PaperView, TagView } from '../types';
 import { querySample, sampleFolders, samplePapers, sampleTags } from './libraryData';
+import { useSampleImports } from './useSampleImports';
 
 const CHUNK = 12;
 
 /** 示例接线：用示例数据驱动文献库界面。所有修改只存在于当前页面，刷新即恢复。 */
 export function SampleLibrary() {
   const [papers, setPapers] = useState<PaperView[]>(samplePapers);
+  const imports = useSampleImports();
   const [folders, setFolders] = useState<FolderView[]>(sampleFolders);
   const [tags, setTags] = useState<TagView[]>(sampleTags);
   const [query, setQuery] = useState<LibraryQuery>({
@@ -98,10 +100,11 @@ export function SampleLibrary() {
         onRenameFolder={(id, name) => setFolders((current) => current.map((f) => (f.id === id ? { ...f, name } : f)))}
         onMoveFolder={(id, parentId) => setFolders((current) => current.map((f) => (f.id === id ? { ...f, parentId } : f)))}
         onDeleteFolder={(id) => setFolders((current) => current.filter((f) => f.id !== id))}
-        onImport={(kind, files) => {
-          const label = { pdf: 'PDF', csl: 'CSL JSON 书目', bibtex: 'BibTeX 书目' }[kind];
-          toast.show({ message: files.length ? `示例：收到 ${files.length} 个 ${label} 文件，演示中不会真正导入。` : '没有可导入的 PDF 文件。', tone: files.length ? 'neutral' : 'warning' });
+        onImport={(_kind, files) => {
+          if (files.length) imports.addFiles(files);
+          else toast.show({ message: '没有可导入的 PDF 文件。', tone: 'warning' });
         }}
+        imports={imports}
         onExportCitations={(ids, format) => toast.show({ message: `示例：导出 ${ids.length} 篇论文的${format === 'csv' ? ' CSV' : format === 'apa' ? ' APA 引用' : ' BibTeX'}` })}
       />
       <Toaster top={16} />

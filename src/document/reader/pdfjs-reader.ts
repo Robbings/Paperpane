@@ -59,6 +59,8 @@ export class PdfjsReader implements ReaderService, AnchorService {
   }
   getSnapshot = () => this.snapshot;
   subscribe = (listener: () => void) => { this.listeners.add(listener); return () => this.listeners.delete(listener); };
+  /** Starts from a whole new state instead of merging: nothing (a password request, an error) carries over. */
+  private reset(state: ReaderState) { if (this.disposed) return; this.snapshot = freeze({ mode: 'live', state: 'ready', data: state }); this.listeners.forEach(fn=>fn()); }
   private publish(patch: Partial<ReaderState>) { if (this.disposed) return; this.snapshot = freeze({ mode: 'live', state: 'ready', data: { ...this.snapshot.data, ...patch } }); this.listeners.forEach(fn=>fn()); }
   private position(patch: Partial<ReaderState['position']>) { this.publish({ position: { ...this.snapshot.data.position, ...patch } }); }
   private capturePosition() {
@@ -95,7 +97,7 @@ export class PdfjsReader implements ReaderService, AnchorService {
     this.sessionLifecycle.abort(); this.sessionLifecycle = new AbortController();
     const sessionId = crypto.randomUUID(); const previous = this.task; this.task = undefined;
     this.password = undefined; this.capturedRange = undefined; this.manager = undefined; this.pdf = undefined;
-    this.publish({ ...empty(), sessionId, document: ref, phase: 'loading' });
+    this.reset({ ...empty(), sessionId, document: ref, phase: 'loading' });
     this.links.setDocument(null); this.viewer.setDocument(null); await previous?.destroy().catch(() => {});
     if (this.disposed || this.snapshot.data.sessionId !== sessionId) return;
     try {
@@ -113,6 +115,17 @@ export class PdfjsReader implements ReaderService, AnchorService {
       this.publish({ phase: 'ready', pageCount: pdf.numPages, passwordRequest: undefined });
       this.invalidate(true);
     } catch { if (!this.disposed && this.snapshot.data.sessionId === sessionId) this.publish({ phase: 'failed', error: { code: 'CORRUPT_FILE', message: '无法打开这份 PDF，请换一份文件重试。', recovery: ['choose-file'] } }); }
+  }
+  /** Gives up on the document being opened (e.g. its password is not known): back to an empty reader. */
+  async cancelOpen(): Promise<void> {
+    if (this.disposed) return;
+    this.sessionLifecycle.abort(); this.sessionLifecycle = new AbortController();
+    const task = this.task; this.task = undefined;
+    this.password = undefined; this.capturedRange = undefined; this.manager = undefined; this.pdf = undefined;
+    // A new session id: the pending open sees it and stops without publishing.
+    this.reset(empty());
+    this.links.setDocument(null); this.viewer.setDocument(null);
+    await task?.destroy().catch(() => {});
   }
   submitPassword(requestId: string, password: string): Result<void> { if (!this.password || this.password.id !== requestId) return failure('STALE_CONFIRMATION', '密码请求已过期'); const submit = this.password.submit; this.password = undefined; this.publish({ phase: 'loading', passwordRequest: undefined }); submit(password); return success(undefined); }
   private ready(): Result<void> { return !this.disposed && this.snapshot.data.phase === 'ready' ? success(undefined) : failure('BUSY', '论文尚未就绪'); }

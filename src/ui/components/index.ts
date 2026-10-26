@@ -22,6 +22,7 @@ export {
   highlightColors,
   type HighlightColor,
   type SelectionMenuAction,
+  type SelectionMenuLook,
 } from './SelectionMenu';
 export { TextArea, TextField } from './TextField';
 export { Toaster, toast, type ToastOptions, type ToastTone } from './Toast';

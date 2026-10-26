@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { ReaderShell } from '@/ui/reader/ReaderShell';
-import { Button } from '@/ui/components';
+import { Button, Dialog, EmptyState, Spinner, TextField, Toaster, toast } from '@/ui/components';
+import { downloadFile } from './library-page';
 import type { AnnotationView, NoteLayout, ReaderInteraction } from '@/ui/reader/types';
 import type { ReaderState } from '@/contracts/reader';
 import type { DocumentAnchor } from '@/contracts/document';
@@ -22,7 +23,9 @@ export function ReaderProof({ libraryItemId }: { libraryItemId?: string }) {
   const [container, setContainer] = useState<HTMLDivElement | null>(null);
   const [state, setState] = useState<ReaderState>();
   const [title, setTitle] = useState('请选择 PDF');
-  const [message, setMessage] = useState('接合验证：本页高亮仅留在当前会话，不会保存。');
+  const [loadError, setLoadError] = useState<string | null>(null);
+  const [hasFile, setHasFile] = useState(false);
+  const [password, setPassword] = useState('');
   const [annotations, setAnnotations] = useState<AnnotationView[]>([]);
   const [noteLayouts, setNoteLayouts] = useState<NoteLayout[]>([]);
   const anchors = useRef(new Map<string, DocumentAnchor>());
@@ -51,22 +54,22 @@ export function ReaderProof({ libraryItemId }: { libraryItemId?: string }) {
           const blob = await db.readFile(item.document);
           if (!alive) return;
           storedFile.current = blob;
+          setHasFile(true);
           setTitle(item.title);
-          setMessage('原 PDF 已从本机载入；阅读位置会保存，高亮仍只留在当前会话。');
           await reader.open(blob, item.document);
           if (!alive || reader.getSnapshot().data.phase !== 'ready') return;
           if (document?.position) {
             const restored = await reader.restorePosition(document.position);
-            if (!restored.ok) setMessage(restored.error.message);
+            if (!restored.ok) report(restored.error.message);
           }
           if (!alive) return;
           persistence = readingPersistence(db, item.document, () => {
-            if (alive) setMessage('阅读位置保存失败，请检查本机存储空间。');
+            if (alive) report('阅读位置保存失败，请检查本机存储空间。');
           });
           persistence.update(reader.getSnapshot().data.position);
         } catch (error) {
           if (alive)
-            setMessage(
+            setLoadError(
               error instanceof Error && !(error instanceof DOMException) ? error.message : importError(error).message,
             );
         }
@@ -82,7 +85,21 @@ export function ReaderProof({ libraryItemId }: { libraryItemId?: string }) {
       })();
     };
   }, [libraryItemId, container]);
-  const report = (text: string) => setMessage(text);
+  const report = (text: string) => toast.show({ message: text });
+  // Problems the reader or the preference store report once, as a notice.
+  const readerError = state?.phase === 'failed' ? state.error?.message : undefined;
+  useEffect(() => {
+    if (preferences.state.error) toast.show({ tone: 'warning', message: preferences.state.error });
+  }, [preferences.state.error]);
+  const backToLibrary = () => location.assign(new URL('library.html', location.href).href);
+  const pickFile = () => input.current?.click();
+  // Without the password: stop this open. From the library that means going back; otherwise pick another PDF.
+  const cancelPassword = () => {
+    setPassword('');
+    void owner.current?.cancelOpen();
+    if (libraryItemId) backToLibrary();
+    else setTitle('请选择 PDF');
+  };
   const subscribeGeometry = useCallback(
     (listener: () => void) => owner.current?.subscribeProjection('viewport', listener) ?? (() => {}),
     [],
@@ -133,7 +150,6 @@ export function ReaderProof({ libraryItemId }: { libraryItemId?: string }) {
           quote: resolved.value.text,
         },
       ]);
-      report('已创建会话高亮；批注尚未接正式存储。');
       return id;
     },
     onSelectionAction(id, action) {
@@ -150,7 +166,6 @@ export function ReaderProof({ libraryItemId }: { libraryItemId?: string }) {
     onAnnotationColor: () => report('已有 PDF 高亮的改色尚未接合。'),
     onAnnotationComment(id, comment) {
       setAnnotations((items) => items.map((item) => (item.id === id ? { ...item, note: comment } : item)));
-      report('评论仅保留在当前会话，尚未接正式存储。');
     },
     onAnnotationDelete: () => report('PDF 批注删除尚未接合。'),
     annotationRects,
@@ -189,7 +204,38 @@ export function ReaderProof({ libraryItemId }: { libraryItemId?: string }) {
           sync: 'unconfigured',
           simulated: true,
         }}
-        document={<div ref={surface} className="pdfViewer pp-pdf-surface" />}
+        document={
+          <>
+            <div ref={surface} className="pdfViewer pp-pdf-surface" />
+            {(loadError ?? readerError) ? (
+              <div className="pp-reader-state">
+                <EmptyState
+                  icon="alert"
+                  tone="danger"
+                  title="这篇论文打不开"
+                  description={loadError ?? readerError}
+                  actions={libraryItemId ? <Button onClick={backToLibrary}>返回文献库</Button> : <Button onClick={pickFile}>换一个 PDF</Button>}
+                />
+              </div>
+            ) : state?.phase === 'loading' || (libraryItemId && !state?.pageCount) ? (
+              <div className="pp-reader-state" role="status">
+                <Spinner size={18} label="正在打开论文" />
+              </div>
+            ) : (
+              !libraryItemId &&
+              !state?.pageCount && (
+                <div className="pp-reader-state">
+                  <EmptyState
+                    icon="file"
+                    title="打开一份 PDF"
+                    description="用于检查真实 PDF 的显示和选区；这里的高亮只留在本次会话。"
+                    actions={<Button variant="primary" onClick={pickFile}>选择 PDF</Button>}
+                  />
+                </div>
+              )
+            )}
+          </>
+        }
         onNavigate={(index) => {
           void owner.current?.navigate(index).then((r) => {
             if (!r.ok) report(r.error.message);
@@ -204,6 +250,12 @@ export function ReaderProof({ libraryItemId }: { libraryItemId?: string }) {
           if (result && !result.ok) report(result.error.message);
         }}
         interaction={interaction}
+        onBack={libraryItemId ? backToLibrary : undefined}
+        exports={libraryItemId ? [{ id: 'original', label: '导出原 PDF', disabled: !hasFile }] : undefined}
+        onExport={() => {
+          const blob = storedFile.current;
+          if (blob) downloadFile(blob, `${title}.pdf`);
+        }}
         settings={{
           preferences: preferences.state.preferences,
           onPreference: preferences.setPreference,
@@ -231,86 +283,69 @@ export function ReaderProof({ libraryItemId }: { libraryItemId?: string }) {
           } else report('该工具将在完整阅读接合阶段连接。');
         }}
       />
-      <div
-        style={{
-          position: 'fixed',
-          left: 18,
-          bottom: 12,
-          zIndex: 1000,
-          display: 'flex',
-          alignItems: 'center',
-          gap: 12,
-          maxWidth: 'calc(100vw - 36px)',
-          padding: 8,
-          background: 'var(--pp-surface)',
-          borderRadius: 12,
+      <input
+        ref={input}
+        type="file"
+        accept="application/pdf,.pdf"
+        hidden
+        onChange={(event) => {
+          const file = event.target.files?.[0];
+          event.target.value = '';
+          if (!file) return;
+          if (file.size > 256 * 1024 * 1024) {
+            report('请选择 256 MiB 以内的 PDF。');
+            return;
+          }
+          setTitle(file.name);
+          setLoadError(null);
+          setAnnotations([]);
+          anchors.current.clear();
+          void owner.current?.open(file, { documentId: crypto.randomUUID(), fileVersion: crypto.randomUUID() });
         }}
-      >
-        {libraryItemId ? (
+      />
+      <Dialog
+        open={Boolean(state?.passwordRequest)}
+        onClose={cancelPassword}
+        title="这份 PDF 需要密码"
+        description="密码只用于本次打开，不会保存。"
+        footer={
           <>
-            <Button onClick={() => location.assign(new URL('library.html', location.href).href)}>返回文献库</Button>
+            <Button onClick={cancelPassword}>{libraryItemId ? '返回文献库' : '取消'}</Button>
             <Button
-              disabled={!storedFile.current}
+              variant="primary"
+              disabled={!password}
               onClick={() => {
-                const blob = storedFile.current;
-                if (!blob) return;
-                const url = URL.createObjectURL(blob);
-                const link = document.createElement('a');
-                link.href = url;
-                link.download = `${title.replace(/[\x00-\x1f/\\]/g, '_')}.pdf`;
-                link.click();
-                setTimeout(() => URL.revokeObjectURL(url), 30000);
+                if (!state?.passwordRequest) return;
+                owner.current?.submitPassword(state.passwordRequest.requestId, password);
+                setPassword('');
               }}
             >
-              导出原 PDF
+              解锁
             </Button>
           </>
-        ) : (
-          <Button onClick={() => input.current?.click()}>打开验证 PDF</Button>
-        )}
-        <span role="status" style={{ fontSize: 12 }}>
-          {preferences.state.error ??
-            (state?.phase === 'loading' ? '正在载入真实 PDF…' : (state?.error?.message ?? message))}
-        </span>
-        <input
-          ref={input}
-          type="file"
-          accept="application/pdf,.pdf"
-          hidden
-          onChange={(event) => {
-            const file = event.target.files?.[0];
-            event.target.value = '';
-            if (!file) return;
-            if (file.size > 256 * 1024 * 1024) {
-              report('请选择 256 MiB 以内的 PDF。');
-              return;
-            }
-            setTitle(file.name);
-            setAnnotations([]);
-            anchors.current.clear();
-            report('接合验证：本页高亮仅留在当前会话，不会保存。');
-            void owner.current?.open(file, { documentId: crypto.randomUUID(), fileVersion: crypto.randomUUID() });
+        }
+      >
+        <form
+          onSubmit={(event) => {
+            event.preventDefault();
+            if (!state?.passwordRequest || !password) return;
+            owner.current?.submitPassword(state.passwordRequest.requestId, password);
+            setPassword('');
           }}
-        />
-        {state?.passwordRequest && (
-          <form
-            onSubmit={(event) => {
-              event.preventDefault();
-              const form = event.currentTarget;
-              const value = new FormData(form).get('password');
-              owner.current?.submitPassword(state.passwordRequest!.requestId, String(value ?? ''));
-              form.reset();
-            }}
-          >
-            <label>
-              PDF 密码
-              <input name="password" type="password" autoComplete="off" />
-            </label>
-            <Button type="submit">解锁</Button>
-            {state.passwordRequest.incorrect ? '密码不正确，请重试' : ''}
-          </form>
-        )}
-      </div>
+        >
+          <TextField
+            label="PDF 密码"
+            hideLabel
+            type="password"
+            autoComplete="off"
+            placeholder="输入密码"
+            value={password}
+            onChange={setPassword}
+            error={state?.passwordRequest?.incorrect ? '密码不正确，请重新输入' : undefined}
+          />
+        </form>
+      </Dialog>
+      <Toaster />
     </>
   );
 }

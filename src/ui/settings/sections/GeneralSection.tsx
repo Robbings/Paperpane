@@ -1,5 +1,6 @@
 import { Button, Segmented, Stepper, Switch } from '@/ui/components';
 import { SettingGroup, SettingRow } from '../SettingRow';
+import { SelectionBarSettings } from './SelectionBarSettings';
 import { fontSizeLabel, localeOptions, mathOptions, themeOptions } from '../options';
 import { FONT_SIZE, type Preferences, type PreferencesState } from '../types';
 
@@ -48,6 +49,8 @@ export function GeneralSection({ state, onPreference, onRetry }: GeneralSectionP
           <Switch label="深色模式下页面减光" hideLabel checked={p.dimPagesInDark} onChange={(on) => onPreference('dimPagesInDark', on)} />
         </SettingRow>
       </SettingGroup>
+
+      <SelectionBarSettings value={p.selectionBar} onChange={(bar) => onPreference('selectionBar', bar)} />
 
       <SettingGroup title="语言">
         <SettingRow label="界面语言">

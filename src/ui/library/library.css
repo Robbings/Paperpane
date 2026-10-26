@@ -926,3 +926,158 @@ td[data-column='starred'] .pp-lib-cell-center {
   align-self: flex-start;
   margin-left: -8px;
 }
+
+/* ---- Import tasks --------------------------------------------------------------- */
+
+/* Beside 导入 while the queue has jobs: a spinner and the count, or how it ended. */
+.pp-lib-tasks {
+  display: inline-flex;
+  flex-shrink: 0;
+  align-items: center;
+  justify-content: center;
+  gap: 5px;
+  min-width: 28px;
+  height: 28px;
+  padding: 0 8px;
+  border: 0;
+  border-radius: var(--pp-radius-pill);
+  background: transparent;
+  color: var(--pp-text-2);
+  font-size: var(--pp-text-sm);
+  font-variant-numeric: tabular-nums;
+}
+
+.pp-lib-tasks:hover,
+.pp-lib-tasks[aria-expanded='true'] {
+  background: var(--pp-fill-hover);
+}
+
+.pp-lib-tasks[data-state='active'] {
+  color: var(--pp-accent);
+}
+
+.pp-lib-tasks[data-state='failed'] {
+  color: var(--pp-danger);
+}
+
+.pp-lib-tasks[data-state='done'] {
+  color: var(--pp-ok);
+}
+
+.pp-imports {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  padding: 12px 6px 10px;
+}
+
+.pp-imports__head {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 0 8px;
+}
+
+.pp-imports__head h2 {
+  margin: 0;
+  font-size: var(--pp-text-md);
+  font-weight: var(--pp-weight-semibold);
+}
+
+.pp-imports__head span {
+  color: var(--pp-text-2);
+  font-size: var(--pp-text-sm);
+}
+
+.pp-imports__viewport {
+  max-height: 340px;
+}
+
+.pp-imports__list {
+  display: flex;
+  flex-direction: column;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.pp-imports__job {
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+  padding: 8px;
+  border-radius: var(--pp-radius-control);
+}
+
+.pp-imports__job:hover {
+  background: var(--pp-fill-hover);
+}
+
+.pp-imports__icon {
+  display: flex;
+  flex-shrink: 0;
+  align-items: center;
+  justify-content: center;
+  width: 26px;
+  height: 26px;
+  border-radius: 7px;
+  background: var(--pp-fill);
+  color: var(--pp-text-2);
+}
+
+.pp-imports__job[data-phase='completed'] .pp-imports__icon {
+  color: var(--pp-ok);
+}
+
+.pp-imports__job[data-phase='failed'] .pp-imports__icon,
+.pp-imports__job[data-phase='failed'] .pp-imports__detail {
+  color: var(--pp-danger);
+}
+
+.pp-imports__job[data-phase='password-required'] .pp-imports__icon {
+  color: var(--pp-warn);
+}
+
+.pp-imports__body {
+  display: flex;
+  flex: 1;
+  flex-direction: column;
+  gap: 4px;
+  min-width: 0;
+}
+
+.pp-imports__title {
+  margin: 0;
+  overflow: hidden;
+  color: var(--pp-text);
+  font-size: var(--pp-text-md);
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.pp-imports__detail {
+  margin: 0;
+  color: var(--pp-text-2);
+  font-size: var(--pp-text-sm);
+  line-height: var(--pp-leading-body);
+}
+
+.pp-imports__password {
+  display: flex;
+  align-items: flex-start;
+  gap: 6px;
+  margin-top: 2px;
+}
+
+.pp-imports__password .pp-field {
+  flex: 1;
+}
+
+.pp-imports__foot {
+  margin: 0;
+  padding: 6px 8px 0;
+  border-top: 0.5px solid var(--pp-hairline);
+  color: var(--pp-text-2);
+  font-size: var(--pp-text-sm);
+}

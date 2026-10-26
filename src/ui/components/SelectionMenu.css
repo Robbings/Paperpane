@@ -113,3 +113,109 @@
 .pp-selmenu__delete:hover {
   background: var(--pp-danger-soft);
 }
+
+/* ---- Looks under review -------------------------------------------------------- */
+
+/* text: smaller text, a little more air. */
+.pp-selmenu[data-look='text'] .pp-selmenu__action {
+  padding: 0 6px;
+  font-size: 12px;
+  font-weight: var(--pp-weight-regular);
+}
+
+/* icon: square buttons; the name is in the tooltip. */
+.pp-selmenu[data-look='icon'] .pp-selmenu__action {
+  justify-content: center;
+  width: 28px;
+  padding: 0;
+  color: var(--pp-text-2);
+}
+
+.pp-selmenu[data-look='icon'] .pp-selmenu__action:hover {
+  color: var(--pp-text);
+}
+
+/* both: icon then name. */
+.pp-selmenu[data-look='both'] .pp-selmenu__action {
+  gap: 4px;
+  padding: 0 7px 0 6px;
+  font-size: 12px;
+  font-weight: var(--pp-weight-regular);
+}
+
+/* stacked: icon over a small name, like a toolbar; dots a size up to match. */
+.pp-selmenu[data-look='stacked'] {
+  height: 46px;
+  padding: 0 4px;
+  border-radius: 14px;
+}
+
+.pp-selmenu[data-look='stacked'] .pp-selmenu__swatch {
+  width: 22px;
+  height: 36px;
+}
+
+.pp-selmenu[data-look='stacked'] .pp-selmenu__dot {
+  width: 13px;
+  height: 13px;
+}
+
+.pp-selmenu[data-look='stacked'] .pp-selmenu__sep {
+  height: 24px;
+  margin: 0 4px;
+}
+
+.pp-selmenu[data-look='stacked'] .pp-selmenu__action {
+  flex-direction: column;
+  justify-content: center;
+  gap: 3px;
+  min-width: 40px;
+  height: 38px;
+  padding: 0 5px;
+  border-radius: 9px;
+  font-size: 10.5px;
+  font-weight: var(--pp-weight-regular);
+  color: var(--pp-text-2);
+}
+
+.pp-selmenu[data-look='stacked'] .pp-selmenu__action svg {
+  color: var(--pp-text);
+}
+
+.pp-selmenu[data-look='stacked'] .pp-selmenu__action:hover {
+  color: var(--pp-text);
+}
+
+.pp-selmenu[data-look='stacked'] .pp-selmenu__delete {
+  width: 34px;
+  height: 38px;
+  border-radius: 9px;
+}
+
+/* reveal: icons; the hovered one slides its name out. */
+.pp-selmenu[data-look='reveal'] .pp-selmenu__action {
+  padding: 0 6px;
+  font-size: 12px;
+  font-weight: var(--pp-weight-regular);
+}
+
+.pp-selmenu__reveal {
+  display: grid;
+  grid-template-columns: 0fr;
+  transition: grid-template-columns var(--pp-dur-med) var(--pp-ease-out);
+}
+
+.pp-selmenu__reveal > span {
+  min-width: 0;
+  overflow: hidden;
+}
+
+.pp-selmenu__action:hover .pp-selmenu__reveal,
+.pp-selmenu__action:focus-visible .pp-selmenu__reveal {
+  grid-template-columns: 1fr;
+}
+
+.pp-selmenu__action:hover .pp-selmenu__reveal > span,
+.pp-selmenu__action:focus-visible .pp-selmenu__reveal > span {
+  padding-left: 4px;
+}
