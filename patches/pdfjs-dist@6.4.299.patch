@@ -1,0 +1,85 @@
+diff --git a/build/paperpane-highlight-geometry.mjs b/build/paperpane-highlight-geometry.mjs
+new file mode 100644
+index 0000000000000000000000000000000000000000..448f9d4065e7660c4b7251326297946e08560025
+--- /dev/null
++++ b/build/paperpane-highlight-geometry.mjs
+@@ -0,0 +1,37 @@
++// Paperpane continuous-highlight geometry adapter. Inputs are native PDF text rectangles in one coordinate system.
++// Merge adjacent fragments within a line; never take one bounding box across the whole selection.
++export function mergeHighlightRects(input) {
++  const rects=input.filter(r=>[r.x,r.y,r.width,r.height].every(Number.isFinite)&&r.width>0&&r.height>0).map(r=>({...r}));
++  const lines=[];
++  for(const r of rects.sort((a,b)=>(a.y+a.height/2)-(b.y+b.height/2)||a.x-b.x)){
++    const cy=r.y+r.height/2;
++    const line=lines.find(l=>Math.abs(cy-l.cy)<=Math.min(r.height,l.height)*0.36);
++    if(line){line.rects.push(r);}else lines.push({cy,height:r.height,rects:[r]});
++  }
++  const bands=[];
++  for(const line of lines){
++    let current;
++    for(const r of line.rects.sort((a,b)=>a.x-b.x)){
++      const gap=current?r.x-(current.x+current.width):Infinity;
++      // At most 1.25 text heights: bridge spaces and font-run splits, not broad column gutters.
++      if(current&&gap<=1.25*Math.min(current.height,r.height)){
++        const right=Math.max(current.x+current.width,r.x+r.width),bottom=Math.max(current.y+current.height,r.y+r.height);
++        current.x=Math.min(current.x,r.x);current.y=Math.min(current.y,r.y);
++        current.width=right-current.x;current.height=bottom-current.y;
++      }else{current={...r};bands.push(current);}
++    }
++  }
++  // Plane-sweep union produces disjoint rectangles. This is also safe for PDF QuadPoints export.
++  const ys=[...new Set(bands.flatMap(r=>[r.y,r.y+r.height]))].sort((a,b)=>a-b);
++  const output=[];let previous=new Map();
++  for(let i=0;i<ys.length-1;i++){
++    const y=ys[i],bottom=ys[i+1];if(bottom-y<1e-8)continue;
++    const spans=bands.filter(r=>r.y<bottom-1e-8&&r.y+r.height>y+1e-8).map(r=>[r.x,r.x+r.width]).sort((a,b)=>a[0]-b[0]);
++    const merged=[];
++    for(const span of spans){const last=merged.at(-1);if(last&&span[0]<=last[1]+1e-7)last[1]=Math.max(last[1],span[1]);else merged.push([...span]);}
++    const next=new Map();
++    for(const [x,right] of merged){const key=`${x}:${right}`;let r=previous.get(key);if(r&&Math.abs(r.y+r.height-y)<1e-7)r.height=bottom-r.y;else{r={x,y,width:right-x,height:bottom-y};output.push(r);}next.set(key,r);}
++    previous=next;
++  }
++  return output;
++}
+diff --git a/build/pdf.mjs b/build/pdf.mjs
+index 3a5c6048d31f4b7246c654d7ac060ae9c4f0325d..ec826697f86653bf6df34dcfd86b5b1ca9dba967 100644
+--- a/build/pdf.mjs
++++ b/build/pdf.mjs
+@@ -1,3 +1,4 @@
++import { mergeHighlightRects } from "./paperpane-highlight-geometry.mjs";
+ /**
+  * @licstart The following is the entire license notice for the
+  * JavaScript code in this page
+@@ -23397,8 +23398,12 @@ class HighlightOutline extends Outline {
+     this.firstPoint = firstPoint;
+     this.lastPoint = lastPoint;
+   }
+-  static build(boxes, isLTR) {
+-    const outline = new HighlightOutliner(boxes, 0.001).getOutlines();
++  static build(boxes, isLTR, dimensions = [1, 1]) {
++    // Paperpane: join native text fragments in PDF units before native outline union.
++    const [w, h] = dimensions;
++    boxes = mergeHighlightRects(boxes.map(r => ({x:r.x*w,y:r.y*h,width:r.width*w,height:r.height*h})))
++      .map(r => ({x:r.x/w,y:r.y/h,width:r.width/w,height:r.height/h}));
++    const outline = new HighlightOutliner(boxes, 0).getOutlines();
+     outline.#boxes = boxes;
+     outline.focusOutline = new HighlightOutliner(boxes, 0.0025, 0.001, isLTR).getOutlines();
+     return outline;
+@@ -23688,7 +23693,7 @@ class HighlightEditor extends DrawingEditor {
+     if (boxes) {
+       params = {
+         ...params,
+-        drawOutlines: HighlightOutline.build(boxes, this._uiManager.direction === "ltr")
++        drawOutlines: HighlightOutline.build(boxes, this._uiManager.direction === "ltr", this.pageDimensions)
+       };
+     }
+     super._addOutlines(params);
+@@ -23918,7 +23923,7 @@ class HighlightEditor extends DrawingEditor {
+           height: (quadPoints[i + 1] - quadPoints[i + 5]) / pageHeight
+         });
+       }
+-      return HighlightOutline.build(boxes, uiManager.direction === "ltr");
++      return HighlightOutline.build(boxes, uiManager.direction === "ltr", [pageWidth,pageHeight]);
+     }
+     const thickness = data.thickness || this._defaultDrawingOptions.thickness;
+     const points = (data.inkLists || data.outlines.points)[0];

@@ -1,4 +1,4 @@
 import { mountPage } from '@/runtime/mount-page';
-import { ReaderPage } from '@/ui/pages/ReaderPage';
+import { ReaderProof } from '@/runtime/reader-proof';
 
-mountPage(<ReaderPage />);
+mountPage(<ReaderProof libraryItemId={new URLSearchParams(location.search).get('item') ?? undefined} />);

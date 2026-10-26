@@ -4,6 +4,7 @@ import { useViewport } from '@/ui/reader/useViewport';
 import { defaultVisibleColumns, firstDirection } from './columns';
 import { LibrarySidebar, type CollectionCounts } from './LibrarySidebar';
 import { LibraryTable } from './LibraryTable';
+import { BatchTagPopover, type BatchTagChoice, type BatchTagApplyResult } from './BatchTagPopover';
 import { LibraryToolbar, type ImportKind } from './LibraryToolbar';
 import { folderEntries, folderPath, PaperDetail } from './PaperDetail';
 import type { FolderView, LibraryQuery, LibraryViewPreferences, PaperView, TagView } from './types';
@@ -28,6 +29,8 @@ export interface LibraryViewProps {
   onToggleStar: (ids: string[], starred: boolean) => void;
   onUpdate: (id: string, patch: Partial<PaperView>) => void;
   onAddTag: (ids: string[], tag: { id?: string; label: string }) => void;
+  /** One callback for the complete batch; failure keeps the editor and draft open. */
+  onAddTags?: (ids: string[], tags: BatchTagChoice[]) => void | BatchTagApplyResult | Promise<void | BatchTagApplyResult>;
   onRemoveTag: (id: string, tagId: string) => void;
   onMovePapers: (ids: string[], folderId: string | null) => void;
   onRemoveFromLibrary: (ids: string[]) => void;
@@ -71,6 +74,7 @@ export function LibraryView(props: LibraryViewProps) {
 
   const tagsById = useMemo(() => new Map(tags.map((tag) => [tag.id, tag])), [tags]);
   const active = activeId ? (props.paperById(activeId) ?? null) : null;
+  const allSelectedStarred = selectedIds.length > 0 && selectedIds.every(id => props.paperById(id)?.starred);
   const currentFolder = query.collection.kind === 'folder' ? query.collection.folderId : null;
 
   // Changing what is listed clears the selection.
@@ -225,10 +229,10 @@ export function LibraryView(props: LibraryViewProps) {
           {selectedIds.length > 1 && (
             <GlassSurface tone="bar" radius="pill" className="pp-lib-batch" role="toolbar" aria-label="批量操作">
               <span className="pp-lib-batch__count">已选 {selectedIds.length} 篇</span>
-              <Button size="sm" variant="quiet" icon="star" onClick={() => props.onToggleStar(selectedIds, true)}>
-                标星
+              <Button size="sm" variant="quiet" icon="star" aria-pressed={allSelectedStarred} onClick={() => props.onToggleStar(selectedIds, !allSelectedStarred)}>
+                {allSelectedStarred ? '取消标星' : '标星'}
               </Button>
-              <Button ref={batchRefs.tag} size="sm" variant="quiet" icon="tag" aria-haspopup="menu" onClick={() => setBatchMenu(batchMenu === 'tag' ? null : 'tag')}>
+              <Button ref={batchRefs.tag} size="sm" variant="quiet" icon="tag" aria-haspopup={props.onAddTags ? 'dialog' : 'menu'} aria-expanded={batchMenu === 'tag'} onClick={() => setBatchMenu(batchMenu === 'tag' ? null : 'tag')}>
                 加标签
               </Button>
               <Button ref={batchRefs.move} size="sm" variant="quiet" icon="folder" aria-haspopup="menu" onClick={() => setBatchMenu(batchMenu === 'move' ? null : 'move')}>
@@ -262,7 +266,10 @@ export function LibraryView(props: LibraryViewProps) {
       />
       </div>
 
-      {batchMenu && (
+      {batchMenu === 'tag' && props.onAddTags ? (
+        <BatchTagPopover key={selectedIds.join(',')} anchorRef={batchRefs.tag} tags={tags} paperCount={selectedIds.length}
+          onApply={choices => props.onAddTags?.([...selectedIds], choices)} onClose={() => setBatchMenu(null)} />
+      ) : batchMenu && (
         <Menu
           label={batchMenu === 'tag' ? '加标签' : batchMenu === 'move' ? '移动到文件夹' : '导出引用'}
           entries={batchEntries[batchMenu]}
