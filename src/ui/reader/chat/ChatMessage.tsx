@@ -119,7 +119,7 @@ export function ChatQuestion({ message, busy, onEdit, onVersion }: QuestionProps
 
 interface AnswerProps {
   message: ChatMessageView;
-  /** The latest answer keeps its tools visible; older ones show them on hover. */
+  /** The newest answer in the conversation. */
   latest: boolean;
   busy: boolean;
   onRegenerate: () => void;

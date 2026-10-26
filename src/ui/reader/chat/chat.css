@@ -121,8 +121,7 @@
 .pp-chat-q:hover .pp-chat-q__hover,
 .pp-chat-q__tools:focus-within .pp-chat-q__hover,
 .pp-chat-a:hover .pp-chat-a__hover,
-.pp-chat-a__tools:focus-within .pp-chat-a__hover,
-.pp-chat-a[data-latest='true'] .pp-chat-a__hover {
+.pp-chat-a__tools:focus-within .pp-chat-a__hover {
   opacity: 1;
 }
 
@@ -429,15 +428,6 @@
   transition: box-shadow var(--pp-dur-fast) var(--pp-ease-out);
 }
 
-.pp-composer:focus-within {
-  box-shadow:
-    inset 0 0.5px 0 var(--pp-glass-hi),
-    inset 0 0 0 0.5px var(--pp-glass-rim),
-    0 0 0 1px color-mix(in srgb, var(--pp-accent) 45%, transparent),
-    0 0 0 4px var(--pp-accent-soft),
-    var(--pp-shadow-float);
-}
-
 /* The top edge drags the box taller or shorter; a small pill shows where. */
 .pp-composer__grip {
   position: absolute;
@@ -463,9 +453,10 @@
   transition: opacity var(--pp-dur-fast) var(--pp-ease-out);
 }
 
-.pp-composer:hover .pp-composer__grip::after,
-.pp-composer__grip:focus-visible::after,
-.pp-composer[data-resized='true'] .pp-composer__grip::after {
+/* Hidden until the pointer is on the edge itself, or while dragging. */
+.pp-composer__grip:hover::after,
+.pp-composer__grip:active::after,
+.pp-composer__grip:focus-visible::after {
   opacity: 1;
 }
 
