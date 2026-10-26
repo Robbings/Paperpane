@@ -59,6 +59,8 @@ export class PdfjsReader implements ReaderService, AnchorService {
   }
   getSnapshot = () => this.snapshot;
   subscribe = (listener: () => void) => { this.listeners.add(listener); return () => this.listeners.delete(listener); };
+  /** Starts from a whole new state instead of merging: nothing (a password request, an error) carries over. */
+  private reset(state: ReaderState) { if (this.disposed) return; this.snapshot = freeze({ mode: 'live', state: 'ready', data: state }); this.listeners.forEach(fn=>fn()); }
   private publish(patch: Partial<ReaderState>) { if (this.disposed) return; this.snapshot = freeze({ mode: 'live', state: 'ready', data: { ...this.snapshot.data, ...patch } }); this.listeners.forEach(fn=>fn()); }
   private position(patch: Partial<ReaderState['position']>) { this.publish({ position: { ...this.snapshot.data.position, ...patch } }); }
   private capturePosition() {
@@ -95,7 +97,7 @@ export class PdfjsReader implements ReaderService, AnchorService {
     this.sessionLifecycle.abort(); this.sessionLifecycle = new AbortController();
     const sessionId = crypto.randomUUID(); const previous = this.task; this.task = undefined;
     this.password = undefined; this.capturedRange = undefined; this.manager = undefined; this.pdf = undefined;
-    this.publish({ ...empty(), sessionId, document: ref, phase: 'loading' });
+    this.reset({ ...empty(), sessionId, document: ref, phase: 'loading' });
     this.links.setDocument(null); this.viewer.setDocument(null); await previous?.destroy().catch(() => {});
     if (this.disposed || this.snapshot.data.sessionId !== sessionId) return;
     try {
@@ -121,7 +123,7 @@ export class PdfjsReader implements ReaderService, AnchorService {
     const task = this.task; this.task = undefined;
     this.password = undefined; this.capturedRange = undefined; this.manager = undefined; this.pdf = undefined;
     // A new session id: the pending open sees it and stops without publishing.
-    this.publish({ ...empty(), sessionId: crypto.randomUUID() });
+    this.reset(empty());
     this.links.setDocument(null); this.viewer.setDocument(null);
     await task?.destroy().catch(() => {});
   }
