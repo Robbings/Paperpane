@@ -1,7 +1,7 @@
 import { Fragment, useEffect, useRef, type ReactNode } from 'react';
-import { Button, Icon, IconButton, ScrollArea, Segmented, Spinner, Tooltip } from '@/ui/components';
+import { Button, Icon, IconButton, ProgressBar, ScrollArea, Segmented, Spinner, Tooltip } from '@/ui/components';
 import { useTranslationDock } from './dock';
-import type { TranslationMode, TranslationPageView, TranslationSentenceView } from './types';
+import type { TranslationMode, TranslationPageView, TranslationSentenceView, TranslationTaskView } from './types';
 import './translation.css';
 
 interface TranslationPaneProps {
@@ -17,16 +17,75 @@ interface TranslationPaneProps {
   onHover: (id: string | null) => void;
   /** Clicked: show the original in the paper. */
   onLocate: (id: string) => void;
+  task: TranslationTaskView;
   onTranslatePage: (pageIndex: number) => void;
+  onTranslateAll: () => void;
+  onPause: () => void;
+  onResume: () => void;
+  /** Retries the failed and unfinished sentences of a page; may be charged again. */
+  onRetryPage: (pageIndex: number) => void;
   /** Bring a sentence into view: `key` changes on every request, `smooth` for follow vs. a jump. */
   reveal: { id: string; key: number; smooth: boolean; flash: boolean } | null;
 }
 
-const summary = (pages: readonly TranslationPageView[]) => {
-  const done = pages.filter((p) => p.state === 'done').length;
-  const busy = pages.some((p) => p.state === 'translating');
-  return busy ? '正在翻译…' : `已翻译 ${done} / ${pages.length} 页`;
-};
+const REPEAT_CHARGE = '会再次请求模型，可能再次计费；已收到的译文会保留';
+
+/** The line under the header: progress, and pause / resume / translate all. Hidden when all is done. */
+function StatusLine({ task, pages, onTranslateAll, onPause, onResume }: Pick<TranslationPaneProps, 'task' | 'pages' | 'onTranslateAll' | 'onPause' | 'onResume'>) {
+  const untranslated = pages.filter((p) => p.state === 'untranslated').length;
+  const progress = task.totalPages ? task.completedPages / task.totalPages : undefined;
+  if (task.phase === 'running' || task.phase === 'pausing') {
+    return (
+      <div className="pp-tr__status" role="status">
+        <Spinner size={12} />
+        <span className="pp-tr__status-text">{task.phase === 'pausing' ? '正在暂停…' : `正在翻译${task.current ? task.current : ''}…`}</span>
+        <Button size="sm" variant="quiet" disabled={task.phase === 'pausing'} onClick={onPause}>
+          暂停
+        </Button>
+        <span className="pp-tr__status-bar">
+          <ProgressBar label="翻译进度" value={progress} />
+        </span>
+      </div>
+    );
+  }
+  if (task.phase === 'paused' || task.phase === 'interrupted') {
+    return (
+      <div className="pp-tr__status" role="status">
+        <Icon name="clock" size={13} />
+        <span className="pp-tr__status-text">{task.phase === 'paused' ? '已暂停' : '上次翻译中断了'}，收到的译文都已保存</span>
+        <Button size="sm" variant="quiet" onClick={onResume}>
+          继续
+        </Button>
+      </div>
+    );
+  }
+  if (task.phase === 'failed') {
+    return (
+      <div className="pp-tr__status" data-tone="danger" role="alert">
+        <Icon name="alert" size={13} />
+        <span className="pp-tr__status-text">{task.error ?? '翻译出错了'}</span>
+        <Tooltip label={REPEAT_CHARGE} labelsChild>
+          <Button size="sm" variant="quiet" onClick={onResume}>
+            重试
+          </Button>
+        </Tooltip>
+      </div>
+    );
+  }
+  if (untranslated > 0) {
+    return (
+      <div className="pp-tr__status">
+        <span className="pp-tr__status-text">还有 {untranslated} 页没翻译</span>
+        <Button size="sm" variant="quiet" onClick={onTranslateAll}>
+          整篇翻译
+        </Button>
+      </div>
+    );
+  }
+  return null;
+}
+
+const summary = (pages: readonly TranslationPageView[]) => `已翻译 ${pages.filter((p) => p.state === 'done').length} / ${pages.length} 页`;
 
 /** Groups a page's sentences into paragraphs for the flow. */
 function paragraphs(sentences: readonly TranslationSentenceView[]) {
@@ -80,10 +139,22 @@ export function TranslationPane(props: TranslationPaneProps) {
         </Tooltip>
       );
     }
-    const text = (
+    // Untranslated or failed: the original, greyed, still lit and located like the rest.
+    const missing = s.state === 'pending' || s.state === 'failed' || (s.state === 'partial' && !s.text);
+    const crossPage = s.endsOnPage !== undefined && s.endsOnPage !== s.pageIndex && (
+      <span className="pp-tr__cont" title="原句跨页">
+        至第 {s.endsOnPage + 1} 页
+      </span>
+    );
+    const text = missing ? (
+      <span className="pp-tr__missing" lang="en">
+        {s.source}
+      </span>
+    ) : (
       <>
         {s.text}
-        {s.streaming && <span className="pp-tr__caret" aria-hidden="true" />}
+        {s.state === 'partial' && <span className="pp-tr__cut">…</span>}
+        {s.state === 'streaming' && <span className="pp-tr__caret" aria-hidden="true" />}
       </>
     );
     if (mode === 'parallel') {
@@ -92,13 +163,15 @@ export function TranslationPane(props: TranslationPaneProps) {
           <span className="pp-tr__source" lang="en">
             {s.source}
           </span>
-          <span className="pp-tr__target">{text}</span>
+          <span className="pp-tr__target">{missing ? <span className="pp-tr__missing">{s.state === 'failed' ? '没翻译成' : '还没翻译'}</span> : text}</span>
+          {crossPage}
         </span>
       );
     }
     return (
-      <span key={s.id} className="pp-tr__s" {...shared}>
+      <span key={s.id} className="pp-tr__s" data-state={s.state} title={s.approximate ? '原文位置可能不准确' : undefined} {...shared}>
         {text}
+        {crossPage}
       </span>
     );
   };
@@ -146,6 +219,8 @@ export function TranslationPane(props: TranslationPaneProps) {
         <IconButton icon="close" label="关闭译文" size="md" shape="pill" onClick={props.onClose} />
       </header>
 
+      <StatusLine task={props.task} pages={pages} onTranslateAll={props.onTranslateAll} onPause={props.onPause} onResume={props.onResume} />
+
       <ScrollArea className="pp-tr__scroll" viewportClassName="pp-tr__viewport" viewportRef={viewport}>
         <div className="pp-tr__flow" data-mode={mode}>
           {pages.map((page) => (
@@ -188,10 +263,13 @@ export function TranslationPane(props: TranslationPaneProps) {
                       </p>
                     ),
                   )}
-                  {page.state === 'translating' && page.sentences.length === 0 && (
+                  {page.state === 'translating' && page.sentences.every((x) => x.state === 'pending') && (
                     <p className="pp-tr__waiting">
                       <Spinner size={13} /> 正在翻译这一页…
                     </p>
+                  )}
+                  {page.state === 'partial' && (
+                    <PageGaps page={page} task={props.task} onRetry={() => props.onRetryPage(page.pageIndex)} />
                   )}
                 </>
               )}
@@ -200,5 +278,26 @@ export function TranslationPane(props: TranslationPaneProps) {
         </div>
       </ScrollArea>
     </section>
+  );
+}
+
+/** Under a partly translated page: how many sentences are missing, and a retry when some failed. */
+function PageGaps({ page, task, onRetry }: { page: TranslationPageView; task: TranslationTaskView; onRetry: () => void }) {
+  const failed = page.sentences.filter((s) => s.state === 'failed').length;
+  const unfinished = page.sentences.filter((s) => s.state === 'pending' || s.state === 'partial').length;
+  if (failed === 0 && unfinished === 0) return null;
+  // While paused, unfinished sentences resume with the task; only failures need a retry here.
+  const waiting = failed === 0 && (task.phase === 'paused' || task.phase === 'interrupted' || task.phase === 'running');
+  return (
+    <div className="pp-tr__pending" data-tone={failed ? 'danger' : undefined}>
+      <span>{failed ? `${failed} 句没翻译成${unfinished ? `，${unfinished} 句未完成` : ''}` : `${unfinished} 句未完成`}</span>
+      {!waiting && (
+        <Tooltip label={REPEAT_CHARGE} labelsChild>
+          <Button size="sm" variant="quiet" onClick={onRetry}>
+            {failed ? '重试这些句子' : '翻译剩下的'}
+          </Button>
+        </Tooltip>
+      )}
+    </div>
   );
 }

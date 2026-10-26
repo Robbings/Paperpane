@@ -266,3 +266,74 @@
 .pp-tr-handle[data-dragging='true']::after {
   opacity: 1;
 }
+
+/* ---- Task status under the header ---------------------------------------------- */
+
+.pp-tr__status {
+  position: relative;
+  display: flex;
+  flex-shrink: 0;
+  align-items: center;
+  gap: 8px;
+  min-height: 34px;
+  padding: 0 8px 0 16px;
+  border-bottom: 0.5px solid var(--pp-hairline);
+  background: var(--pp-fill);
+  color: var(--pp-text-2);
+  font-size: var(--pp-text-sm);
+}
+
+.pp-tr__status[data-tone='danger'] {
+  background: var(--pp-danger-soft);
+  color: var(--pp-danger);
+}
+
+.pp-tr__status-text {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+/* A hairline of progress along the bottom of the status line. */
+.pp-tr__status-bar {
+  position: absolute;
+  right: 0;
+  bottom: -0.5px;
+  left: 0;
+}
+
+.pp-tr__status-bar .pp-progress__track {
+  height: 2px;
+  border-radius: 0;
+}
+
+/* Sentences without a translation: the original, greyed. */
+.pp-tr__missing {
+  color: var(--pp-text-3);
+  font-family: var(--pp-font-paper);
+  font-size: 0.92em;
+}
+
+.pp-tr__s[data-state='failed'] .pp-tr__missing {
+  text-decoration: underline wavy color-mix(in srgb, var(--pp-danger) 55%, transparent);
+  text-decoration-thickness: 1px;
+  text-underline-offset: 3px;
+}
+
+.pp-tr__cut {
+  color: var(--pp-text-3);
+}
+
+/* A sentence whose original runs onto the next page. */
+.pp-tr__cont {
+  margin-left: 4px;
+  padding: 0 5px;
+  border-radius: 4px;
+  background: var(--pp-fill);
+  color: var(--pp-text-3);
+  font-size: var(--pp-text-xs);
+  white-space: nowrap;
+  vertical-align: 0.1em;
+}
