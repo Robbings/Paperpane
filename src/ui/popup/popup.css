@@ -1,5 +1,6 @@
-/* Extension popup: glass over a soft wash of colour. The popup is its own small
-   window, so the wash is drawn here; without it the glass would have nothing to show. */
+/* Extension popup: a light frosted ground with white cards, in the same restrained
+   language as the reader. The popup is its own small window with nothing behind it
+   to blur, so the frost is a soft top-lit gradient rather than a backdrop filter. */
 
 html:has(body[data-page='popup']),
 body[data-page='popup'],
@@ -8,64 +9,47 @@ body[data-page='popup'] #root {
 }
 
 body[data-page='popup'] {
-  width: 348px;
-  background: var(--pp-popup-ground);
+  width: 340px;
+  background:
+    linear-gradient(180deg, var(--pp-popup-sheen), transparent 140px),
+    var(--pp-popup-ground);
 }
 
 :root {
-  --pp-popup-ground: #e6eaf1;
-  --pp-popup-wash:
-    radial-gradient(70% 42% at 0% 4%, rgba(112, 156, 236, 0.62), transparent 72%),
-    radial-gradient(60% 38% at 100% 34%, rgba(244, 184, 132, 0.5), transparent 74%),
-    radial-gradient(70% 36% at 12% 78%, rgba(126, 194, 176, 0.42), transparent 72%),
-    radial-gradient(50% 30% at 96% 100%, rgba(152, 176, 232, 0.36), transparent 72%);
-  --pp-popup-glass: rgba(255, 255, 255, 0.44);
-  --pp-popup-glass-hover: rgba(255, 255, 255, 0.7);
+  --pp-popup-ground: #f1f1f4;
+  --pp-popup-sheen: rgba(255, 255, 255, 0.85);
+  --pp-popup-card: rgba(255, 255, 255, 0.92);
 }
 
 @media (prefers-color-scheme: dark) {
   :root:not([data-theme='light']) {
-    --pp-popup-ground: #141518;
-    --pp-popup-wash:
-      radial-gradient(70% 42% at 0% 4%, rgba(70, 108, 196, 0.5), transparent 72%),
-      radial-gradient(60% 38% at 100% 34%, rgba(168, 108, 60, 0.34), transparent 74%),
-      radial-gradient(70% 36% at 12% 78%, rgba(52, 128, 110, 0.34), transparent 72%),
-      radial-gradient(50% 30% at 96% 100%, rgba(80, 100, 170, 0.3), transparent 72%);
-    --pp-popup-glass: rgba(40, 40, 44, 0.46);
-    --pp-popup-glass-hover: rgba(70, 70, 76, 0.6);
+    --pp-popup-ground: #1f1f22;
+    --pp-popup-sheen: rgba(255, 255, 255, 0.04);
+    --pp-popup-card: rgba(255, 255, 255, 0.06);
   }
 }
 
 :root[data-theme='dark'] {
-  --pp-popup-ground: #141518;
-  --pp-popup-wash:
-    radial-gradient(70% 42% at 0% 4%, rgba(70, 108, 196, 0.5), transparent 72%),
-    radial-gradient(60% 38% at 100% 34%, rgba(168, 108, 60, 0.34), transparent 74%),
-    radial-gradient(70% 36% at 12% 78%, rgba(52, 128, 110, 0.34), transparent 72%),
-    radial-gradient(50% 30% at 96% 100%, rgba(80, 100, 170, 0.3), transparent 72%);
-  --pp-popup-glass: rgba(40, 40, 44, 0.46);
-  --pp-popup-glass-hover: rgba(70, 70, 76, 0.6);
+  --pp-popup-ground: #1f1f22;
+  --pp-popup-sheen: rgba(255, 255, 255, 0.04);
+  --pp-popup-card: rgba(255, 255, 255, 0.06);
 }
 
 .pp-popup {
-  position: relative;
   display: flex;
   flex-direction: column;
   gap: 10px;
   padding: 14px 12px 12px;
-  isolation: isolate;
 }
 
-.pp-popup__wash {
-  position: absolute;
-  inset: 0;
-  z-index: -1;
-  background: var(--pp-popup-wash);
-}
-
-/* Glass here is thinner than in the reader: the wash is the only thing behind it. */
-.pp-popup .pp-glass {
-  --pp-glass-bg: var(--pp-popup-glass);
+/* Cards: rounded, with a hairline and the faintest lift. */
+.pp-popup__card {
+  border-radius: 16px;
+  background: var(--pp-popup-card);
+  box-shadow:
+    inset 0 0.5px 0 var(--pp-glass-hi),
+    0 0 0 0.5px var(--pp-hairline),
+    0 1px 3px rgba(0, 0, 0, 0.04);
 }
 
 /* ---- Header -------------------------------------------------------------------- */
@@ -100,7 +84,6 @@ body[data-page='popup'] {
   flex-direction: column;
   gap: 12px;
   padding: 14px;
-  border-radius: var(--pp-radius-panel);
 }
 
 .pp-popup__tab-row {
@@ -223,7 +206,7 @@ body[data-page='popup'] {
   gap: 6px;
   height: 34px;
   border: 0;
-  border-radius: var(--pp-radius-control);
+  border-radius: 10px;
   background: var(--pp-accent);
   box-shadow:
     inset 0 0.5px 0 rgba(255, 255, 255, 0.28),
@@ -244,7 +227,7 @@ body[data-page='popup'] {
 }
 
 .pp-popup__primary--soft {
-  background: var(--pp-popup-glass-hover);
+  background: var(--pp-fill);
   box-shadow: inset 0 0 0 0.5px var(--pp-hairline);
   color: var(--pp-text);
   -webkit-font-smoothing: auto;
@@ -252,39 +235,18 @@ body[data-page='popup'] {
 
 /* ---- Auto-open ------------------------------------------------------------------- */
 
-.pp-popup__group {
-  border-radius: var(--pp-radius-panel);
-}
-
 .pp-popup__row {
   display: flex;
   align-items: center;
   gap: 12px;
-  min-height: 52px;
-  padding: 9px 14px;
-}
-
-.pp-popup__row--sub {
-  min-height: 40px;
-  border-top: 0.5px solid var(--pp-hairline);
-}
-
-.pp-popup__row-text {
-  display: flex;
-  flex: 1;
-  flex-direction: column;
-  gap: 1px;
-  min-width: 0;
+  min-height: 46px;
+  padding: 6px 12px 6px 14px;
 }
 
 .pp-popup__row-label {
+  flex: 1;
   color: var(--pp-text);
   font-size: var(--pp-text-md);
-}
-
-.pp-popup__row-detail {
-  color: var(--pp-text-2);
-  font-size: var(--pp-text-sm);
 }
 
 /* ---- Recent ---------------------------------------------------------------------- */
@@ -309,13 +271,13 @@ body[data-page='popup'] {
   width: 100%;
   padding: 7px 8px;
   border: 0;
-  border-radius: var(--pp-radius-control);
+  border-radius: 10px;
   background: transparent;
   text-align: left;
 }
 
 .pp-popup__recent button:hover {
-  background: var(--pp-popup-glass);
+  background: var(--pp-fill-hover);
 }
 
 .pp-popup__recent-title {
@@ -346,7 +308,6 @@ body[data-page='popup'] {
   grid-template-columns: repeat(3, 1fr);
   gap: 2px;
   padding: 4px;
-  border-radius: var(--pp-radius-panel);
 }
 
 .pp-popup__dock button {
@@ -356,7 +317,7 @@ body[data-page='popup'] {
   gap: 6px;
   height: 34px;
   border: 0;
-  border-radius: 10px;
+  border-radius: 12px;
   background: transparent;
   color: var(--pp-text);
   font-size: var(--pp-text-md);
@@ -368,5 +329,5 @@ body[data-page='popup'] {
 }
 
 .pp-popup__dock button:hover {
-  background: var(--pp-popup-glass-hover);
+  background: var(--pp-fill-hover);
 }

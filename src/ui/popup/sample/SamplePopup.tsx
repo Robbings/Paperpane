@@ -13,7 +13,6 @@ const tabs: Record<string, ActiveTabView | null> = {
     tabId: 1,
     title: 'Recovering Reading Order in Two-Column Scientific PDFs',
     displayUrl: 'arxiv.org/pdf/2510.01234',
-    host: 'arxiv.org',
     pdf: 'available',
     canOpenInReader: true,
     inLibrary: true,
@@ -22,15 +21,14 @@ const tabs: Record<string, ActiveTabView | null> = {
     tabId: 2,
     title: 'layout-aware-segmentation.pdf',
     displayUrl: '~/Downloads/layout-aware-segmentation.pdf',
-    host: 'file',
     pdf: 'available',
     canOpenInReader: true,
   },
   checking: null,
-  'not-pdf': { tabId: 3, title: 'Example', displayUrl: 'example.com', host: 'example.com', pdf: 'unavailable', canOpenInReader: false, block: 'not-pdf' },
-  restricted: { tabId: 4, title: '扩展程序', displayUrl: 'chrome://extensions', host: null, pdf: 'unavailable', canOpenInReader: false, block: 'restricted' },
-  'file-access': { tabId: 5, title: 'paper.pdf', displayUrl: '~/Downloads/paper.pdf', host: 'file', pdf: 'unavailable', canOpenInReader: false, block: 'file-access' },
-  'in-reader': { tabId: 6, title: '阅读器', displayUrl: '', host: null, pdf: 'available', canOpenInReader: false, block: 'in-reader' },
+  'not-pdf': { tabId: 3, title: 'Example', displayUrl: 'example.com', pdf: 'unavailable', canOpenInReader: false, block: 'not-pdf' },
+  restricted: { tabId: 4, title: '扩展程序', displayUrl: 'chrome://extensions', pdf: 'unavailable', canOpenInReader: false, block: 'restricted' },
+  'file-access': { tabId: 5, title: 'paper.pdf', displayUrl: '~/Downloads/paper.pdf', pdf: 'unavailable', canOpenInReader: false, block: 'file-access' },
+  'in-reader': { tabId: 6, title: '阅读器', displayUrl: '', pdf: 'available', canOpenInReader: false, block: 'in-reader' },
 };
 
 const state = new URLSearchParams(window.location.search).get('state') ?? 'pdf';
@@ -47,7 +45,6 @@ export function SamplePopup() {
   useSamplePreferences();
   const { status } = useSampleSettings();
   const [autoOpen, setAutoOpen] = useState(true);
-  const [excluded, setExcluded] = useState<ReadonlySet<string>>(() => new Set());
   const tab = state in tabs ? tabs[state]! : tabs.pdf!;
 
   return (
@@ -56,17 +53,8 @@ export function SamplePopup() {
         activeTab={tab}
         onOpenInReader={() => open('./reader.html')}
         onAllowFileAccess={() => toast.show({ message: '示例：会打开本扩展的详情页' })}
-        autoOpen={{ enabled: autoOpen, excludedHere: tab?.host ? excluded.has(tab.host) : null }}
-        onAutoOpen={setAutoOpen}
-        onExcludeHere={(on) =>
-          setExcluded((all) => {
-            const next = new Set(all);
-            if (!tab?.host) return all;
-            if (on) next.add(tab.host);
-            else next.delete(tab.host);
-            return next;
-          })
-        }
+        autoOpenPdf={autoOpen}
+        onAutoOpenPdf={setAutoOpen}
         recent={recent}
         onOpenRecent={() => open('./reader.html')}
         onOpenLibrary={() => open('./library.html')}

@@ -34,7 +34,7 @@ const blockText: Record<NonNullable<ActiveTabView['block']>, { icon: IconName; t
 function CurrentTab({ tab, onOpen, onAllowFileAccess }: { tab: ActiveTabView | null; onOpen: () => void; onAllowFileAccess: () => void }) {
   if (!tab || tab.pdf === 'checking' || tab.pdf === 'unknown') {
     return (
-      <section className="pp-glass pp-popup__tab" data-tone="float" aria-busy="true" aria-label="当前页面">
+      <section className="pp-popup__card pp-popup__tab" aria-busy="true" aria-label="当前页面">
         <div className="pp-popup__tab-row">
           <span className="pp-popup__thumb pp-popup__thumb--empty" aria-hidden="true" />
           <div className="pp-popup__tab-text">
@@ -48,7 +48,7 @@ function CurrentTab({ tab, onOpen, onAllowFileAccess }: { tab: ActiveTabView | n
   if (!tab.canOpenInReader) {
     const block = blockText[tab.block ?? 'not-pdf'];
     return (
-      <section className="pp-glass pp-popup__tab" data-tone="float" data-state="blocked" aria-label="当前页面">
+      <section className="pp-popup__card pp-popup__tab" data-state="blocked" aria-label="当前页面">
         <div className="pp-popup__tab-row">
           <span className="pp-popup__badge-icon" data-block={tab.block ?? 'not-pdf'} aria-hidden="true">
             <Icon name={block.icon} size={18} />
@@ -69,7 +69,7 @@ function CurrentTab({ tab, onOpen, onAllowFileAccess }: { tab: ActiveTabView | n
   }
 
   return (
-    <section className="pp-glass pp-popup__tab" data-tone="float" aria-label="当前页面">
+    <section className="pp-popup__card pp-popup__tab" aria-label="当前页面">
       <div className="pp-popup__tab-row">
         <PageThumb />
         <div className="pp-popup__tab-text">
@@ -93,18 +93,13 @@ function CurrentTab({ tab, onOpen, onAllowFileAccess }: { tab: ActiveTabView | n
 
 /**
  * The extension's toolbar popup: the current tab and a way into the reader,
- * auto-open, recent papers, and the library and settings. A wash of colour
- * sits behind it so the glass has something to show.
+ * auto-open, recent papers, and the library and settings.
  */
 export function PopupView(props: PopupViewProps) {
-  const { activeTab: tab, autoOpen, recent } = props;
-  // The per-site switch only matters on a PDF the reader can take over.
-  const siteLabel = tab?.pdf === 'available' && tab.host ? (tab.host === 'file' ? '本地 PDF 也自动打开' : `在 ${tab.host} 上自动打开`) : null;
+  const { activeTab: tab, recent } = props;
 
   return (
     <div className="pp-popup">
-      <div className="pp-popup__wash" aria-hidden="true" />
-
       <header className="pp-popup__head">
         <LogoMark />
         <span className="pp-popup__name">纸窗</span>
@@ -113,22 +108,11 @@ export function PopupView(props: PopupViewProps) {
 
       <CurrentTab tab={tab} onOpen={() => tab && props.onOpenInReader(tab.tabId)} onAllowFileAccess={props.onAllowFileAccess} />
 
-      <section className="pp-glass pp-popup__group" data-tone="float" aria-label="自动打开">
+      <section className="pp-popup__card pp-popup__group" aria-label="自动打开">
         <div className="pp-popup__row">
-          <div className="pp-popup__row-text">
-            <span className="pp-popup__row-label">自动用纸窗打开 PDF</span>
-            <span className="pp-popup__row-detail">在浏览器里打开 PDF 时直接转到阅读器</span>
-          </div>
-          <Switch label="自动用纸窗打开 PDF" hideLabel checked={autoOpen.enabled} onChange={props.onAutoOpen} />
+          <span className="pp-popup__row-label">自动打开 PDF</span>
+          <Switch label="自动打开 PDF" hideLabel checked={props.autoOpenPdf} onChange={props.onAutoOpenPdf} />
         </div>
-        {autoOpen.enabled && autoOpen.excludedHere !== null && siteLabel && (
-          <div className="pp-popup__row pp-popup__row--sub">
-            <div className="pp-popup__row-text">
-              <span className="pp-popup__row-label">{siteLabel}</span>
-            </div>
-            <Switch label={siteLabel} hideLabel checked={!autoOpen.excludedHere} onChange={(on) => props.onExcludeHere(!on)} />
-          </div>
-        )}
       </section>
 
       {recent.length > 0 && (
@@ -152,7 +136,7 @@ export function PopupView(props: PopupViewProps) {
 
       <StatusLine status={props.status} inline className="pp-popup__status" onOpen={props.onOpenSettings} />
 
-      <nav className="pp-glass pp-popup__dock" data-tone="bar" aria-label="打开">
+      <nav className="pp-popup__card pp-popup__dock" aria-label="打开">
         <button type="button" onClick={props.onOpenLibrary}>
           <Icon name="library" size={17} />
           文献库
