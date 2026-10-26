@@ -41,18 +41,56 @@ const sections: { id: SettingsSection; label: string; icon: IconName; descriptio
 /** Draft comparison that tells an emptied number field (NaN) apart from "use the default" (null). */
 const fingerprint = (draft: SettingsDraft) => JSON.stringify(draft, (_key, value: unknown) => (typeof value === 'number' && Number.isNaN(value) ? 'NaN' : value));
 
+type Json = unknown;
+const same = (a: Json, b: Json) => JSON.stringify(a) === JSON.stringify(b);
+const isPlain = (v: Json): v is Record<string, Json> => typeof v === 'object' && v !== null && !Array.isArray(v);
+/** Lists whose items carry an identity merge item by item. */
+const itemKey = (v: Json) => (isPlain(v) ? ((v.id ?? v.feature) as string | undefined) : undefined);
+
 /**
- * After a conflict: the parts of the draft this page changed, laid over the newer
- * settings; everything this page did not touch keeps the other window's values.
+ * Three-way merge after a conflict: starting from what this page loaded (base),
+ * keep every field the other window changed (latest) and every field this page
+ * changed (mine). A field both changed to different values is a conflict: this
+ * page's value is used and the path is reported, so the reader decides knowingly.
  */
-function mergeOnto(latest: SettingsSnapshot, base: SettingsSnapshot, draft: SettingsDraft): SettingsDraft {
-  const from = toDraft(base);
-  const merged = toDraft(latest);
-  for (const key of Object.keys(draft) as (keyof SettingsDraft)[]) {
-    if (JSON.stringify(draft[key]) !== JSON.stringify(from[key])) Object.assign(merged, { [key]: draft[key] });
+function merge3(base: Json, latest: Json, mine: Json, path: string, conflicts: string[]): Json {
+  if (same(mine, base)) return latest;
+  if (same(latest, base) || same(mine, latest)) return mine;
+  if (isPlain(base) && isPlain(latest) && isPlain(mine)) {
+    const out: Record<string, Json> = {};
+    for (const key of new Set([...Object.keys(latest), ...Object.keys(mine)])) {
+      const value = merge3(base[key], latest[key], mine[key], path ? `${path}.${key}` : key, conflicts);
+      if (value !== undefined) out[key] = value;
+    }
+    return out;
   }
-  return merged;
+  if (Array.isArray(base) && Array.isArray(latest) && Array.isArray(mine) && [...base, ...latest, ...mine].every((v) => itemKey(v) !== undefined)) {
+    const find = (list: Json[], key: string) => list.find((v) => itemKey(v) === key);
+    const keys = [...new Set([...latest, ...mine].map((v) => itemKey(v)!))];
+    const out: Json[] = [];
+    for (const key of keys) {
+      const value = merge3(find(base, key), find(latest, key), find(mine, key), `${path}.${key}`, conflicts);
+      if (value !== undefined) out.push(value);
+    }
+    return out;
+  }
+  conflicts.push(path);
+  return mine;
 }
+
+function mergeOnto(latest: SettingsSnapshot, base: SettingsSnapshot, draft: SettingsDraft): { merged: SettingsDraft; conflicts: string[] } {
+  const conflicts: string[] = [];
+  const merged = merge3(toDraft(base), toDraft(latest), draft, '', conflicts) as SettingsDraft;
+  return { merged, conflicts };
+}
+
+const fieldNames: Record<string, string> = {
+  'runtime.timeoutSec': '超时',
+  'runtime.concurrency': '同时进行的请求',
+  'runtime.maxOutputTokens': '输出长度上限',
+  defaultModelId: '默认模型',
+};
+const fieldName = (path: string) => fieldNames[path] ?? path;
 
 /** Problems the page can find before saving; the logic layer checks everything again. */
 const localProblems = (draft: SettingsDraft) => runtimeProblems(draft.runtime);
@@ -65,6 +103,9 @@ export function SettingsView(props: SettingsViewProps) {
   const [problems, setProblems] = useState<ReadonlyMap<string, string>>(new Map());
   // A conflict's newer settings, kept until the reader chooses what to do.
   const latest = useRef<SettingsSnapshot | null>(null);
+  // The draft as it is now, for a save that finishes after more typing.
+  const draftNow = useRef(draft);
+  draftNow.current = draft;
 
   const dirty = useMemo(() => fingerprint(draft) !== fingerprint(toDraft(base)), [draft, base]);
 
@@ -107,11 +148,17 @@ export function SettingsView(props: SettingsViewProps) {
     if (result.ok) {
       latest.current = null;
       setBase(result.value);
-      setDraft(toDraft(result.value));
-      setBar({ kind: 'saved' });
+      // Typed on while saving: keep the newer draft, still unsaved.
+      if (fingerprint(draftNow.current) === fingerprint(toSave)) {
+        setDraft(toDraft(result.value));
+        setBar({ kind: 'saved' });
+      } else {
+        setBar({ kind: 'dirty' });
+      }
     } else if (result.reason === 'conflict') {
       latest.current = result.latest;
-      setBar({ kind: 'conflict' });
+      const { conflicts } = mergeOnto(result.latest, base, draftNow.current);
+      setBar({ kind: 'conflict', fields: conflicts.map(fieldName) });
     } else if (result.reason === 'invalid') {
       setProblems(new Map(result.problems.map((p) => [p.path, p.message])));
       // Problems the page has no field for still get said, at the bar.
@@ -185,7 +232,8 @@ export function SettingsView(props: SettingsViewProps) {
             onOverwrite={() => {
               const next = latest.current;
               if (!next) return;
-              const merged = mergeOnto(next, base, draft);
+              const { merged } = mergeOnto(next, base, draftNow.current);
+              latest.current = null;
               setBase(next);
               setDraft(merged);
               void save(next.revision, merged);

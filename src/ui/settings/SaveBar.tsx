@@ -5,7 +5,8 @@ export type SaveBarState =
   | { kind: 'saving' }
   | { kind: 'saved' }
   | { kind: 'invalid'; count: number; message?: string }
-  | { kind: 'conflict' }
+  /** fields: what both windows changed to different values; empty when the changes merge cleanly. */
+  | { kind: 'conflict'; fields: readonly string[] }
   | { kind: 'failed'; message: string };
 
 interface SaveBarProps {
@@ -14,7 +15,7 @@ interface SaveBarProps {
   onDiscard: () => void;
   /** Conflict: drop this draft and take what the other window saved. */
   onReload: () => void;
-  /** Conflict: save this page's changes over the newer settings, keeping what it did not touch. */
+  /** Conflict: merge this page's changes into the newer settings and save. */
   onOverwrite: () => void;
 }
 
@@ -36,7 +37,10 @@ export function SaveBar({ state, onSave, onDiscard, onReload, onOverwrite }: Sav
         )}
         {state.kind === 'saved' && '已保存'}
         {state.kind === 'invalid' && (state.message ?? `有 ${state.count} 处需要修改`)}
-        {state.kind === 'conflict' && '设置已在其他窗口更新，你的更改还没保存。保存时只覆盖你改过的部分。'}
+        {state.kind === 'conflict' &&
+          (state.fields.length === 0
+            ? '设置已在其他窗口更新。保存时会保留那边的改动，只写入你改过的项。'
+            : `「${state.fields.join('」「')}」在其他窗口也改了。保存会用你的值。`)}
         {state.kind === 'failed' && `没能保存：${state.message}`}
       </p>
       {state.kind === 'conflict' ? (
@@ -45,7 +49,7 @@ export function SaveBar({ state, onSave, onDiscard, onReload, onOverwrite }: Sav
             放弃更改，载入最新
           </Button>
           <Button size="sm" variant="primary" onClick={onOverwrite}>
-            保存我的更改
+            {state.fields.length === 0 ? '合并后保存' : '用我的值保存'}
           </Button>
         </>
       ) : (
