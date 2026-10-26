@@ -1,5 +1,5 @@
 import { useState, type CSSProperties } from 'react';
-import { Button, IconButton, SaveStatus, TextArea, Tooltip, Segmented, highlightColors, type HighlightColor, type LocalSaveState, type SyncState } from '@/ui/components';
+import { Button, Menu, IconButton, SaveStatus, TextArea, Tooltip, Segmented, highlightColors, type HighlightColor, type LocalSaveState, type SyncState } from '@/ui/components';
 import type { AnnotationView } from '../types';
 import { PanelBody } from './PanelBody';
 import { PanelHeader } from './PanelHeader';
@@ -25,11 +25,12 @@ interface AnnotationsPanelProps {
   onColor: (id: string, color: HighlightColor) => void;
   onComment: (id: string, comment: string) => void;
   onDelete: (id: string) => void;
+  onRemoveComment: (id: string) => void;
   onCopyAll: () => void;
   onExport: () => void;
 }
 
-export function AnnotationsPanel({ items, local, sync, simulated, onLocate, onColor, onComment, onDelete, onCopyAll, onExport }: AnnotationsPanelProps) {
+export function AnnotationsPanel({ items, local, sync, simulated, onLocate, onColor, onComment, onDelete, onRemoveComment, onCopyAll, onExport }: AnnotationsPanelProps) {
   const [kind, setKind] = useState<KindFilter>('all');
   const [color, setColor] = useState<HighlightColor | null>(null);
 
@@ -89,6 +90,7 @@ export function AnnotationsPanel({ items, local, sync, simulated, onLocate, onCo
                 onColor={(c) => onColor(item.id, c)}
                 onComment={(text) => onComment(item.id, text)}
                 onDelete={() => onDelete(item.id)}
+                onRemoveComment={() => onRemoveComment(item.id)}
               />
             ))}
           </ul>
@@ -109,11 +111,13 @@ interface AnnotationItemProps {
   onColor: (color: HighlightColor) => void;
   onComment: (text: string) => void;
   onDelete: () => void;
+  onRemoveComment: () => void;
 }
 
 /** One annotation: click to go to it; hover for recolour, edit comment and delete. */
-function AnnotationItem({ item, onLocate, onColor, onComment, onDelete }: AnnotationItemProps) {
+function AnnotationItem({ item, onLocate, onColor, onComment, onDelete, onRemoveComment }: AnnotationItemProps) {
   const [picking, setPicking] = useState(false);
+  const [deletion, setDeletion] = useState<{x:number;y:number}|null>(null);
   const [editing, setEditing] = useState<string | null>(null);
 
   const save = () => {
@@ -189,10 +193,17 @@ function AnnotationItem({ item, onLocate, onColor, onComment, onDelete }: Annota
               </Tooltip>
             )}
             <IconButton icon="edit" label={item.note ? '编辑评论' : '添加评论'} size="md" shape="pill" onClick={() => setEditing(item.note ?? '')} />
-            <IconButton icon="trash" label="删除" size="md" shape="pill" onClick={onDelete} />
+            <IconButton icon="trash" label={item.note ? '删除选项' : '删除高亮'} size="md" shape="pill" onClick={event=>{
+              if (!item.note) { onDelete(); return; }
+              const box=event.currentTarget.getBoundingClientRect();setDeletion({x:box.right,y:box.bottom});
+            }} />
           </>
         )}
       </span>
+      {deletion && <Menu label="删除选项" anchor={deletion} align="end" entries={[
+        {id:'comment',label:'仅删除评论（保留高亮）'},
+        {id:'annotation',label:'删除整条批注（含高亮）'},
+      ]} onClose={()=>setDeletion(null)} onSelect={id=>{setEditing(null);if(id==='comment')onRemoveComment();else onDelete();}}/>}
     </li>
   );
 }

@@ -72,6 +72,8 @@ export interface ReaderSearchState {
  * offset in CSS pixels from the passage's top-left corner on the paper.
  */
 export interface NoteLayout {
+  /** Zoom percentage at which offsets and dimensions were recorded; legacy layouts use 100. */
+  zoom?: number;
   id: string;
   dx: number;
   dy: number;

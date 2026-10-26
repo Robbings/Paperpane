@@ -79,7 +79,7 @@ export class AnnotationDatabase extends PaperDatabase {
       await this.document(tx, ref);
       const annotation = await request(tx.objectStore('annotations').get(layout.id)) as Annotation | undefined;
       if (!annotation || annotation.deletedAt || annotation.anchor.documentId !== ref.documentId || annotation.anchor.fileVersion !== ref.fileVersion) throw new AnnotationFault('NOT_FOUND', '便签对应的批注已不可用。');
-      if (![layout.dx,layout.dy,layout.width,layout.height,layout.z].every(Number.isFinite) || typeof layout.open !== 'boolean' || typeof layout.collapsed !== 'boolean' || layout.width < 100 || layout.height < 34 || layout.width > 2000 || layout.height > 2000) throw new AnnotationFault('INVALID_INPUT', '便签尺寸无效。');
+      if ((layout.zoom !== undefined && (!Number.isFinite(layout.zoom) || layout.zoom < 25 || layout.zoom > 400)) || ![layout.dx,layout.dy,layout.width,layout.height,layout.z].every(Number.isFinite) || typeof layout.open !== 'boolean' || typeof layout.collapsed !== 'boolean' || layout.width < 100 || layout.height < 34 || layout.width > 2000 || layout.height > 2000) throw new AnnotationFault('INVALID_INPUT', '便签尺寸无效。');
       const old = await request(tx.objectStore('annotationLayouts').get(layout.id)) as AnnotationLayoutRecord | undefined;
       if (old?.revision !== expected) throw new AnnotationFault('CONFLICT', '便签布局已在其他窗口修改。');
       const at = new Date().toISOString();

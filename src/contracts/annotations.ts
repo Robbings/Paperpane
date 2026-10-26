@@ -22,5 +22,5 @@ export interface AnnotationService extends Readable<AnnotationState> {
 }
 
 /** Presentation preferences, not PDF geometry. CSS pixel offsets relative to the freshly projected anchor. */
-export interface AnnotationNoteLayout { id: Id; dx: number; dy: number; width: number; height: number; collapsed: boolean; open: boolean; z: number }
+export interface AnnotationNoteLayout { zoom?: number; id: Id; dx: number; dy: number; width: number; height: number; collapsed: boolean; open: boolean; z: number }
 export interface AnnotationLayoutRecord extends RecordStamp { document: DocumentRef; layout: AnnotationNoteLayout }

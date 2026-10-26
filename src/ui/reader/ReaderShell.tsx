@@ -357,9 +357,15 @@ export function ReaderShell(props: ReaderShellProps) {
       // Start under the passage, shifted left if it would run past the visible paper area.
       const visibleRight = (scrollRef.current?.getBoundingClientRect().right ?? window.innerWidth) - 12;
       const dx = first ? Math.min(0, visibleRight - NOTE_SIZE.width - first.left) : 0;
-      return [...current, { id, dx, dy: first ? bottom - first.top + 10 : 0, width: NOTE_SIZE.width, height: NOTE_SIZE.height, collapsed: false, open: true, z }];
+      return [...current, { id, dx, dy: first ? bottom - first.top + 10 : 0, width: NOTE_SIZE.width, height: NOTE_SIZE.height, zoom: zoomPercent, collapsed: false, open: true, z }];
     });
 
+  const removeComment = (id: string) => {
+    const previous = annotations.find(item=>item.id===id)?.note ?? '';
+    interaction.onAnnotationComment(id, '');
+    setNoteLayouts(current=>current.map(n=>n.id===id?{...n,open:false}:n));
+    toast.show({message:'已删除评论，高亮保留',action:{label:'撤销',onAction:()=>interaction.onAnnotationComment(id,previous)}});
+  };
   const deleteAnnotation = async (id: string) => {
     if (await interaction.onAnnotationDelete(id) === false) return;
     toast.show({
@@ -569,6 +575,7 @@ export function ReaderShell(props: ReaderShellProps) {
                     onColor={interaction.onAnnotationColor}
                     onComment={interaction.onAnnotationComment}
                     onDelete={deleteAnnotation}
+                    onRemoveComment={removeComment}
                     onCopyAll={() => props.onTool('copy-annotations')}
                     onExport={() => props.onTool('export-annotations')}
                   />
@@ -658,6 +665,7 @@ export function ReaderShell(props: ReaderShellProps) {
 
       <CommentNotes
         notes={noteLayouts}
+        zoomPercent={zoomPercent}
         annotations={annotations}
         container={paperElement}
         layoutKey={`${zoomPercent}:${interaction.rotation}:${effectivePlacement}:${effectiveWidth}:${effectiveHeight}:${sidebarOpen}`}
@@ -667,6 +675,7 @@ export function ReaderShell(props: ReaderShellProps) {
         onRaise={(id) => setNoteLayouts((current) => current.map((n) => (n.id === id && n.z !== topZ.current ? { ...n, z: ++topZ.current } : n)))}
         onClose={(id) => setNoteLayouts((current) => current.map((n) => (n.id === id ? { ...n, open: false } : n)))}
         onComment={interaction.onAnnotationComment}
+        onRemoveComment={removeComment}
         onLocate={props.onLocateAnnotation}
       />
     </div>

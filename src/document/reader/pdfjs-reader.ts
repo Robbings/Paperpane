@@ -1,4 +1,4 @@
-import { AnnotationEditorType, GlobalWorkerOptions, PasswordResponses, getDocument, type PDFDocumentLoadingTask, type PDFDocumentProxy } from 'pdfjs-dist';
+import { TextLayer, AnnotationEditorType, GlobalWorkerOptions, PasswordResponses, getDocument, type PDFDocumentLoadingTask, type PDFDocumentProxy } from 'pdfjs-dist';
 import { mergeHighlightRects } from 'pdfjs-dist/build/paperpane-highlight-geometry.mjs';
 import workerUrl from 'pdfjs-dist/build/pdf.worker.min.mjs?url';
 import { EventBus, PDFFindController, PDFLinkService, PDFViewer } from 'pdfjs-dist/web/pdf_viewer.mjs';
@@ -10,6 +10,10 @@ import type { Annotation } from '@/contracts/annotations';
 import { SavedHighlights, pdfHighlightColors } from './saved-highlights';
 
 GlobalWorkerOptions.workerSrc = workerUrl;
+// Pin the invisible fallback used by both PDF.js canvas measurement and DOM.
+// Generic sans-serif resolved differently in the host browser (about 6% wider),
+// shifting selection endpoints. Original PDF canvas fonts are untouched.
+TextLayer.fontFamilyMap.set('sans-serif', 'Arial, sans-serif');
 const empty = (): ReaderState => ({ sessionId: crypto.randomUUID(), document: null, phase: 'empty', pageCount: 0, position: { pageIndex: 0, offset: 0, zoom: 1, rotation: 0 }, selection: null, menuTarget: null, tool: 'select', search: {query: '', matchCase: false, wholeWord: false, status: 'idle', total: 0, current: 0}, textLayer: 'unknown', outline: [] });
 function freeze<T>(value: T): T { if (value && typeof value === 'object') { Object.freeze(value); Object.values(value).forEach(freeze); } return value; }
 
@@ -163,18 +167,30 @@ export class PdfjsReader implements ReaderService, AnchorService {
       const part = range.cloneRange(); if (!layer.contains(part.startContainer)) part.setStart(layer, 0); if (!layer.contains(part.endContainer)) part.setEnd(layer, layer.childNodes.length);
       const bounds = layer.getBoundingClientRect(); const crop = view.pdfPage.view as number[];
       // Only leaf text ranges: container rectangles can span columns or several lines.
-      const clientRects: DOMRect[] = [];
+      const clientRects: {left:number;top:number;right:number;bottom:number;width:number;height:number}[] = [];
       const walker = document.createTreeWalker(layer, NodeFilter.SHOW_TEXT);
       for (let node = walker.nextNode(); node; node = walker.nextNode()) {
         if (!part.intersectsNode(node)) continue;
         const leaf = document.createRange(); leaf.selectNodeContents(node);
         if (node === part.startContainer) leaf.setStart(node, part.startOffset);
         if (node === part.endContainer) leaf.setEnd(node, part.endOffset);
-        clientRects.push(...leaf.getClientRects());
+        if (leaf.collapsed || !leaf.toString().trim()) continue;
+        const span = node.parentElement;
+        if (!span) continue;
+        const em = span.getBoundingClientRect();
+        // A browser Range includes fallback-font ascent/descent outside PDF.js's
+        // positioned glyph run. Keep its selected character extent, but use the
+        // text layer's em box in the perpendicular direction (also at 90/270°).
+        const vertical = view.viewport.rotation % 180 !== 0;
+        for (const rect of leaf.getClientRects()) {
+          const left = vertical ? em.left : rect.left, right = vertical ? em.right : rect.right;
+          const top = vertical ? rect.top : em.top, bottom = vertical ? rect.bottom : em.bottom;
+          if(right>left && bottom>top)clientRects.push({left,right,top,bottom,width:right-left,height:bottom-top});
+        }
       }
       const rects = clientRects.filter(r=>r.width>0 && r.height>0).map(r=>{
-        const a = view.viewport.convertToPdfPoint(r.left-bounds.left, r.top-bounds.top) as number[];
-        const b = view.viewport.convertToPdfPoint(r.right-bounds.left, r.bottom-bounds.top) as number[];
+        const a = view.viewport.convertToPdfPoint((r.left-bounds.left)*view.viewport.width/bounds.width, (r.top-bounds.top)*view.viewport.height/bounds.height) as number[];
+        const b = view.viewport.convertToPdfPoint((r.right-bounds.left)*view.viewport.width/bounds.width, (r.bottom-bounds.top)*view.viewport.height/bounds.height) as number[];
         return { x: Math.min(a[0]!,b[0]!)-crop[0]!, y: Math.min(a[1]!,b[1]!)-crop[1]!, width: Math.abs(a[0]!-b[0]!), height: Math.abs(a[1]!-b[1]!) };
       });
       if (rects.length) pages.push({ pageIndex, rects, quote: { exact: part.toString() } });
