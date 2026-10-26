@@ -202,18 +202,15 @@ export function ChatAnswer({ message, latest, busy, onRegenerate, onVersion, onL
       {note}
 
       {!running && (
+        // Right-aligned: what shows on hover sits to the left, versions stay put at the end.
         <div className="pp-chat-a__tools">
+          {state === 'stopped' && <span className="pp-chat-a__state">已停止</span>}
           <span className="pp-chat-a__hover">
+            {message.model && <span className="pp-chat-a__model">{message.model.displayName}</span>}
             <IconButton icon="copy" label="复制回答" size="md" shape="pill" disabled={!message.markdown} onClick={() => copy(stripSourceMarkers(message.markdown))} />
             <IconButton icon="rotate" label="重新生成" size="md" shape="pill" disabled={busy} onClick={onRegenerate} />
           </span>
           <VersionSwitch version={message.version} disabled={busy} onVersion={onVersion} />
-          {message.model && (
-            <span className="pp-chat-a__model">
-              {message.model.displayName}
-              {state === 'stopped' && ' · 已停止'}
-            </span>
-          )}
         </div>
       )}
     </article>

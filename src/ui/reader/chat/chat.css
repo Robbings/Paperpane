@@ -59,8 +59,7 @@
 
 /* Docked at the bottom the panel is wide: keep a readable column. */
 .pp-reader[data-placement='bottom'] .pp-chat__viewport > *,
-.pp-reader[data-placement='bottom'] .pp-composer,
-.pp-reader[data-placement='bottom'] .pp-chat__footnote {
+.pp-reader[data-placement='bottom'] .pp-composer {
   width: 100%;
   max-width: 720px;
   margin-inline: auto;
@@ -199,23 +198,36 @@
   animation: pp-caret 1.1s steps(2, jump-none) infinite;
 }
 
-/* One line under the answer: copy, regenerate, versions, then the model in small grey. */
+/* One right-aligned line under the answer: the model, copy and regenerate show
+   on hover; versions, which matter, always show at the end. */
 .pp-chat-a__tools {
   display: flex;
   align-items: center;
+  justify-content: flex-end;
   gap: 2px;
   min-height: 24px;
-  margin: -2px 0 0 -5px;
+  margin: -2px -5px 0 0;
+}
+
+.pp-chat-a__hover {
+  align-items: center;
 }
 
 .pp-chat-a__model {
   min-width: 0;
-  margin-left: 6px;
+  margin-right: 4px;
   overflow: hidden;
   color: var(--pp-text-3);
   font-size: var(--pp-text-xs);
   text-overflow: ellipsis;
   white-space: nowrap;
+}
+
+.pp-chat-a__state {
+  margin-right: auto;
+  padding-left: 5px;
+  color: var(--pp-text-3);
+  font-size: var(--pp-text-xs);
 }
 
 /* Problems read as a quiet line, not a coloured box. */
@@ -257,8 +269,12 @@
   transform: rotate(180deg);
 }
 
+.pp-chat-version .pp-icon-btn {
+  width: 18px !important;
+}
+
 .pp-chat-version__count {
-  min-width: 26px;
+  min-width: 22px;
   color: var(--pp-text-2);
   font-size: var(--pp-text-xs);
   font-variant-numeric: tabular-nums;
@@ -388,29 +404,73 @@
   font-size: var(--pp-text-sm);
 }
 
-/* ---- Composer ---------------------------------------------------------------------------- */
+/* ---- Composer: a glass bar floating over the end of the conversation ---------------- */
+
+.pp-chat .pp-panel__body {
+  position: relative;
+}
+
+.pp-chat__dock {
+  position: absolute;
+  right: 0;
+  bottom: 0;
+  left: 0;
+  z-index: 2;
+}
 
 .pp-composer {
+  position: relative;
   display: flex;
-  flex-shrink: 0;
   flex-direction: column;
-  gap: 2px;
-  margin-top: 4px;
-  padding: 9px 6px 6px 12px;
-  border-radius: 14px;
-  background: var(--pp-fill);
-  box-shadow: inset 0 0 0 0.5px var(--pp-hairline);
+  gap: 6px;
+  padding: 11px 8px 8px 14px;
+  border-radius: 18px;
   cursor: text;
-  transition:
-    background-color var(--pp-dur-fast) var(--pp-ease-out),
-    box-shadow var(--pp-dur-fast) var(--pp-ease-out);
+  transition: box-shadow var(--pp-dur-fast) var(--pp-ease-out);
 }
 
 .pp-composer:focus-within {
-  background: var(--pp-reading-surface);
   box-shadow:
-    inset 0 0 0 1px color-mix(in srgb, var(--pp-accent) 55%, transparent),
-    0 0 0 3px var(--pp-accent-soft);
+    inset 0 0.5px 0 var(--pp-glass-hi),
+    inset 0 0 0 0.5px var(--pp-glass-rim),
+    0 0 0 1px color-mix(in srgb, var(--pp-accent) 45%, transparent),
+    0 0 0 4px var(--pp-accent-soft),
+    var(--pp-shadow-float);
+}
+
+/* The top edge drags the box taller or shorter; a small pill shows where. */
+.pp-composer__grip {
+  position: absolute;
+  top: -4px;
+  right: 24px;
+  left: 24px;
+  height: 10px;
+  cursor: ns-resize;
+  touch-action: none;
+}
+
+.pp-composer__grip::after {
+  content: '';
+  position: absolute;
+  top: 6px;
+  left: 50%;
+  width: 34px;
+  height: 4px;
+  border-radius: var(--pp-radius-pill);
+  background: var(--pp-hairline-strong);
+  opacity: 0;
+  transform: translateX(-50%);
+  transition: opacity var(--pp-dur-fast) var(--pp-ease-out);
+}
+
+.pp-composer:hover .pp-composer__grip::after,
+.pp-composer__grip:focus-visible::after,
+.pp-composer[data-resized='true'] .pp-composer__grip::after {
+  opacity: 1;
+}
+
+.pp-composer__grip:focus-visible {
+  outline: none;
 }
 
 .pp-composer textarea {
@@ -435,31 +495,51 @@
 .pp-composer__bar {
   display: flex;
   align-items: center;
-  gap: 6px;
+  gap: 4px;
+  margin-left: -6px;
   cursor: default;
 }
 
-.pp-composer__model {
+/* Model and thinking strength: quiet chips that name the current choice. */
+.pp-composer__chip {
   display: inline-flex;
   align-items: center;
-  gap: 3px;
-  max-width: 60%;
-  height: 24px;
-  margin-left: -6px;
-  padding: 0 7px;
-  overflow: hidden;
+  gap: 4px;
+  min-width: 0;
+  height: 26px;
+  padding: 0 8px;
   border: 0;
   border-radius: var(--pp-radius-pill);
   background: transparent;
   color: var(--pp-text-2);
   font-size: var(--pp-text-xs);
-  text-overflow: ellipsis;
   white-space: nowrap;
 }
 
-.pp-composer__model:hover:not(:disabled) {
+.pp-composer__chip:hover:not(:disabled),
+.pp-composer__chip[aria-expanded='true'] {
   background: var(--pp-fill-hover);
   color: var(--pp-text);
+}
+
+.pp-composer__chip svg {
+  flex-shrink: 0;
+  color: var(--pp-text-3);
+}
+
+.pp-composer__chip-text {
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.pp-composer__chip:first-of-type .pp-composer__chip-text {
+  max-width: 132px;
+}
+
+.pp-composer__tool {
+  width: 26px !important;
+  height: 26px !important;
+  color: var(--pp-text-2);
 }
 
 .pp-composer__warn {
@@ -471,20 +551,33 @@
   flex: 1;
 }
 
+/* Send: a small round accent button with a clear arrow; greyed until there is a question. */
 .pp-composer__send,
 .pp-composer__stop {
-  width: 28px !important;
-  height: 28px !important;
+  width: 30px !important;
+  height: 30px !important;
+  transition:
+    background-color var(--pp-dur-fast) var(--pp-ease-out),
+    transform var(--pp-dur-fast) var(--pp-ease-spring);
+}
+
+.pp-composer__send svg {
+  stroke-width: 2.2;
 }
 
 .pp-composer__send:not(:disabled) {
   background: var(--pp-accent);
   color: var(--pp-on-accent);
+  box-shadow: 0 1px 2px color-mix(in srgb, var(--pp-accent) 35%, transparent);
 }
 
 .pp-composer__send:not(:disabled):hover {
   background: var(--pp-accent);
   filter: brightness(1.08);
+}
+
+.pp-composer__send:not(:disabled):active {
+  transform: scale(0.94);
 }
 
 .pp-composer__send:disabled {
@@ -498,11 +591,14 @@
   color: var(--pp-reading-surface) !important;
 }
 
+.pp-composer__stop svg {
+  transform: scale(0.8);
+}
+
 .pp-composer__attachments {
   display: flex;
   flex-wrap: wrap;
   gap: 6px;
-  margin-bottom: 4px;
 }
 
 .pp-composer__attachment {
@@ -531,14 +627,6 @@
   transform: scale(0.8);
   background: var(--pp-glass-float-solid) !important;
   box-shadow: 0 0 0 0.5px var(--pp-hairline-strong);
-}
-
-.pp-chat__footnote {
-  flex-shrink: 0;
-  margin: 6px 0 0;
-  color: var(--pp-text-3);
-  font-size: 11px;
-  text-align: center;
 }
 
 /* ---- Conversations popover ------------------------------------------------------------- */

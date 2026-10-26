@@ -118,7 +118,7 @@ toast.show({ message: '翻译失败：请求超时', tone: 'error', action: { la
 - 生成状态 `generation` 决定界面：排队、生成中（输入框的发送按钮变成停止）、已停止、被中断、失败、保存失败，各自带恢复按钮，`onRecover(id, action)`。
 - 对话切换、重命名、删除都在标题旁的下拉里（`ChatSessions`）。快捷问题和推荐追问点一下只填进输入框，由读者决定是否发送。
 - 换到另一家供应商的模型：`onModel` 之后，逻辑层返回的确认信息传给 `modelChange`，界面弹出说明；用户点「换用」调用 `onConfirmModelChange`。
-- 输入框下方有一行小字：演示时说明不会调用模型，正式时提示「回答由模型生成，请以原文为准」。
+- 输入框是浮在对话末尾的玻璃条，可拖动上沿调整高度（双击恢复自动）。模型右侧是思考强度（`ModelView.reasoningLevels` 非空时显示，`onReasoning` 设置当前对话的 `reasoning`）；模型能看图且传了 `onCaptureRegion` 时，左侧有框选论文区域的按钮。
 
 ## 概览面板 `OverviewPanel`
 

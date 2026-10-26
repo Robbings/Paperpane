@@ -42,6 +42,10 @@ export interface ChatPanelProps {
   onRecover: (messageId: string, action: ErrorView['recovery'][number]) => void;
   onRetrySuggestions: () => void;
   onModel: (modelId: string) => void;
+  /** Sets the session's thinking strength. */
+  onReasoning?: (level: string) => void;
+  /** Starts picking a region of the paper to attach as an image. */
+  onCaptureRegion?: () => void;
   onConfirmModelChange: () => void;
   onCancelModelChange: () => void;
   onNewSession: () => void;
@@ -82,12 +86,22 @@ export function ChatPanel(props: ChatPanelProps) {
   const [removing, setRemoving] = useState<SessionSummary | null>(null);
   const titleRef = useRef<HTMLButtonElement>(null);
   const inputRef = useRef<HTMLTextAreaElement>(null);
+  const dockRef = useRef<HTMLDivElement>(null);
+  // The composer floats over the end of the transcript; the transcript keeps that much room at its end.
+  const [dockHeight, setDockHeight] = useState(0);
+  useEffect(() => {
+    const el = dockRef.current;
+    if (!el) return;
+    const observer = new ResizeObserver(() => setDockHeight(el.offsetHeight));
+    observer.observe(el);
+    return () => observer.disconnect();
+  }, [models.length]);
   const messages = session?.messages ?? [];
   const last = messages[messages.length - 1];
   const busy = messages.some((m) => m.generation?.state === 'running' || m.generation?.state === 'queued');
   const modelId = session?.modelId ?? props.defaultModelId;
   // Follow the text as it streams: the length of the last message changes on every chunk.
-  const scroll = useStickToBottom(`${session?.id}:${messages.length}:${last?.markdown.length}:${session?.suggestions.state}`);
+  const scroll = useStickToBottom(`${session?.id}:${messages.length}:${last?.markdown.length}:${session?.suggestions.state}:${dockHeight}`);
 
   /** Puts a quick question or follow-up in the box, ready to send or adjust. */
   const prefill = (question: string) => {
@@ -144,7 +158,14 @@ export function ChatPanel(props: ChatPanelProps) {
     <div className="pp-panel pp-chat">
       {header}
       <PanelBody>
-        <ScrollArea className="pp-chat__scroll" viewportClassName="pp-chat__viewport" viewportRef={scroll.ref} onScroll={scroll.onScroll} {...cleanCopyHandlers}>
+        <ScrollArea
+          className="pp-chat__scroll"
+          viewportClassName="pp-chat__viewport"
+          viewportRef={scroll.ref}
+          onScroll={scroll.onScroll}
+          style={{ paddingBottom: dockHeight + 20 }}
+          {...cleanCopyHandlers}
+        >
           {props.source}
           {messages.length === 0 ? (
             <div className="pp-chat-start">
@@ -218,6 +239,7 @@ export function ChatPanel(props: ChatPanelProps) {
           )}
         </ScrollArea>
 
+        <div ref={dockRef} className="pp-chat__dock">
         <ChatComposer
           inputRef={inputRef}
           text={session?.draft.text ?? props.newDraft ?? ''}
@@ -235,8 +257,11 @@ export function ChatPanel(props: ChatPanelProps) {
           }}
           onStop={props.onStop}
           onModel={props.onModel}
+          reasoning={session?.reasoning}
+          onReasoning={props.onReasoning}
+          onCaptureRegion={props.onCaptureRegion}
         />
-        <p className="pp-chat__footnote">{props.demo ? '演示内容，不会调用模型或保存' : '回答由模型生成，请以原文为准'}</p>
+        </div>
       </PanelBody>
 
       <ChatSessions

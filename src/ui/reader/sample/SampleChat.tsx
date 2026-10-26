@@ -6,9 +6,9 @@ import type { ChatMessageView, ChatSessionView, CitationView, ModelChangeView, M
 // 示例接线：讨论面板的演示数据。回答是预先写好的文本，按小段"流式"出现；不调用任何模型，刷新即恢复。
 
 const models: ModelView[] = [
-  { id: 'm-a', displayName: '示例模型 A', providerId: 'p-1', providerName: '示例供应商甲', endpointOrigin: 'api.provider-one.example', vision: true },
-  { id: 'm-a-mini', displayName: '示例模型 A mini', providerId: 'p-1', providerName: '示例供应商甲', endpointOrigin: 'api.provider-one.example', vision: false },
-  { id: 'm-b', displayName: '示例模型 B', providerId: 'p-2', providerName: '示例供应商乙', endpointOrigin: 'api.provider-two.example', vision: true },
+  { id: 'm-a', displayName: '示例模型 A', providerId: 'p-1', providerName: '示例供应商甲', endpointOrigin: 'api.provider-one.example', vision: true, reasoningLevels: ['low', 'medium', 'high'] },
+  { id: 'm-a-mini', displayName: '示例模型 A mini', providerId: 'p-1', providerName: '示例供应商甲', endpointOrigin: 'api.provider-one.example', vision: false, reasoningLevels: [] },
+  { id: 'm-b', displayName: '示例模型 B', providerId: 'p-2', providerName: '示例供应商乙', endpointOrigin: 'api.provider-two.example', vision: true, reasoningLevels: ['none', 'low', 'medium', 'high', 'max'] },
 ];
 
 const DOCUMENT_TITLE = 'Recovering Reading Order in Two-Column Scientific PDFs';
@@ -46,6 +46,7 @@ interface Session {
   id: string;
   title: string;
   modelId: string;
+  reasoning?: string;
   messages: Msg[];
   activeLeafId: string | null;
   draft: string;
@@ -167,6 +168,7 @@ export function SampleChat({ onLocateQuote }: { onLocateQuote: (quote: string) =
     id: current.id,
     title: current.title,
     modelId: current.modelId,
+    reasoning: current.reasoning,
     draft: { text: current.draft, attachments: [] },
     suggestions: current.suggestions,
     messages: visible(current).map((m) => {
@@ -241,6 +243,8 @@ export function SampleChat({ onLocateQuote }: { onLocateQuote: (quote: string) =
         if (current && current.messages.length > 0 && from && to && from.providerId !== to.providerId) setPendingModel(modelId);
         else applyModel(modelId);
       }}
+      onReasoning={(level) => current && update(current.id, (s) => ({ ...s, reasoning: level }))}
+      onCaptureRegion={() => toast.show({ message: '示例：在论文上框选一块区域，作为图片附到问题里' })}
       onConfirmModelChange={() => {
         if (pendingModel) applyModel(pendingModel);
         setPendingModel(null);
