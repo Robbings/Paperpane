@@ -66,6 +66,8 @@ function InlineField({
 }) {
   const [draft, setDraft] = useState(value);
   const titleRef = useRef<HTMLTextAreaElement>(null);
+  // Esc blurs the field too; the blur must not save the draft it is throwing away.
+  const cancelled = useRef(false);
   useEffect(() => setDraft(value), [value]);
   useLayoutEffect(() => {
     const el = titleRef.current;
@@ -73,7 +75,14 @@ function InlineField({
     el.style.height = 'auto';
     el.style.height = `${el.scrollHeight}px`;
   }, [draft]);
+  const arm = () => {
+    cancelled.current = false;
+  };
   const commit = () => {
+    if (cancelled.current) {
+      cancelled.current = false;
+      return;
+    }
     if (draft.trim() !== value) onCommit(draft.trim());
   };
   const keys = (event: KeyboardEvent<HTMLInputElement | HTMLTextAreaElement>) => {
@@ -82,6 +91,7 @@ function InlineField({
       event.currentTarget.blur();
     }
     if (event.key === 'Escape') {
+      cancelled.current = true;
       setDraft(value);
       event.currentTarget.blur();
     }
@@ -94,9 +104,9 @@ function InlineField({
     <label className={variant === 'title' ? 'pp-lib-inline pp-lib-inline--title' : 'pp-lib-inline'}>
       <span className={variant === 'title' ? 'pp-visually-hidden' : 'pp-lib-inline__label'}>{label}</span>
       {variant === 'title' ? (
-        <textarea ref={titleRef} rows={1} value={draft} onChange={(event) => setDraft(event.target.value)} onBlur={commit} onKeyDown={keys} />
+        <textarea ref={titleRef} rows={1} value={draft} onChange={(event) => setDraft(event.target.value)} onFocus={arm} onBlur={commit} onKeyDown={keys} />
       ) : (
-        <input value={draft} placeholder={placeholder} onChange={(event) => setDraft(event.target.value)} onBlur={commit} onKeyDown={keys} />
+        <input value={draft} placeholder={placeholder} onChange={(event) => setDraft(event.target.value)} onFocus={arm} onBlur={commit} onKeyDown={keys} />
       )}
     </label>
   );
