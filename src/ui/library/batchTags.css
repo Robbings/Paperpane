@@ -1,21 +1,117 @@
 /* Scoped to the library batch editor. Existing global controls and materials stay shared. */
-.pp-batch-tags { display: grid; gap: var(--pp-space-3); }
-.pp-batch-tags__heading { display: flex; align-items: baseline; justify-content: space-between; gap: 12px; }
-.pp-batch-tags__heading h2 { margin: 0; font-size: var(--pp-text-lg); font-weight: var(--pp-weight-semibold); }
-.pp-batch-tags__heading > span { color: var(--pp-text-3); font-size: var(--pp-text-sm); }
-.pp-batch-tags__choices { max-height: 208px; min-height: 40px; overflow-y: auto; overscroll-behavior: contain; margin: -4px; padding: 4px; }
-.pp-batch-tags__row { display: flex; align-items: center; gap: 8px; min-height: 36px; padding: 0 8px; border-radius: var(--pp-radius-control); }
-.pp-batch-tags__row:hover, .pp-batch-tags__row:focus-within { background: var(--pp-fill-hover); }
-.pp-batch-tags__row .pp-toggle { flex: 1; min-width: 0; gap: 8px; align-items: center; }
-.pp-batch-tags__row .pp-checkbox { margin-top: 0; }
-.pp-batch-tags__row .pp-toggle__text { flex: 1; min-width: 0; }
-.pp-batch-tags__row .pp-toggle__label { display: block; padding: 8px 0; line-height: 20px; overflow-wrap: anywhere; cursor: pointer; }
-.pp-batch-tags__new { color: var(--pp-text-3); font-size: var(--pp-text-xs); flex-shrink: 0; }
-.pp-batch-tags__create { display: flex; align-items: center; gap: 8px; width: 100%; min-height: 36px; padding: 6px 8px; border: 0; border-radius: var(--pp-radius-control); background: transparent; color: var(--pp-accent); text-align: left; font: inherit; font-size: var(--pp-text-md); }
-.pp-batch-tags__create > span:first-of-type { flex: 1; min-width: 0; overflow-wrap: anywhere; }
-.pp-batch-tags__create:hover { background: var(--pp-fill-hover); }
-.pp-batch-tags__key { color: var(--pp-text-3); font-size: var(--pp-text-sm); }
-.pp-batch-tags__empty { margin: 0; padding: 12px 8px; color: var(--pp-text-3); font-size: var(--pp-text-md); line-height: var(--pp-leading-body); }
-.pp-batch-tags__error { margin: 0; color: var(--pp-danger); font-size: var(--pp-text-md); line-height: var(--pp-leading-body); }
-.pp-batch-tags__footer { display: flex; align-items: center; gap: 6px; padding-top: 12px; border-top: .5px solid var(--pp-hairline); }
-.pp-batch-tags__footer > span { margin-right: auto; color: var(--pp-text-3); font-size: var(--pp-text-sm); }
+.pp-batch-tags {
+  display: grid;
+  gap: var(--pp-space-3);
+}
+.pp-batch-tags__heading {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 12px;
+}
+.pp-batch-tags__heading h2 {
+  margin: 0;
+  font-size: var(--pp-text-lg);
+  font-weight: var(--pp-weight-semibold);
+}
+.pp-batch-tags__heading > span {
+  color: var(--pp-text-2);
+  font-size: var(--pp-text-sm);
+}
+.pp-batch-tags__scroll {
+  margin: -4px;
+}
+.pp-batch-tags__choices {
+  max-height: 208px;
+  min-height: 40px;
+  padding: 4px;
+}
+.pp-batch-tags__row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-height: 36px;
+  padding: 0 8px;
+  border-radius: var(--pp-radius-control);
+}
+.pp-batch-tags__row:hover,
+.pp-batch-tags__row:focus-within {
+  background: var(--pp-fill-hover);
+}
+.pp-batch-tags__row .pp-toggle {
+  flex: 1;
+  min-width: 0;
+  gap: 8px;
+  align-items: center;
+}
+.pp-batch-tags__row .pp-checkbox {
+  margin-top: 0;
+}
+.pp-batch-tags__row .pp-toggle__text {
+  flex: 1;
+  min-width: 0;
+}
+.pp-batch-tags__row .pp-toggle__label {
+  display: block;
+  padding: 8px 0;
+  line-height: 20px;
+  overflow-wrap: anywhere;
+  cursor: pointer;
+}
+.pp-batch-tags__new {
+  color: var(--pp-text-2);
+  font-size: var(--pp-text-xs);
+  flex-shrink: 0;
+}
+.pp-batch-tags__create {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  width: 100%;
+  min-height: 36px;
+  padding: 6px 8px;
+  border: 0;
+  border-radius: var(--pp-radius-control);
+  background: transparent;
+  color: var(--pp-accent);
+  text-align: left;
+  font: inherit;
+  font-size: var(--pp-text-md);
+}
+.pp-batch-tags__create > span:first-of-type {
+  flex: 1;
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+.pp-batch-tags__create:hover {
+  background: var(--pp-fill-hover);
+}
+.pp-batch-tags__key {
+  color: var(--pp-text-2);
+  font-size: var(--pp-text-sm);
+}
+.pp-batch-tags__empty {
+  margin: 0;
+  padding: 12px 8px;
+  color: var(--pp-text-2);
+  font-size: var(--pp-text-md);
+  line-height: var(--pp-leading-body);
+}
+.pp-batch-tags__error {
+  margin: 0;
+  color: var(--pp-danger);
+  font-size: var(--pp-text-md);
+  line-height: var(--pp-leading-body);
+}
+.pp-batch-tags__footer {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding-top: 12px;
+  border-top: 0.5px solid var(--pp-hairline);
+}
+.pp-batch-tags__footer > span {
+  margin-right: auto;
+  color: var(--pp-text-2);
+  font-size: var(--pp-text-sm);
+}

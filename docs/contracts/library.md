@@ -61,3 +61,10 @@ PdfBibliography 带提取版本和字段来源（pdf-metadata / first-page），
 LibraryService.addTags(ids, tags) 接收完整批次，LibraryDatabase 在同一 readwrite 事务中检查论文、复用/新建规范化标签、更新所有 tagIds 及变更日志。任何一项失败均 abort，不允许循环调用多个 addTag 冒充一次保存。addTag 复用同一实现。重试不会重复建标签或重复关联；已有的标签关联保持。
 
 LibraryView.onAddTags 返回成功/失败结果；BatchTagPopover 等待提交结果，保存中锁定重复操作，失败显示原因并保留 selected/created 草稿，只有成功才关闭。只把选中的标签交给服务，未勾选的新标签不写库。正式 library.html 已连接此接口；library-preview.html 继续作为明确标识的内存预览。
+
+
+## 阅读入口与本机偏好
+
+`reader.html?item=<libraryId>` 打开数据库原 PDF；不带 item 的 `reader.html` 保留示例阅读器和原讨论/概览示例，`?view=gallery` 保留组件目录。`reader-proof.html` 仍是独立文件验证入口。真实阅读器的快速设置直接保存本机外观偏好，模型/密钥等完整配置未接合；不注入虚假的已配置模型。
+
+外观偏好存入 `meta` 中独立的 `readerPreferences` 记录，字段按现有 UI Preferences 的合法范围验证，单字段事务合并避免跨页覆盖；在成功提交后广播刷新。与文献库列宽/布局偏好、可清除缓存分开。

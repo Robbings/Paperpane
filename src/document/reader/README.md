@@ -1,6 +1,6 @@
 # PDF.js reading surface — first integration proof
 
-The surface backs the library PDF route (`reader.html?item=…`) and a standalone file picker (`reader-proof.html`). It reuses the current ReaderShell, ReaderToolbar, SelectionMenu, annotation panel and OverlayScrollbar through the controlled runtime interface. Library records, raw files and reading positions use the durable services; research edits below remain explicitly session-only.
+The surface backs the library PDF route (`reader.html?item=…`) and a standalone file picker (`reader-proof.html`). Without an item, `reader.html` keeps the sample reader and its discussion/overview demonstrations; `reader.html?view=gallery` keeps the component gallery. It reuses the current ReaderShell, ReaderToolbar, SelectionMenu, annotation panel and OverlayScrollbar through the controlled runtime interface. Library records, raw files and reading positions use the durable services; research edits below remain explicitly session-only.
 
 ## What is real
 
@@ -35,3 +35,7 @@ Manual first-slice check (2026-10-26): opened the original BERT PDF, selected mu
 Native `switchannotationeditormode` / `showannotationeditorui` events are no longer forwarded blindly. PDF.js can emit these when an existing highlight is double-clicked, unintentionally leaving the reading surface in persistent HIGHLIGHT mode even though the Paperpane toolbar is off. The runtime's one-shot creation still enters the native editor explicitly and restores NONE afterward.
 
 The controlled shell ports are available and selection creation is connected. Persistent pen mode and existing-highlight edit/delete reconciliation remain separate annotation work; their callbacks show an explicit unavailable message. The adapter must not emulate those actions by changing the UI list alone while leaving native PDF annotations unchanged.
+
+## Quick appearance preferences
+
+The real PDF reader passes the existing QuickSettings UI a local preference service. Theme, reading-text size, page dimming and other appearance values are applied immediately and saved by per-field IndexedDB transactions in `meta.readerPreferences`; other real-reader tabs follow committed changes. Invalid values are rejected, failed saves are reported, and cache clearing does not touch this store. Model configuration and secrets are still separate unfinished work; no sample provider/model is reported as configured in the real reader. Sample reader/settings views retain their existing clearly marked demonstration storage.
