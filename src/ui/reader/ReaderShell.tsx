@@ -78,8 +78,6 @@ interface ReaderShellProps {
   library?: ReaderLibraryProps;
   /** Content for research panels the page supplies itself (discussion, overview, …); the rest show a placeholder. */
   panels?: Partial<Record<ResearchPanelId, ReactNode>>;
-  /** Under review: panel headers on the glass (default) or on the reading surface. */
-  panelHeader?: 'glass' | 'white';
 }
 
 export interface ReaderLibraryProps extends ReaderLibraryData {
@@ -339,7 +337,6 @@ export function ReaderShell(props: ReaderShellProps) {
     <div
       className="pp-reader"
       data-placement={effectivePlacement}
-      data-panel-header={props.panelHeader === 'white' ? 'white' : undefined}
       data-switching={switching ?? undefined}
       data-resizing={resizing || windowResizing ? 'true' : undefined}
       style={style}

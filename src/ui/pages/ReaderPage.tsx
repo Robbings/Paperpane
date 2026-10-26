@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
 import { createPortal } from 'react-dom';
-import { Segmented, Toaster, toast } from '@/ui/components';
+import { Toaster, toast } from '@/ui/components';
 import { ComponentGallery } from '@/ui/gallery/ComponentGallery';
 import { sampleFolders, samplePapers, sampleTags } from '@/ui/library/sample/libraryData';
 import type { FolderView, PaperView, TagView } from '@/ui/library/types';
@@ -37,8 +37,6 @@ function SampleReader() {
   // 示例：文献库里的论文与标签，当前论文是第一篇。
   const [papers, setPapers] = useState<PaperView[]>(samplePapers);
   const [tags, setTags] = useState<TagView[]>(sampleTags);
-  // 审阅用的临时开关：比较面板标题放在玻璃上还是白底上，定稿后删除。
-  const [panelHeader, setPanelHeader] = useState<'glass' | 'white'>(params.get('header') === 'white' ? 'white' : 'glass');
   const [folders, setFolders] = useState<FolderView[]>(sampleFolders);
   const [saved, setSaved] = useState(true);
   const current = papers[0]!;
@@ -123,7 +121,6 @@ function SampleReader() {
           if (target) navigate(target.pageIndex);
         }}
         onTool={() => undefined}
-        panelHeader={panelHeader}
         panels={{ discuss: <SampleChat onLocateQuote={locateQuote} />, overview: <SampleOverview onLocateQuote={locateQuote} /> }}
         library={{
           currentPaperId: current.id,
@@ -159,19 +156,6 @@ function SampleReader() {
         }}
       />
       <Toaster />
-      <div className="pp-review-switch">
-        <span>面板标题</span>
-        <Segmented
-          label="面板标题样式"
-          size="sm"
-          options={[
-            { value: 'glass', label: '方案 1：灰' },
-            { value: 'white', label: '方案 2：白' },
-          ]}
-          value={panelHeader}
-          onChange={setPanelHeader}
-        />
-      </div>
       {flash && createPortal(<LocateFlash key={flash.key} rects={flash.rects} />, flash.page)}
     </>
   );

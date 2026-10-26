@@ -619,65 +619,50 @@
   --pp-pad-end: var(--pp-space-6);
 }
 
-/* The header and filters stay on the glass with the rest of the chrome; the
-   text below sits on an opaque surface that runs to the card's edges, like a
-   window's content area meeting its toolbar at one hairline. */
+/* The whole panel sits on the reading surface, header included; only the
+   function rail stays glass, meeting the panel at one hairline. */
+.pp-panel {
+  background: var(--pp-reading-surface);
+}
+
+.pp-reader[data-placement='right'] .pp-panel {
+  border-right: 0.5px solid var(--pp-hairline);
+}
+
+.pp-reader[data-placement='bottom'] .pp-panel {
+  border-bottom: 0.5px solid var(--pp-hairline);
+}
+
+/* The content below the header and filters. */
 .pp-panel__body {
   display: flex;
   flex: 1;
   flex-direction: column;
   min-height: 0;
-  margin: 6px calc(var(--pp-pad-end) * -1) calc(var(--pp-pad-bottom) * -1) calc(var(--pp-pad-start) * -1);
-  padding: 0 var(--pp-pad-end) var(--pp-pad-bottom) var(--pp-pad-start);
-  border-top: 0.5px solid var(--pp-hairline-strong);
-  background: var(--pp-reading-surface);
+  margin-top: 2px;
 }
 
-/* Option under review: the whole panel, header included, on the reading
-   surface; only the function rail stays glass. */
-.pp-reader[data-panel-header='white'] .pp-panel {
-  background: var(--pp-reading-surface);
-}
-
-.pp-reader[data-panel-header='white'] .pp-panel__body {
-  border-top-color: transparent;
-}
-
-.pp-reader[data-panel-header='white'][data-placement='right'] .pp-panel {
-  border-right: 0.5px solid var(--pp-hairline);
-}
-
-.pp-reader[data-panel-header='white'][data-placement='bottom'] .pp-panel {
-  border-bottom: 0.5px solid var(--pp-hairline);
-}
-
-.pp-reader[data-panel-header='white'] .pp-panel__body {
-  border-right: 0;
-  border-bottom: 0;
-}
-
-/* Where the surface meets the function rail. */
-.pp-reader[data-placement='right'] .pp-panel__body {
-  border-right: 0.5px solid var(--pp-hairline);
-}
-
-.pp-reader[data-placement='bottom'] .pp-panel__body {
-  border-bottom: 0.5px solid var(--pp-hairline);
-}
-
+/* A slim, quiet header: it names the panel without competing with the content. */
 .pp-panel__header {
   display: flex;
   flex-shrink: 0;
   align-items: center;
-  gap: var(--pp-space-2);
-  min-height: 30px;
+  gap: 6px;
+  min-height: 28px;
+  margin-right: -6px;
 }
 
 .pp-panel__title {
   margin: 0;
-  font-size: var(--pp-text-md);
+  color: var(--pp-text-2);
+  font-size: 12.5px;
   font-weight: var(--pp-weight-semibold);
   line-height: var(--pp-leading-tight);
+}
+
+.pp-panel__header .pp-icon-btn {
+  width: var(--pp-control-sm);
+  height: var(--pp-control-sm);
 }
 
 .pp-panel__meta {
@@ -894,21 +879,4 @@
   100% {
     opacity: 0;
   }
-}
-
-/* Temporary review switch on the demo page (remove after the choice is made). */
-.pp-review-switch {
-  position: fixed;
-  bottom: 14px;
-  left: 14px;
-  z-index: var(--pp-z-float);
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  padding: 4px 4px 4px 12px;
-  border-radius: var(--pp-radius-pill);
-  background: var(--pp-glass-float-solid);
-  box-shadow: var(--pp-shadow-float);
-  color: var(--pp-text-2);
-  font-size: var(--pp-text-xs);
 }
