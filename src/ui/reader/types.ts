@@ -53,6 +53,37 @@ export type ReaderMenuTarget =
 /** "auto-highlight": a finished selection becomes a highlight in the last colour at once. */
 export type ReaderTool = 'select' | 'auto-highlight';
 
+export type Rotation = 0 | 90 | 180 | 270;
+
+/** Find in the paper: what is being looked for and where the runtime is in the results. */
+export interface ReaderSearchState {
+  query: string;
+  matchCase: boolean;
+  wholeWord: boolean;
+  status: 'idle' | 'searching' | 'done';
+  total: number;
+  /** 1-based index of the selected match; 0 when there is none. */
+  current: number;
+}
+
+/**
+ * A comment note's layout, kept per annotation so it can be restored when the
+ * paper is opened again. The note is pinned to its passage: (dx, dy) is its
+ * offset in CSS pixels from the passage's top-left corner on the paper.
+ */
+export interface NoteLayout {
+  id: string;
+  dx: number;
+  dy: number;
+  width: number;
+  height: number;
+  collapsed: boolean;
+  /** False when closed; the layout stays for when it reopens. */
+  open: boolean;
+  /** Stacking order among open notes. */
+  z: number;
+}
+
 /**
  * How the runtime drives reading and annotating. The shell owns the visuals
  * (menu, comment notes, annotation list); selection capture, hit-testing,
@@ -90,4 +121,19 @@ export interface ReaderInteraction {
    * again. Returns the unsubscribe function (backed by AnchorService.subscribeProjection).
    */
   subscribeGeometry: (listener: () => void) => () => void;
+
+  /** Page rotation, applied by the runtime to every page. */
+  rotation: Rotation;
+  onRotate: (rotation: Rotation) => void;
+
+  /** Find: the runtime searches the text layer, marks all matches and scrolls to the current one. */
+  search: ReaderSearchState;
+  onSearch: (query: string, options: { matchCase: boolean; wholeWord: boolean }) => void;
+  onSearchStep: (direction: 1 | -1) => void;
+  /** The find bar closed: clear the marks. */
+  onSearchClose: () => void;
+
+  /** Comment notes' layouts, saved by the runtime with the paper and handed back when it reopens. */
+  noteLayouts: readonly NoteLayout[];
+  onNoteLayouts: (layouts: NoteLayout[]) => void;
 }

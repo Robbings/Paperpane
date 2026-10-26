@@ -1,11 +1,12 @@
 import type { PageRect } from '../LocateFlash';
+import { viewToPage } from './pageFrame';
 
 // 示例接线：在示例论文的 DOM 里按引文查找位置。真实阅读器由逻辑层用锚点和
 // 页面坐标完成，这里只为演示"跳回原文"的界面效果。
 
 const normalize = (text: string) => text.replace(/\s+/g, ' ').toLowerCase();
 
-/** Finds a quote on one of the pages under `root` and returns its page element and line boxes in page coordinates. */
+/** Finds a quote on one of the pages under `root` and returns its page element and line boxes in the page's own (unturned) coordinates. */
 export function findQuote(root: HTMLElement, quote: string): { page: HTMLElement; rects: PageRect[] } | null {
   const target = normalize(quote).trim();
   if (!target) return null;
@@ -30,10 +31,9 @@ export function findQuote(root: HTMLElement, quote: string): { page: HTMLElement
     const range = document.createRange();
     range.setStart(start.node, start.offset);
     range.setEnd(end.node, end.offset + 1);
-    const box = page.getBoundingClientRect();
     const rects = Array.from(range.getClientRects())
-      .filter((r) => r.width > 1)
-      .map((r) => ({ left: r.left - box.left, top: r.top - box.top, width: r.width, height: r.height }));
+      .filter((r) => r.width > 1 && r.height > 1)
+      .map((r) => viewToPage(page, r));
     return { page, rects };
   }
   return null;

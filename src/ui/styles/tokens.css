@@ -79,6 +79,9 @@
   --pp-hl-blue-dot: #2bb4d8;
   --pp-hl-pink-dot: #e06aa6;
   --pp-hl-purple-dot: #9874e8;
+  /* Find matches on the paper: orange, apart from the selection's blue and the highlight colours. */
+  --pp-find-match: rgba(255, 150, 40, 0.3);
+  --pp-find-current: rgba(255, 122, 0, 0.62);
 
   /* Typography */
   --pp-font-ui: -apple-system, BlinkMacSystemFont, 'SF Pro Text', 'PingFang SC', 'Segoe UI Variable Text',

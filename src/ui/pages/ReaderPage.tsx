@@ -8,6 +8,7 @@ import type { LibraryEntryDraft } from '@/ui/reader/library/SaveToLibraryPopover
 import { LocateFlash, type PageRect } from '@/ui/reader/LocateFlash';
 import { ReaderShell } from '@/ui/reader/ReaderShell';
 import { findQuote } from '@/ui/reader/sample/findQuote';
+import { pageToView } from '@/ui/reader/sample/pageFrame';
 import { useSampleReader } from '@/ui/reader/sample/useSampleReader';
 import { SampleChat } from '@/ui/reader/sample/SampleChat';
 import { SampleOverview } from '@/ui/reader/sample/SampleOverview';
@@ -75,8 +76,8 @@ function SampleReader() {
       toast.show({ message: '没有在论文中找到这段引文', tone: 'warning' });
       return;
     }
-    const first = found.rects[0]!;
-    const top = found.page.offsetTop + first.top - container.clientHeight * 0.35;
+    const first = pageToView(found.page, found.rects[0]!);
+    const top = container.scrollTop + first.top - container.getBoundingClientRect().top - container.clientHeight * 0.35;
     container.scrollTo({ top: Math.max(0, top), behavior: 'smooth' });
     const key = Date.now();
     setFlash({ page: found.page, rects: found.rects, key });
@@ -101,13 +102,14 @@ function SampleReader() {
         // 示例数据不保存：状态行如实标为演示，而不是模拟"已保存"。
         annotationStatus={{ local: 'unmodified', sync: 'unconfigured', simulated: true }}
         notes={{ value: note, onChange: setNote, local: 'unmodified', sync: 'unconfigured', simulated: true }}
-        document={<SamplePaper pageCount={sampleHeader.pageCount} zoomPercent={zoom} highlights={reader.paperHighlights} />}
+        document={<SamplePaper pageCount={sampleHeader.pageCount} zoomPercent={zoom} rotation={reader.interaction.rotation} highlights={reader.paperHighlights} />}
         onNavigate={navigate}
         onZoom={(direction) => {
-          const index = ZOOM_STEPS.indexOf(zoom);
-          const next = ZOOM_STEPS[Math.min(Math.max(index + (direction === 'in' ? 1 : -1), 0), ZOOM_STEPS.length - 1)];
+          // From any value, typed ones included, go to the next step up or down.
+          const next = direction === 'in' ? ZOOM_STEPS.find((step) => step > zoom) : [...ZOOM_STEPS].reverse().find((step) => step < zoom);
           if (next !== undefined) setZoom(next);
         }}
+        onZoomTo={setZoom}
         interaction={reader.interaction}
         onLocateAnnotation={(id) => {
           const target = annotations.find((item) => item.id === id);

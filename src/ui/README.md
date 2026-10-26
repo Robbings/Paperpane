@@ -101,7 +101,7 @@ toast.show({ message: '翻译失败：请求超时', tone: 'error', action: { la
 | `annotations`、`annotationStatus` | 批注列表与保存 / 同步状态 |
 | `notes` | 笔记内容、`onChange`、保存 / 同步状态 |
 | `initialLayout`、`onLayoutChange` | 停靠位置、宽高、是否显示标题；由逻辑层保存为偏好 |
-| `onNavigate`、`onZoom` | 跳页、缩放 |
+| `onNavigate`、`onZoom(direction)`、`onZoomTo(percent)` | 跳页、按档位缩放、输入的百分比（界面已限制在 25–400） |
 | `onHighlight(color, selection)`、`onSelectionAction(action, selection)` | 选区菜单的操作；`selection` 是选中时的快照，锚点由逻辑层生成 |
 | `onLocateAnnotation(id)`、`onTool(tool)` | 定位批注、工具栏按钮 |
 | `panels` | 可选。由页面提供的研究区面板内容，如 `{ discuss: <ChatPanel …/>, overview: <OverviewPanel …/> }`；没提供的面板显示占位 |
@@ -122,6 +122,9 @@ toast.show({ message: '翻译失败：请求超时', tone: 'error', action: { la
 - `subscribeGeometry(listener)`：批注位置可能变化时通知（页面渲染完成、缩放、旋转、重排），便签据此重新定位；建议直接接 `AnchorService.subscribeProjection`。
 - `onAnnotationComment`：便签每次输入都会立即调用，不做延迟；由运行时持有草稿、合并写入，并在关闭或切换文档时写完。
 - 评论便签放在滚动容器里、钉在原文旁边，随论文滚动和缩放；可以拖动、调大小、收起成标题小条、关闭后再打开（保持原位置）。标题就是评论的第一行。便签所在的层带 `data-pp-overlay`，运行时捕获选区和点击时应忽略来自这里的事件。
+- `noteLayouts` / `onNoteLayouts(layouts)`：便签的布局由运行时持有并随论文保存，下次打开时原样交回。每项是 `NoteLayout { id, dx, dy, width, height, collapsed, open, z }`：`id` 是批注 id；`(dx, dy)` 是便签相对原文第一行左上角的偏移（CSS 像素）；`open: false` 表示已关闭但保留位置；`z` 是叠放顺序。外壳每次拖动、缩放、收起、关闭、打开都会交回整组新值（拖动过程中会连续调用，写入请自行合并）。批注被彻底删除时，由运行时一并去掉对应布局；撤销删除时保留。
+- `rotation` / `onRotate(rotation)`：页面旋转，`0 | 90 | 180 | 270`，作用于所有页面（对应 PDF.js 的 `pagesRotation`）。工具栏按钮每次顺时针转 90°，旋转后按钮保持标记，右键或「更多」菜单里可以恢复。旋转后请通知 `subscribeGeometry`。
+- 查找：`search` 是当前状态 `{ query, matchCase, wholeWord, status: 'idle' | 'searching' | 'done', total, current }`（`current` 从 1 开始，没有结果为 0）。查找栏随输入调用 `onSearch(query, { matchCase, wholeWord })`，Enter / Shift+Enter 和上下按钮调用 `onSearchStep(1 | -1)`，关闭时调用 `onSearchClose()`（清除页面上的标记，保留上次的查询词）。⌘F / Ctrl+F 打开查找栏（有选中文字时用它作查询词），⌘G / ⌘⇧G 跳到下一个 / 上一个。运行时负责搜索文本层、标记全部结果并把当前结果滚到视野里；对应 PDF.js 的 `find` / `findagain` 事件和 `updatefindmatchescount`、`updatefindcontrolstate`。页面上的标记颜色已在界面定义：`.textLayer .highlight` 和 `.highlight.selected`（`--pp-find-match`、`--pp-find-current`）。
 - PDF 页面的外观（纸张、阴影、页间距、深色模式减光）由界面在 `.pp-pdf-surface .page` 上定义。高亮色点（`--pp-hl-*-dot`）与页面高亮（`--pp-hl-*-fill`，与 PDF.js 使用的颜色一致）同色相。
 
 ## 讨论面板 `ChatPanel`

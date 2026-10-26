@@ -1,24 +1,10 @@
 import { useEffect, useLayoutEffect, useRef, useState, type CSSProperties, type PointerEvent as ReactPointerEvent } from 'react';
 import { createPortal } from 'react-dom';
 import { Icon, IconButton } from '@/ui/components';
-import type { AnnotationView, ViewRect } from '../types';
-import './notes.css';
+import type { AnnotationView, NoteLayout, ViewRect } from '../types';
 
-/**
- * A comment note's layout. It is pinned to its passage: (dx, dy) is its offset
- * from the passage's top-left corner on the paper, so it scrolls and zooms with
- * the text. Closed notes keep their layout for when they reopen.
- */
-export interface NoteLayout {
-  id: string;
-  dx: number;
-  dy: number;
-  width: number;
-  height: number;
-  collapsed: boolean;
-  open: boolean;
-  z: number;
-}
+export type { NoteLayout };
+import './notes.css';
 
 export const NOTE_SIZE = { width: 260, height: 168, minWidth: 220, minHeight: 124, maxWidth: 520, maxHeight: 520 };
 const PILL_HEIGHT = 34;

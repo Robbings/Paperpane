@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState, type FormEvent, type MouseEvent, type RefObject } from 'react';
 import { GlassSurface, Icon, IconButton, Menu, Tooltip, type MenuEntry } from '@/ui/components';
-import type { DocumentHeaderView, DockPlacement } from './types';
+import type { DocumentHeaderView, DockPlacement, Rotation } from './types';
 
 /**
  * full: everything · compact: region/rotate/export move into "更多" ·
@@ -8,7 +8,7 @@ import type { DocumentHeaderView, DockPlacement } from './types';
  */
 export type ToolbarDensity = 'full' | 'compact' | 'tight';
 
-export type ToolbarTool = 'search' | 'region' | 'rotate' | 'export' | 'settings';
+export type ToolbarTool = 'region' | 'export' | 'settings';
 
 interface ReaderToolbarProps {
   header: DocumentHeaderView;
@@ -31,12 +31,21 @@ interface ReaderToolbarProps {
   onToggleTitle: () => void;
   onPageSubmit: (pageIndex: number) => void;
   onZoom: (direction: 'in' | 'out') => void;
+  /** A typed percentage, already limited to 25–400. */
+  onZoomTo: (percent: number) => void;
   onTogglePlacement: () => void;
   onToggleAutoHighlight: () => void;
+  findOpen: boolean;
+  /** Opens or closes the find bar. */
+  onFind: () => void;
+  rotation: Rotation;
+  /** Turns the pages a quarter clockwise. */
+  onRotate: () => void;
+  onResetRotation: () => void;
   onTool: (tool: ToolbarTool) => void;
 }
 
-type OpenMenu = { kind: 'context' | 'more'; x: number; y: number; align: 'start' | 'end' } | null;
+type OpenMenu = { kind: 'context' | 'more' | 'rotate'; x: number; y: number; align: 'start' | 'end' } | null;
 
 export function ReaderToolbar({
   header,
@@ -56,12 +65,25 @@ export function ReaderToolbar({
   onToggleTitle,
   onPageSubmit,
   onZoom,
+  onZoomTo,
   onTogglePlacement,
   onToggleAutoHighlight,
+  findOpen,
+  onFind,
+  rotation,
+  onRotate,
+  onResetRotation,
   onTool,
 }: ReaderToolbarProps) {
   const [pageDraft, setPageDraft] = useState(String(pageIndex + 1));
   useEffect(() => setPageDraft(String(pageIndex + 1)), [pageIndex]);
+
+  const [zoomDraft, setZoomDraft] = useState<string | null>(null);
+  const submitZoom = () => {
+    const value = Number.parseFloat(zoomDraft ?? '');
+    if (Number.isFinite(value)) onZoomTo(Math.round(Math.min(400, Math.max(25, value))));
+    setZoomDraft(null);
+  };
 
   const [menu, setMenu] = useState<OpenMenu>(null);
   const moreRef = useRef<HTMLButtonElement>(null);
@@ -95,6 +117,9 @@ export function ReaderToolbar({
   };
 
   const titleEntry: MenuEntry = { id: 'title', label: '显示论文标题', checked: showTitle };
+  const rotateLabel = rotation === 0 ? '顺时针旋转页面' : `顺时针旋转页面（现在 ${rotation}°）`;
+  // Turned pages: the button stays marked, and right-click or the menu puts them back.
+  const resetEntry: MenuEntry = { id: 'rotate-reset', label: '恢复页面方向', icon: 'rotate', disabled: rotation === 0 };
   const moreEntries: MenuEntry[] = [
     ...(density === 'tight'
       ? ([
@@ -104,7 +129,8 @@ export function ReaderToolbar({
         ] as MenuEntry[])
       : []),
     { id: 'region', label: '框选图像', icon: 'region' },
-    { id: 'rotate', label: '旋转页面', icon: 'rotate' },
+    { id: 'rotate', label: rotateLabel, icon: 'rotate' },
+    ...(rotation !== 0 ? [resetEntry] : []),
     { id: 'export', label: '导出', icon: 'export' },
     { kind: 'separator', id: 'sep-title' },
     titleEntry,
@@ -114,7 +140,9 @@ export function ReaderToolbar({
     if (id === 'title') onToggleTitle();
     else if (id === 'zoom-in') onZoom('in');
     else if (id === 'zoom-out') onZoom('out');
-    else if (id === 'region' || id === 'rotate' || id === 'export') onTool(id);
+    else if (id === 'rotate') onRotate();
+    else if (id === 'rotate-reset') onResetRotation();
+    else if (id === 'region' || id === 'export') onTool(id);
   };
 
   return (
@@ -179,7 +207,27 @@ export function ReaderToolbar({
                 <Icon name="minus" size={15} strokeWidth={1.7} />
               </button>
             </Tooltip>
-            <span aria-live="polite">{zoomPercent}%</span>
+            {/* Click the percentage to type one; Enter applies, Esc cancels. */}
+            <input
+              className="pp-toolbar__zoom-input"
+              aria-label="缩放比例（%）"
+              inputMode="numeric"
+              value={zoomDraft ?? `${zoomPercent}%`}
+              onFocus={(event) => {
+                setZoomDraft(String(zoomPercent));
+                const input = event.currentTarget;
+                window.setTimeout(() => input.select(), 0);
+              }}
+              onChange={(event) => setZoomDraft(event.target.value.replace(/[^\d.]/g, ''))}
+              onBlur={submitZoom}
+              onKeyDown={(event) => {
+                if (event.key === 'Enter') event.currentTarget.blur();
+                if (event.key === 'Escape') {
+                  setZoomDraft(null);
+                  window.setTimeout(() => (document.activeElement as HTMLElement | null)?.blur(), 0);
+                }
+              }}
+            />
             <Tooltip label="放大" shortcut="⌘+" labelsChild>
               <button type="button" aria-label="放大" onClick={() => onZoom('in')}>
                 <Icon name="plus" size={15} strokeWidth={1.7} />
@@ -190,12 +238,24 @@ export function ReaderToolbar({
       </div>
 
       <div className="pp-toolbar__group pp-toolbar__tools">
-        <IconButton icon="search" label="查找" shape="pill" onClick={() => onTool('search')} />
+        <IconButton icon="search" label={findOpen ? '关闭查找' : '查找'} shortcut="⌘F" shape="pill" active={findOpen} aria-pressed={findOpen} onClick={onFind} />
         <IconButton icon="marker" label="自动高亮" shape="pill" active={autoHighlight} aria-pressed={autoHighlight} onClick={onToggleAutoHighlight} />
         {density === 'full' ? (
           <>
             <IconButton icon="region" label="框选图像" shape="pill" onClick={() => onTool('region')} />
-            <IconButton icon="rotate" label="旋转页面" shape="pill" onClick={() => onTool('rotate')} />
+            <IconButton
+              icon="rotate"
+              label={rotateLabel}
+              shape="pill"
+              active={rotation !== 0}
+              onClick={onRotate}
+              onContextMenu={(event) => {
+                if (rotation === 0) return;
+                event.preventDefault();
+                event.stopPropagation();
+                setMenu({ kind: 'rotate', x: event.clientX, y: event.clientY, align: 'start' });
+              }}
+            />
           </>
         ) : (
           <IconButton
@@ -224,8 +284,8 @@ export function ReaderToolbar({
 
       {menu && (
         <Menu
-          label={menu.kind === 'more' ? '更多工具' : '工具栏'}
-          entries={menu.kind === 'more' ? moreEntries : [titleEntry]}
+          label={menu.kind === 'more' ? '更多工具' : menu.kind === 'rotate' ? '页面方向' : '工具栏'}
+          entries={menu.kind === 'more' ? moreEntries : menu.kind === 'rotate' ? [resetEntry] : [titleEntry]}
           anchor={{ x: menu.x, y: menu.y }}
           align={menu.align}
           triggerRef={menu.kind === 'more' ? moreRef : undefined}

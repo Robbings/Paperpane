@@ -38,6 +38,7 @@ const paths = {
   upload: 'M12 15V5 M8 9l4-4 4 4 M5 15v4h14v-4',
   close: 'M6.5 6.5l11 11 M17.5 6.5l-11 11',
   chevronDown: 'M7 10l5 5 5-5',
+  chevronUp: 'M7 14l5-5 5 5',
   chevronRight: 'M10 7l5 5-5 5',
   more: 'M6 12h.01 M12 12h.01 M18 12h.01',
   folder: 'M3.5 7.5A1.5 1.5 0 0 1 5 6h4l2 2h8a1.5 1.5 0 0 1 1.5 1.5V17A1.5 1.5 0 0 1 19 18.5H5A1.5 1.5 0 0 1 3.5 17z',
