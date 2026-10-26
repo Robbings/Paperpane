@@ -1,6 +1,6 @@
-import { useRef, useState, type ReactNode } from 'react';
+import { useId, useRef, useState, type ReactNode } from 'react';
 import { Button, Icon, IconButton, Markdown, MarkdownInline, Menu, Skeleton, Tooltip } from '@/ui/components';
-import type { OverviewCardDef, OverviewResultView, OverviewSourceView } from './types';
+import type { OverviewCardDef, OverviewContent, OverviewResultView, OverviewSourceView } from './types';
 
 interface SourceMarkerProps {
   number: number;
@@ -8,7 +8,7 @@ interface SourceMarkerProps {
   onLocate: (source: OverviewSourceView) => void;
 }
 
-/** A small number after a claim: hover shows the quoted passage, click goes to it in the paper. */
+/** A small number after a claim: faint until hovered; shows the quote and goes to it in the paper. Never copied. */
 export function SourceMarker({ number, source, onLocate }: SourceMarkerProps) {
   const label = source.verified ? `${source.pageLabel ?? ''}：“${source.quote}”` : `没有在论文中找到这句引文：“${source.quote}”`;
   return (
@@ -16,6 +16,7 @@ export function SourceMarker({ number, source, onLocate }: SourceMarkerProps) {
       <button
         type="button"
         className="pp-source-marker"
+        data-copy-skip=""
         data-unverified={source.verified ? undefined : 'true'}
         aria-label={source.verified ? `出处 ${number}，${source.pageLabel ?? ''}，跳到原文` : `出处 ${number}，未能核实`}
         onClick={() => source.verified && onLocate(source)}
@@ -29,6 +30,8 @@ export function SourceMarker({ number, source, onLocate }: SourceMarkerProps) {
 interface OverviewSectionProps {
   card: OverviewCardDef;
   result: OverviewResultView;
+  collapsed: boolean;
+  onCollapsed: (collapsed: boolean) => void;
   /** Page-wide marker number for one of this card's source labels. */
   numberOf: (label: string) => number | undefined;
   canGenerate: boolean;
@@ -38,49 +41,62 @@ interface OverviewSectionProps {
   onLocate: (source: OverviewSourceView) => void;
 }
 
-const skeletonLines = (card: OverviewCardDef) =>
-  card.display === 'lead' ? 2 : card.output === 'list' ? (card.listStyle === 'tags' ? 1 : 3) : card.output === 'fields' ? 4 : 3;
+const skeletonLines: Record<OverviewCardDef['output'], number> = { markdown: 3, tags: 1, points: 4, fields: 4 };
 
-/** One part of the overview page. Only the title shows; its actions appear on hover. */
-export function OverviewSection({ card, result, numberOf, canGenerate, onRegenerate, onHide, onCopy, onLocate }: OverviewSectionProps) {
+/** What a collapsed section still says about itself. */
+function summary(content?: OverviewContent): string | null {
+  if (!content) return null;
+  if (content.output === 'tags') return content.tags.join(' · ');
+  if (content.output === 'points') return `${content.points.length} 条`;
+  if (content.output === 'fields') return content.fields.map((f) => f.label).join(' · ');
+  return null;
+}
+
+/** One part of the overview page: a title row that folds the part away, and its content. */
+export function OverviewSection(props: OverviewSectionProps) {
+  const { card, result, collapsed } = props;
   const [menu, setMenu] = useState(false);
   const moreRef = useRef<HTMLButtonElement>(null);
+  const bodyId = useId();
   const running = result.state === 'running' || result.state === 'queued';
   const lead = card.display === 'lead';
+  const content = result.content;
 
   const marker = (label: string): ReactNode => {
     const source = result.sources?.find((s) => s.label === label);
-    const number = numberOf(label);
-    // Markers for sources that never arrived (e.g. still streaming) stay out of the way.
+    const number = props.numberOf(label);
+    // Markers whose source has not arrived yet stay out of the way.
     if (!source || number === undefined) return null;
-    return <SourceMarker number={number} source={source} onLocate={onLocate} />;
+    return <SourceMarker number={number} source={source} onLocate={props.onLocate} />;
   };
 
-  let body: ReactNode = null;
-  const content = result.content;
-  if (!content && (running || result.state === 'empty')) {
-    body = <Skeleton lines={skeletonLines(card)} />;
-  } else if (content?.output === 'markdown') {
+  let body: ReactNode;
+  if (!content) {
+    body = running || result.state === 'empty' ? <Skeleton lines={lead ? 2 : skeletonLines[card.output]} /> : null;
+  } else if (content.output === 'markdown') {
     body = <Markdown text={content.markdown} renderCitation={marker} className={lead ? 'pp-ov-lead' : 'pp-ov-prose'} />;
-  } else if (content?.output === 'list' && card.listStyle === 'tags') {
+  } else if (content.output === 'tags') {
     body = (
-      <ul className="pp-ov-keywords">
-        {content.items.map((item) => (
-          <li key={item}>{item}</li>
+      <ul className="pp-ov-tags">
+        {content.tags.map((tag) => (
+          <li key={tag}>{tag}</li>
         ))}
       </ul>
     );
-  } else if (content?.output === 'list') {
+  } else if (content.output === 'points') {
     body = (
       <ol className="pp-ov-points">
-        {content.items.map((item) => (
-          <li key={item}>
-            <MarkdownInline text={item} renderCitation={marker} />
+        {content.points.map((point) => (
+          <li key={point.title}>
+            <strong className="pp-ov-points__title">{point.title}</strong>
+            <span className="pp-ov-points__text">
+              <MarkdownInline text={point.text} renderCitation={marker} />
+            </span>
           </li>
         ))}
       </ol>
     );
-  } else if (content?.output === 'fields') {
+  } else {
     body = (
       <dl className="pp-ov-fields">
         {content.fields.map((field) => (
@@ -95,33 +111,14 @@ export function OverviewSection({ card, result, numberOf, canGenerate, onRegener
     );
   }
 
-  return (
-    <section
-      className="pp-ov-section"
-      data-lead={lead ? 'true' : undefined}
-      data-running={result.state === 'running' ? 'true' : undefined}
-      aria-label={card.name}
-      aria-busy={running}
-    >
-      {!lead && (
-        <header className="pp-ov-section__head">
-          <h3>{card.name}</h3>
-          <span className="pp-ov-section__actions">
-            <IconButton icon="copy" label={`复制「${card.name}」`} size="md" shape="pill" disabled={!content} onClick={onCopy} />
-            <IconButton icon="rotate" label={`重新生成「${card.name}」`} size="md" shape="pill" disabled={!canGenerate || running} onClick={onRegenerate} />
-            <IconButton ref={moreRef} icon="more" label="更多" size="md" shape="pill" aria-haspopup="menu" onClick={() => setMenu((open) => !open)} />
-          </span>
-        </header>
-      )}
-
-      {body}
-
+  const notes = (
+    <>
       {result.state === 'failed' && (
         <p className="pp-ov-section__note" data-tone="danger" role="alert">
           <Icon name="alert" size={14} />
           <span>{result.error?.message ?? '这一部分没有生成成功。'}</span>
-          {canGenerate && (
-            <Button size="sm" variant="quiet" onClick={onRegenerate}>
+          {props.canGenerate && (
+            <Button size="sm" variant="quiet" onClick={props.onRegenerate}>
               重试
             </Button>
           )}
@@ -131,14 +128,56 @@ export function OverviewSection({ card, result, numberOf, canGenerate, onRegener
         <p className="pp-ov-section__note" data-tone="warn">
           <Icon name="alert" size={14} />
           <span>生成被中断，上面是已保存的部分。</span>
-          {canGenerate && (
-            <Button size="sm" variant="quiet" onClick={onRegenerate}>
+          {props.canGenerate && (
+            <Button size="sm" variant="quiet" onClick={props.onRegenerate}>
               继续生成
             </Button>
           )}
         </p>
       )}
       {result.state === 'stopped' && <p className="pp-ov-section__aside">已停止，保留了已生成的部分。</p>}
+    </>
+  );
+
+  // The opening lines have no title and do not fold.
+  if (lead) {
+    return (
+      <section className="pp-ov-section" data-lead="true" data-running={result.state === 'running' ? 'true' : undefined} aria-label={card.name} aria-busy={running}>
+        {body}
+        {notes}
+      </section>
+    );
+  }
+
+  const folded = summary(content);
+  return (
+    <section
+      className="pp-ov-section"
+      data-collapsed={collapsed ? 'true' : undefined}
+      data-running={result.state === 'running' ? 'true' : undefined}
+      aria-label={card.name}
+      aria-busy={running}
+    >
+      <header className="pp-ov-section__head">
+        <button type="button" className="pp-ov-section__toggle" aria-expanded={!collapsed} aria-controls={bodyId} onClick={() => props.onCollapsed(!collapsed)}>
+          <Icon name="chevronRight" size={12} strokeWidth={2.2} className="pp-ov-section__chevron" />
+          <h3>{card.name}</h3>
+          {collapsed && folded && <span className="pp-ov-section__summary">{folded}</span>}
+        </button>
+        <span className="pp-ov-section__actions">
+          <IconButton icon="copy" label={`复制「${card.name}」`} size="md" shape="pill" disabled={!content} onClick={props.onCopy} />
+          <IconButton icon="rotate" label={`重新生成「${card.name}」`} size="md" shape="pill" disabled={!props.canGenerate || running} onClick={props.onRegenerate} />
+          <IconButton ref={moreRef} icon="more" label="更多" size="md" shape="pill" aria-haspopup="menu" onClick={() => setMenu((open) => !open)} />
+        </span>
+      </header>
+
+      {/* Folding animates the height: the grid row goes from 1fr to 0fr. */}
+      <div id={bodyId} className="pp-ov-section__body" inert={collapsed}>
+        <div className="pp-ov-section__inner">
+          {body}
+          {notes}
+        </div>
+      </div>
 
       {menu && (
         <Menu
@@ -150,7 +189,7 @@ export function OverviewSection({ card, result, numberOf, canGenerate, onRegener
           })()}
           align="end"
           triggerRef={moreRef}
-          onSelect={onHide}
+          onSelect={props.onHide}
           onClose={() => setMenu(false)}
         />
       )}

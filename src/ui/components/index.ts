@@ -1,4 +1,5 @@
 export { Button } from './Button';
+export { cleanCopyHandlers, stripSourceMarkers } from './cleanCopy';
 export { Dialog } from './Dialog';
 export { Badge, EmptyState, ProgressBar, Skeleton, Spinner } from './Feedback';
 export { GlassSurface } from './GlassSurface';

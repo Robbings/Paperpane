@@ -1,5 +1,5 @@
 import { useMemo, useRef, useState } from 'react';
-import { Button, EmptyState, IconButton, Menu, ScrollArea, Spinner, toast } from '@/ui/components';
+import { Button, EmptyState, IconButton, Menu, ScrollArea, Spinner, cleanCopyHandlers, stripSourceMarkers, toast } from '@/ui/components';
 import { formatDate } from '@/ui/library/columns';
 import { PanelHeader } from '../panels/PanelHeader';
 import { OverviewSection } from './OverviewSection';
@@ -28,20 +28,32 @@ export interface OverviewPanelProps {
 const MARKER = /\[\^([^\]]+)\]/g;
 const emptyResult: OverviewResultView = { state: 'empty' };
 
-const textsOf = (content?: OverviewContent): string[] =>
-  !content ? [] : content.output === 'markdown' ? [content.markdown] : content.output === 'list' ? [...content.items] : content.fields.map((f) => f.value);
+/** The texts that may carry source markers, in reading order. */
+function textsOf(content?: OverviewContent): string[] {
+  if (!content) return [];
+  switch (content.output) {
+    case 'markdown':
+      return [content.markdown];
+    case 'tags':
+      return [];
+    case 'points':
+      return content.points.map((p) => p.text);
+    case 'fields':
+      return content.fields.map((f) => f.value);
+  }
+}
 
-const plain = (text: string) => text.replace(MARKER, '').replace(/\s+([，。；、,.;])/g, '$1');
-
+/** A card as Markdown for the clipboard, without source markers. */
 function toMarkdown(card: OverviewCardDef, content: OverviewContent): string {
+  const plain = stripSourceMarkers;
   const body =
     content.output === 'markdown'
       ? plain(content.markdown)
-      : content.output === 'list'
-        ? card.listStyle === 'tags'
-          ? content.items.join('、')
-          : content.items.map((item, i) => `${i + 1}. ${plain(item)}`).join('\n')
-        : content.fields.map((field) => `- **${field.label}**：${plain(field.value)}`).join('\n');
+      : content.output === 'tags'
+        ? content.tags.join('、')
+        : content.output === 'points'
+          ? content.points.map((p) => `- **${p.title}**：${plain(p.text)}`).join('\n')
+          : content.fields.map((f) => `- **${f.label}**：${plain(f.value)}`).join('\n');
   return card.display === 'lead' ? body : `## ${card.name}\n\n${body}`;
 }
 
@@ -53,6 +65,8 @@ const timeOf = (iso: string) => {
 /** The paper at a glance, laid out as one page: opening lines, keywords, the structured summary, key points. */
 export function OverviewPanel(props: OverviewPanelProps) {
   const [menu, setMenu] = useState(false);
+  // Folded parts, per card; the logic layer may keep this as a preference later.
+  const [collapsed, setCollapsed] = useState<ReadonlySet<string>>(() => new Set());
   const moreRef = useRef<HTMLButtonElement>(null);
   const visible = props.cards.filter((card) => card.visible);
   const resultOf = (id: string) => props.results[id] ?? emptyResult;
@@ -166,7 +180,8 @@ export function OverviewPanel(props: OverviewPanelProps) {
   return (
     <div className="pp-panel pp-ov">
       {header}
-      <ScrollArea className="pp-ov__scroll" viewportClassName="pp-ov__viewport">
+      {/* Long generated text sits on an opaque sheet, not on the glass. */}
+      <ScrollArea className="pp-ov__sheet" viewportClassName="pp-ov__viewport" {...cleanCopyHandlers}>
         {!props.modelReady && (
           <p className="pp-ov__notice">
             模型暂不可用，下面是上次整理的结果。
@@ -184,6 +199,15 @@ export function OverviewPanel(props: OverviewPanelProps) {
                 key={card.id}
                 card={card}
                 result={resultOf(card.id)}
+                collapsed={collapsed.has(card.id)}
+                onCollapsed={(fold) =>
+                  setCollapsed((current) => {
+                    const next = new Set(current);
+                    if (fold) next.add(card.id);
+                    else next.delete(card.id);
+                    return next;
+                  })
+                }
                 numberOf={(label) => numbers.get(`${card.id}:${label}`)}
                 canGenerate={props.modelReady}
                 onRegenerate={() => props.onRegenerate([card.id])}

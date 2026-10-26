@@ -1,15 +1,14 @@
 // View models for the overview panel: reader-defined cards, each with a
 // prompt and an output form, and this paper's result for each card.
 
-export type OverviewOutput = 'markdown' | 'list' | 'fields';
+/** Prose, a set of keywords, titled points, or named fields from a JSON Schema. */
+export type OverviewOutput = 'markdown' | 'tags' | 'points' | 'fields';
 
 export interface OverviewCardDef {
   id: string;
   name: string;
   prompt: string;
   output: OverviewOutput;
-  /** Lists only: one point per line, or short keywords. */
-  listStyle?: 'bullets' | 'tags';
   /** Structured cards: a JSON Schema whose top-level properties become the rows. */
   schema?: string;
   /** A short text card shown as the page's opening lines, without a title. */
@@ -19,10 +18,12 @@ export interface OverviewCardDef {
   visible: boolean;
 }
 
-/** Text in every form may carry source markers written as [^label]. */
+/** Running text (prose, point text, field values) may carry source markers written as [^label]. */
 export type OverviewContent =
   | { output: 'markdown'; markdown: string }
-  | { output: 'list'; items: readonly string[] }
+  | { output: 'tags'; tags: readonly string[] }
+  /** A short title the eye can catch, then one sentence. */
+  | { output: 'points'; points: readonly { title: string; text: string }[] }
   | { output: 'fields'; fields: readonly { label: string; value: string }[] };
 
 /** A passage the result cites; the logic layer checks the quote against the paper. */

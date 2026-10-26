@@ -1,5 +1,5 @@
 import { useEffect, useLayoutEffect, useRef, useState, type ReactNode } from 'react';
-import { Badge, Button, Dialog, EmptyState, IconButton, ScrollArea, Skeleton } from '@/ui/components';
+import { Badge, Button, Dialog, EmptyState, IconButton, ScrollArea, Skeleton, cleanCopyHandlers } from '@/ui/components';
 import { PanelHeader } from '../panels/PanelHeader';
 import { ChatAnswer, ChatQuestion } from './ChatMessage';
 import { ChatComposer } from './ChatComposer';
@@ -164,7 +164,7 @@ export function ChatPanel(props: ChatPanelProps) {
       ) : (
         <>
           {session && <div className="pp-chat__title">{session.title}</div>}
-          <ScrollArea className="pp-chat__scroll" viewportClassName="pp-chat__viewport" viewportRef={scroll.ref} onScroll={scroll.onScroll}>
+          <ScrollArea className="pp-chat__scroll" viewportClassName="pp-chat__viewport" viewportRef={scroll.ref} onScroll={scroll.onScroll} {...cleanCopyHandlers}>
             {props.source}
             {messages.length === 0 ? (
               <div className="pp-chat-start">

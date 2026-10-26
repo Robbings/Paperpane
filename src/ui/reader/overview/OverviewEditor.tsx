@@ -12,7 +12,7 @@ interface OverviewEditorProps {
   onVisible: (id: string, visible: boolean) => void;
 }
 
-const outputLabels: Record<OverviewOutput, string> = { markdown: '文本', list: '列表', fields: '结构化' };
+const outputLabels: Record<OverviewOutput, string> = { markdown: '文本', tags: '关键词', points: '要点', fields: '结构化' };
 const CARD_DRAG = 'application/x-paperpane-overview-card';
 
 /** A JSON Schema check for the structured form: an object with named properties. */
@@ -72,27 +72,11 @@ export function OverviewEditor({ cards, onSave, onRemove, onReset, onReorder, on
               label="输出形式"
               size="sm"
               stretch
-              options={(['markdown', 'list', 'fields'] as const).map((value) => ({ value, label: outputLabels[value] }))}
+              options={(['markdown', 'tags', 'points', 'fields'] as const).map((value) => ({ value, label: outputLabels[value] }))}
               value={draft.output}
-              onChange={(output) => setDraft({ ...draft, output, listStyle: output === 'list' ? (draft.listStyle ?? 'bullets') : undefined })}
+              onChange={(output) => setDraft({ ...draft, output })}
             />
           </div>
-          {draft.output === 'list' && (
-            <div className="pp-ov-form__field">
-              <span className="pp-field__label">显示为</span>
-              <Segmented
-                label="列表显示为"
-                size="sm"
-                stretch
-                options={[
-                  { value: 'bullets', label: '逐条要点' },
-                  { value: 'tags', label: '短标签' },
-                ]}
-                value={draft.listStyle ?? 'bullets'}
-                onChange={(listStyle) => setDraft({ ...draft, listStyle })}
-              />
-            </div>
-          )}
           {draft.output === 'fields' && (
             <TextArea
               label="JSON Schema"

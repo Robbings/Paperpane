@@ -1,5 +1,5 @@
 import { useState, type ReactNode } from 'react';
-import { Button, Icon, IconButton, Markdown, Spinner, TextArea, Tooltip, toast } from '@/ui/components';
+import { Button, Icon, IconButton, Markdown, Spinner, TextArea, Tooltip, stripSourceMarkers, toast } from '@/ui/components';
 import type { AttachmentView, ChatMessageView, CitationView, ErrorView } from './types';
 
 interface VersionProps {
@@ -140,10 +140,10 @@ export function ChatAnswer({ message, latest, busy, onRegenerate, onVersion, onL
 
   const marker = (label: string): ReactNode => {
     const citation = byLabel.get(label);
-    if (!citation) return <sup className="pp-chat-marker pp-chat-marker--unknown">{label}</sup>;
+    if (!citation) return null;
     return (
       <Tooltip label={`${citation.pageLabel}：${citation.quote}`} labelsChild>
-        <button type="button" className="pp-chat-marker" aria-label={`出处 ${label}，${citation.pageLabel}`} onClick={() => onLocate(citation)}>
+        <button type="button" className="pp-chat-marker" data-copy-skip="" aria-label={`出处 ${label}，${citation.pageLabel}`} onClick={() => onLocate(citation)}>
           {label}
         </button>
       </Tooltip>
@@ -219,7 +219,7 @@ export function ChatAnswer({ message, latest, busy, onRegenerate, onVersion, onL
           <span className="pp-chat-a__spacer" />
           <VersionSwitch version={message.version} disabled={busy} onVersion={onVersion} />
           <span className="pp-chat-a__actions">
-            <IconButton icon="copy" label="复制回答" size="md" shape="pill" disabled={!message.markdown} onClick={() => copy(message.markdown)} />
+            <IconButton icon="copy" label="复制回答" size="md" shape="pill" disabled={!message.markdown} onClick={() => copy(stripSourceMarkers(message.markdown))} />
             <IconButton icon="rotate" label="重新生成" size="md" shape="pill" disabled={busy} onClick={onRegenerate} />
           </span>
         </footer>

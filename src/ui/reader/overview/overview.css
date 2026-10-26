@@ -1,12 +1,18 @@
-/* Overview panel: one page with a typographic hierarchy, not a stack of boxes. */
+/* Overview panel: the header stays on the glass; the content is an opaque
+   sheet with a clear type scale, so generated text reads crisply. */
 
-.pp-ov__scroll {
+.pp-ov__sheet {
   flex: 1;
-  margin: var(--pp-space-2) -6px 0;
+  margin-top: var(--pp-space-2);
+  border-radius: 10px;
+  background: var(--pp-surface);
+  box-shadow:
+    0 0 0 0.5px var(--pp-hairline),
+    0 1px 2px rgba(0, 0, 0, 0.04);
 }
 
 .pp-ov__viewport {
-  padding: 2px 6px var(--pp-space-6);
+  padding: 18px 18px 20px;
 }
 
 /* Docked at the bottom the panel is wide: keep a readable column. */
@@ -36,7 +42,6 @@
 .pp-ov__page {
   display: flex;
   flex-direction: column;
-  gap: 22px;
 }
 
 /* ---- Sections -------------------------------------------------------------------- */
@@ -44,29 +49,86 @@
 .pp-ov-section {
   display: flex;
   flex-direction: column;
-  gap: 8px;
+  padding: 14px 0;
+}
+
+.pp-ov-section + .pp-ov-section {
+  border-top: 0.5px solid var(--pp-hairline);
+}
+
+.pp-ov-section[data-lead='true'] {
+  padding: 0 0 18px;
+}
+
+.pp-ov-section:last-child {
+  padding-bottom: 0;
 }
 
 .pp-ov-section__head {
   display: flex;
   align-items: center;
-  min-height: 24px;
-  margin-bottom: -4px;
+  gap: 4px;
+  min-height: 26px;
+  margin: -3px -6px 0 -6px;
 }
 
-.pp-ov-section__head h3 {
+.pp-ov-section__toggle {
+  display: flex;
   flex: 1;
+  align-items: center;
+  gap: 6px;
+  min-width: 0;
+  height: 26px;
+  padding: 0 6px;
+  border: 0;
+  border-radius: var(--pp-radius-inner);
+  background: transparent;
+  color: var(--pp-text);
+  text-align: left;
+}
+
+.pp-ov-section__toggle:hover {
+  background: var(--pp-fill);
+}
+
+.pp-ov-section__toggle h3 {
+  flex-shrink: 0;
   margin: 0;
-  color: var(--pp-text-3);
-  font-size: var(--pp-text-xs);
+  font-size: var(--pp-text-md);
   font-weight: var(--pp-weight-semibold);
-  letter-spacing: 0.04em;
+}
+
+.pp-ov-section__chevron {
+  flex-shrink: 0;
+  color: var(--pp-text-3);
+  transform: rotate(90deg);
+  transition: transform var(--pp-dur-layout) var(--pp-ease-layout);
+}
+
+.pp-ov-section[data-collapsed='true'] .pp-ov-section__chevron {
+  transform: rotate(0deg);
+}
+
+/* Folded: one quiet line saying what is inside. */
+.pp-ov-section__summary {
+  min-width: 0;
+  overflow: hidden;
+  color: var(--pp-text-2);
+  font-size: var(--pp-text-sm);
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  animation: pp-fade-in var(--pp-dur-med) var(--pp-ease-out);
+}
+
+@keyframes pp-fade-in {
+  from {
+    opacity: 0;
+  }
 }
 
 .pp-ov-section__actions {
   display: flex;
-  gap: 0;
-  margin: -4px -6px -4px 0;
+  flex-shrink: 0;
   opacity: 0;
   transition: opacity var(--pp-dur-fast) var(--pp-ease-out);
 }
@@ -86,92 +148,134 @@
   transform: scale(0.88);
 }
 
-/* The opening lines: the one place with larger text. */
-.pp-ov-lead {
-  font-size: var(--pp-text-lg);
-  line-height: 1.62;
-}
-
-.pp-ov-prose {
-  line-height: 1.65;
-}
-
-/* Keywords: a quiet line of words, not a row of chips. */
-.pp-ov-keywords {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 2px 0;
-  margin: 0;
-  padding: 0;
-  color: var(--pp-text-2);
-  font-size: var(--pp-text-md);
-  line-height: 1.6;
-  list-style: none;
-}
-
-.pp-ov-keywords li + li::before {
-  content: '·';
-  margin: 0 0.55em;
-  color: var(--pp-text-3);
-}
-
-.pp-ov-fields {
-  display: flex;
-  flex-direction: column;
-  gap: 9px;
-  margin: 0;
-}
-
-.pp-ov-fields > div {
+/* Folding animates the row height and fades the content. */
+.pp-ov-section__body {
   display: grid;
-  grid-template-columns: 4.6em minmax(0, 1fr);
-  gap: 10px;
+  grid-template-rows: 1fr;
+  opacity: 1;
+  transition:
+    grid-template-rows var(--pp-dur-layout) var(--pp-ease-layout),
+    opacity var(--pp-dur-layout) var(--pp-ease-layout);
 }
 
-.pp-ov-fields dt {
-  padding-top: 1px;
-  color: var(--pp-text-2);
-  font-size: var(--pp-text-sm);
-  line-height: 1.65;
+.pp-ov-section[data-collapsed='true'] .pp-ov-section__body {
+  grid-template-rows: 0fr;
+  opacity: 0;
 }
 
-.pp-ov-fields dd {
-  margin: 0;
-  font-size: var(--pp-text-md);
-  line-height: 1.65;
-}
-
-/* Points take a small dot, not a number, so they never read as source numbers. */
-.pp-ov-points {
+.pp-ov-section__inner {
   display: flex;
   flex-direction: column;
   gap: 8px;
+  min-height: 0;
+  overflow: hidden;
+}
+
+/* Spacing lives inside the clipped box, so a folded part closes to nothing. */
+.pp-ov-section__inner > :first-child {
+  margin-top: 10px;
+}
+
+/* ---- Content forms ------------------------------------------------------------------ */
+
+/* The opening lines: the page's anchor. */
+.pp-ov-lead {
+  font-size: 15px;
+  font-weight: var(--pp-weight-medium);
+  line-height: 1.7;
+}
+
+.pp-ov-prose {
+  font-size: 13.5px;
+  line-height: 1.75;
+}
+
+.pp-ov-tags {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.pp-ov-tags li {
+  padding: 3px 9px;
+  border-radius: 6px;
+  background: var(--pp-fill);
+  box-shadow: inset 0 0 0 0.5px var(--pp-hairline);
+  font-size: var(--pp-text-sm);
+  line-height: 1.5;
+}
+
+.pp-ov-points {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
   margin: 0;
   padding: 0;
   list-style: none;
 }
 
 .pp-ov-points li {
-  position: relative;
-  padding-left: 1.1em;
-  font-size: var(--pp-text-md);
-  line-height: 1.65;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  padding-left: 12px;
+  border-left: 2px solid var(--pp-hairline-strong);
 }
 
-.pp-ov-points li::before {
-  content: '';
-  position: absolute;
-  top: 0.72em;
-  left: 0.1em;
-  width: 4px;
-  height: 4px;
-  border-radius: 50%;
-  background: var(--pp-text-3);
+.pp-ov-points__title {
+  font-size: 13.5px;
+  font-weight: var(--pp-weight-semibold);
+  line-height: 1.5;
 }
 
-/* Text still arriving ends with a quiet caret (shared with the discussion panel). */
+.pp-ov-points__text {
+  font-size: 13.5px;
+  line-height: 1.7;
+}
+
+.pp-ov-fields {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  margin: 0;
+}
+
+.pp-ov-fields dt {
+  margin-bottom: 2px;
+  color: var(--pp-text-2);
+  font-size: var(--pp-text-sm);
+  font-weight: var(--pp-weight-semibold);
+}
+
+.pp-ov-fields dd {
+  margin: 0;
+  font-size: 13.5px;
+  line-height: 1.7;
+}
+
+/* Wide panel: labels beside values. */
+@container (min-width: 560px) {
+  .pp-ov-fields > div {
+    display: grid;
+    grid-template-columns: 6em minmax(0, 1fr);
+    gap: 14px;
+  }
+
+  .pp-ov-fields dt {
+    padding-top: 2px;
+  }
+}
+
+.pp-ov {
+  container-type: inline-size;
+}
+
+/* Text still arriving ends with a quiet caret. */
 .pp-ov-section[data-running='true'] .pp-md > :last-child::after,
-.pp-ov-section[data-running='true'] li:last-child::after,
+.pp-ov-section[data-running='true'] .pp-ov-points li:last-child .pp-ov-points__text::after,
 .pp-ov-section[data-running='true'] .pp-ov-fields > div:last-child dd::after {
   content: '';
   display: inline-block;
@@ -182,10 +286,6 @@
   background: var(--pp-text-3);
   vertical-align: -0.15em;
   animation: pp-caret 1.1s steps(2, jump-none) infinite;
-}
-
-.pp-ov-section[data-running='true'] .pp-ov-keywords li:last-child::after {
-  display: none;
 }
 
 .pp-ov-section__note {
@@ -207,11 +307,11 @@
 
 .pp-ov-section__aside {
   margin: 0;
-  color: var(--pp-text-3);
+  color: var(--pp-text-2);
   font-size: var(--pp-text-xs);
 }
 
-/* ---- Source markers ------------------------------------------------------------------ */
+/* ---- Source markers: faint until the reader looks for them ---------------------------- */
 
 .pp-source-marker {
   display: inline-flex;
@@ -224,20 +324,40 @@
   border: 0;
   border-radius: 4px;
   background: transparent;
-  color: var(--pp-accent);
-  font-size: 10.5px;
-  font-weight: var(--pp-weight-semibold);
+  color: var(--pp-text-3);
+  font-size: 10px;
+  font-weight: var(--pp-weight-medium);
   font-variant-numeric: tabular-nums;
   line-height: 1;
   vertical-align: 0.45em;
+  opacity: 0.75;
+  transition:
+    color var(--pp-dur-fast) var(--pp-ease-out),
+    opacity var(--pp-dur-fast) var(--pp-ease-out),
+    background-color var(--pp-dur-fast) var(--pp-ease-out);
+}
+
+/* Hovering the sentence, point or field brings its markers up. */
+.pp-ov-lead p:hover .pp-source-marker,
+.pp-ov-prose p:hover .pp-source-marker,
+.pp-ov-points li:hover .pp-source-marker,
+.pp-ov-fields > div:hover .pp-source-marker,
+.pp-source-marker:focus-visible {
+  color: var(--pp-accent);
+  opacity: 1;
 }
 
 .pp-source-marker:hover {
   background: var(--pp-accent-soft);
+  color: var(--pp-accent);
+  opacity: 1;
 }
 
-.pp-source-marker[data-unverified='true'] {
+.pp-source-marker[data-unverified='true'],
+.pp-ov-points li:hover .pp-source-marker[data-unverified='true'],
+.pp-ov-fields > div:hover .pp-source-marker[data-unverified='true'] {
   color: var(--pp-text-3);
+  opacity: 0.6;
   cursor: default;
 }
 
@@ -249,10 +369,10 @@
   display: flex;
   flex-direction: column;
   gap: 4px;
-  margin-top: var(--pp-space-6);
+  margin-top: var(--pp-space-5);
   padding-top: var(--pp-space-3);
   border-top: 0.5px solid var(--pp-hairline);
-  color: var(--pp-text-3);
+  color: var(--pp-text-2);
   font-size: var(--pp-text-xs);
   line-height: 1.5;
 }
