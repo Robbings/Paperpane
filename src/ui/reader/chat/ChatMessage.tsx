@@ -1,5 +1,6 @@
 import { useState, type ReactNode } from 'react';
-import { Button, Icon, IconButton, Markdown, Spinner, TextArea, Tooltip, stripSourceMarkers, toast } from '@/ui/components';
+import { Button, Icon, IconButton, Markdown, Spinner, TextArea, stripSourceMarkers, toast } from '@/ui/components';
+import { SourceMarker } from '../SourceMarker';
 import type { AttachmentView, ChatMessageView, CitationView, ErrorView } from './types';
 
 interface VersionProps {
@@ -8,11 +9,11 @@ interface VersionProps {
   onVersion: (direction: -1 | 1) => void;
 }
 
-/** "‹ 2 / 3 ›" for edited questions and regenerated answers. */
+/** "‹ 2/3 ›" for edited questions and regenerated answers. */
 function VersionSwitch({ version, disabled, onVersion }: VersionProps) {
   if (!version || version.count < 2) return null;
   return (
-    <span className="pp-chat-version" role="group" aria-label="版本">
+    <span className="pp-chat-version" role="group" aria-label={`版本 ${version.index} / ${version.count}`}>
       <IconButton
         icon="chevronRight"
         label="上一个版本"
@@ -23,7 +24,7 @@ function VersionSwitch({ version, disabled, onVersion }: VersionProps) {
         onClick={() => onVersion(-1)}
       />
       <span className="pp-chat-version__count">
-        {version.index} / {version.count}
+        {version.index}/{version.count}
       </span>
       <IconButton icon="chevronRight" label="下一个版本" size="md" shape="pill" disabled={disabled || version.index >= version.count} onClick={() => onVersion(1)} />
     </span>
@@ -59,11 +60,16 @@ interface QuestionProps {
   onVersion: (direction: -1 | 1) => void;
 }
 
-/** The reader's own question: a quiet block on the right, editable into a new version. */
+/** The reader's question: a soft bubble on the right; its tools float underneath on hover. */
 export function ChatQuestion({ message, busy, onEdit, onVersion }: QuestionProps) {
   const [editing, setEditing] = useState<string | null>(null);
 
   if (editing !== null) {
+    const changed = editing.trim() !== '' && editing.trim() !== message.markdown.trim();
+    const submit = () => {
+      onEdit(editing.trim());
+      setEditing(null);
+    };
     return (
       <div className="pp-chat-q pp-chat-q--editing">
         <TextArea
@@ -76,48 +82,44 @@ export function ChatQuestion({ message, busy, onEdit, onVersion }: QuestionProps
           autoFocus
           onKeyDown={(event) => {
             if (event.key === 'Escape') setEditing(null);
+            if (event.key === 'Enter' && !event.shiftKey && !event.nativeEvent.isComposing && changed) {
+              event.preventDefault();
+              submit();
+            }
           }}
         />
-        <p className="pp-chat-q__hint">发送后会得到一个新回答，原来的问答仍保留为另一个版本。</p>
-        <div className="pp-chat-q__edit-actions">
+        <div className="pp-chat-q__edit-bar">
+          <span>原来的问答会保留为另一个版本</span>
           <Button size="sm" variant="quiet" onClick={() => setEditing(null)}>
             取消
           </Button>
-          <Button
-            size="sm"
-            variant="primary"
-            disabled={!editing.trim() || editing.trim() === message.markdown.trim()}
-            onClick={() => {
-              onEdit(editing.trim());
-              setEditing(null);
-            }}
-          >
-            发送
+          <Button size="sm" variant="primary" disabled={!changed} onClick={submit}>
+            重新提问
           </Button>
         </div>
       </div>
     );
   }
 
+  const versions = (message.version?.count ?? 1) > 1;
   return (
     <div className="pp-chat-q">
       <Attachments items={message.attachments} />
-      {/* Actions sit beside the question (shown on hover), so they take no extra line. */}
-      <div className="pp-chat-q__row">
-        <span className="pp-chat-q__actions">
+      {message.markdown && <div className="pp-chat-q__bubble">{message.markdown}</div>}
+      <div className="pp-chat-q__tools" data-versions={versions ? 'true' : undefined}>
+        <span className="pp-chat-q__hover">
           <IconButton icon="copy" label="复制问题" size="md" shape="pill" onClick={() => copy(message.markdown)} />
           <IconButton icon="edit" label="修改问题" size="md" shape="pill" disabled={busy} onClick={() => setEditing(message.markdown)} />
         </span>
-        {message.markdown && <div className="pp-chat-q__text">{message.markdown}</div>}
+        <VersionSwitch version={message.version} disabled={busy} onVersion={onVersion} />
       </div>
-      <VersionSwitch version={message.version} disabled={busy} onVersion={onVersion} />
     </div>
   );
 }
 
 interface AnswerProps {
   message: ChatMessageView;
-  /** Actions stay visible on the latest answer; older ones show them on hover. */
+  /** The latest answer keeps its tools visible; older ones show them on hover. */
   latest: boolean;
   busy: boolean;
   onRegenerate: () => void;
@@ -132,97 +134,87 @@ const recoveryLabels: Record<ErrorView['recovery'][number], string> = {
   'change-model': '换个模型',
 };
 
-/** A generated answer: plain text on the panel, told apart by its sources and the small model line, not by a bubble. */
+/** Source markers numbered in the order the answer cites them. */
+function numbering(markdown: string, citations: readonly CitationView[]) {
+  const numbers = new Map<string, number>();
+  for (const [, label] of markdown.matchAll(/\[\^([^\]]+)\]/g)) {
+    if (label && !numbers.has(label) && citations.some((c) => c.label === label)) numbers.set(label, numbers.size + 1);
+  }
+  return numbers;
+}
+
+/** A generated answer: plain text with faint source markers, and one quiet line of tools. */
 export function ChatAnswer({ message, latest, busy, onRegenerate, onVersion, onLocate, onRecover }: AnswerProps) {
   const state = message.generation?.state ?? 'completed';
   const running = state === 'running' || state === 'queued';
-  const byLabel = new Map(message.citations.map((citation) => [citation.label, citation]));
+  const numbers = numbering(message.markdown, message.citations);
 
   const marker = (label: string): ReactNode => {
-    const citation = byLabel.get(label);
-    if (!citation) return null;
-    return (
-      <Tooltip label={`${citation.pageLabel}：${citation.quote}`} labelsChild>
-        <button type="button" className="pp-chat-marker" data-copy-skip="" aria-label={`出处 ${label}，${citation.pageLabel}`} onClick={() => onLocate(citation)}>
-          {label}
-        </button>
-      </Tooltip>
-    );
+    const citation = message.citations.find((c) => c.label === label);
+    const number = numbers.get(label);
+    // A marker whose source has not arrived yet stays out of the way.
+    if (!citation || number === undefined) return null;
+    return <SourceMarker number={number} quote={citation.quote} pageLabel={citation.pageLabel} verified={citation.verified} onLocate={() => onLocate(citation)} />;
   };
 
   let note: ReactNode = null;
   if (message.generation?.state === 'failed' || message.generation?.state === 'save-failed') {
-    const { error } = message.generation;
+    const { state: failedState, error } = message.generation;
     note = (
-      <div className="pp-chat-note" data-tone={message.generation.state === 'failed' ? 'danger' : 'warn'} role="alert">
-        <Icon name="alert" size={15} />
-        <span className="pp-chat-note__text">
-          {message.generation.state === 'save-failed' ? `回答未能保存：${error.message}` : error.message}
-          {message.markdown && message.generation.state === 'failed' && ' 已生成的部分保留在上方。'}
+      <p className="pp-chat-note" data-tone={failedState === 'failed' ? 'danger' : 'warn'} role="alert">
+        <Icon name="alert" size={14} />
+        <span>
+          {failedState === 'save-failed' ? `回答没有保存成功：${error.message}` : error.message}
+          {message.markdown && failedState === 'failed' && ' 已生成的部分保留在上面。'}
         </span>
         {error.recovery.map((action) => (
           <Button key={action} size="sm" variant="quiet" onClick={() => onRecover(action)}>
-            {message.generation?.state === 'save-failed' && action === 'retry' ? '重新保存' : recoveryLabels[action]}
+            {failedState === 'save-failed' && action === 'retry' ? '重新保存' : recoveryLabels[action]}
           </Button>
         ))}
-      </div>
+      </p>
     );
   } else if (state === 'interrupted') {
     note = (
-      <div className="pp-chat-note" data-tone="warn">
-        <Icon name="alert" size={15} />
-        <span className="pp-chat-note__text">生成被中断（页面关闭或连接断开），上方是已保存的部分。</span>
+      <p className="pp-chat-note" data-tone="warn">
+        <Icon name="alert" size={14} />
+        <span>生成被中断了，上面是已保存的部分。</span>
         <Button size="sm" variant="quiet" disabled={busy} onClick={onRegenerate}>
           重新生成
         </Button>
-      </div>
+      </p>
     );
   }
 
+  const waiting = running && !message.markdown;
   return (
     <article className="pp-chat-a" data-latest={latest ? 'true' : undefined} aria-busy={running}>
-      {state === 'queued' && !message.markdown ? (
+      {waiting ? (
         <p className="pp-chat-a__waiting">
-          <Spinner size={13} /> 等待开始…
-        </p>
-      ) : state === 'running' && !message.markdown ? (
-        <p className="pp-chat-a__waiting">
-          <Spinner size={13} /> 正在阅读论文…
+          <Spinner size={12} /> {state === 'queued' ? '等待开始' : '正在阅读论文'}
         </p>
       ) : (
-        <Markdown text={message.markdown} renderCitation={marker} className={state === 'running' ? 'pp-chat-a__text pp-chat-a__text--streaming' : 'pp-chat-a__text'} />
-      )}
-
-      {message.citations.length > 0 && !running && (
-        <div className="pp-chat-sources" aria-label="出处">
-          {message.citations.map((citation) => (
-            <Tooltip key={citation.id} label={citation.quote} labelsChild>
-              <button type="button" className="pp-chat-source" aria-label={`出处 ${citation.label}：${citation.pageLabel}`} onClick={() => onLocate(citation)}>
-                <span className="pp-chat-source__label">{citation.label}</span>
-                {citation.pageLabel}
-              </button>
-            </Tooltip>
-          ))}
-        </div>
+        message.markdown && (
+          <Markdown text={message.markdown} renderCitation={marker} className={state === 'running' ? 'pp-chat-a__text pp-chat-a__text--streaming' : 'pp-chat-a__text'} />
+        )
       )}
 
       {note}
 
       {!running && (
-        <footer className="pp-chat-a__foot">
-          {message.model && (
-            <span className="pp-chat-a__model">
-              {message.model.displayName}
-              {state === 'stopped' && ' · 已停止，保留已生成的部分'}
-            </span>
-          )}
-          <span className="pp-chat-a__spacer" />
-          <VersionSwitch version={message.version} disabled={busy} onVersion={onVersion} />
-          <span className="pp-chat-a__actions">
+        <div className="pp-chat-a__tools">
+          <span className="pp-chat-a__hover">
             <IconButton icon="copy" label="复制回答" size="md" shape="pill" disabled={!message.markdown} onClick={() => copy(stripSourceMarkers(message.markdown))} />
             <IconButton icon="rotate" label="重新生成" size="md" shape="pill" disabled={busy} onClick={onRegenerate} />
           </span>
-        </footer>
+          <VersionSwitch version={message.version} disabled={busy} onVersion={onVersion} />
+          {message.model && (
+            <span className="pp-chat-a__model">
+              {message.model.displayName}
+              {state === 'stopped' && ' · 已停止'}
+            </span>
+          )}
+        </div>
       )}
     </article>
   );

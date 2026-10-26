@@ -1,31 +1,7 @@
 import { useId, useRef, useState, type ReactNode } from 'react';
-import { Button, Icon, IconButton, Markdown, MarkdownInline, Menu, Skeleton, Tooltip } from '@/ui/components';
+import { Button, Icon, IconButton, Markdown, MarkdownInline, Menu, Skeleton } from '@/ui/components';
+import { SourceMarker } from '../SourceMarker';
 import type { OverviewCardDef, OverviewContent, OverviewResultView, OverviewSourceView } from './types';
-
-interface SourceMarkerProps {
-  number: number;
-  source: OverviewSourceView;
-  onLocate: (source: OverviewSourceView) => void;
-}
-
-/** A small number after a claim: faint until hovered; shows the quote and goes to it in the paper. Never copied. */
-export function SourceMarker({ number, source, onLocate }: SourceMarkerProps) {
-  const label = source.verified ? `${source.pageLabel ?? ''}：“${source.quote}”` : `没有在论文中找到这句引文：“${source.quote}”`;
-  return (
-    <Tooltip label={label} labelsChild>
-      <button
-        type="button"
-        className="pp-source-marker"
-        data-copy-skip=""
-        data-unverified={source.verified ? undefined : 'true'}
-        aria-label={source.verified ? `出处 ${number}，${source.pageLabel ?? ''}，跳到原文` : `出处 ${number}，未能核实`}
-        onClick={() => source.verified && onLocate(source)}
-      >
-        {number}
-      </button>
-    </Tooltip>
-  );
-}
 
 interface OverviewSectionProps {
   card: OverviewCardDef;
@@ -67,7 +43,7 @@ export function OverviewSection(props: OverviewSectionProps) {
     const number = props.numberOf(label);
     // Markers whose source has not arrived yet stay out of the way.
     if (!source || number === undefined) return null;
-    return <SourceMarker number={number} source={source} onLocate={props.onLocate} />;
+    return <SourceMarker number={number} quote={source.quote} pageLabel={source.pageLabel} verified={source.verified} onLocate={() => props.onLocate(source)} />;
   };
 
   let body: ReactNode;

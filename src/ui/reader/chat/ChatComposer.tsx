@@ -1,8 +1,10 @@
-import { useLayoutEffect, useRef, useState } from 'react';
+import { useLayoutEffect, useRef, useState, type RefObject } from 'react';
 import { Icon, IconButton, Menu, type MenuEntry } from '@/ui/components';
 import type { AttachmentView, ModelView } from './types';
 
 interface ChatComposerProps {
+  /** The text box, for callers that put text in and focus it. */
+  inputRef?: RefObject<HTMLTextAreaElement | null>;
   text: string;
   attachments: readonly AttachmentView[];
   placeholder: string;
@@ -23,7 +25,8 @@ const MAX_ROWS = 8;
 /** The question box: text, region screenshots, the model in use, send / stop. */
 export function ChatComposer(props: ChatComposerProps) {
   const { text, attachments, models, modelId, busy } = props;
-  const ref = useRef<HTMLTextAreaElement>(null);
+  const ownRef = useRef<HTMLTextAreaElement>(null);
+  const ref = props.inputRef ?? ownRef;
   const modelRef = useRef<HTMLButtonElement>(null);
   const [modelMenu, setModelMenu] = useState(false);
   const model = models.find((m) => m.id === modelId);
@@ -36,7 +39,7 @@ export function ChatComposer(props: ChatComposerProps) {
     el.style.height = 'auto';
     el.style.height = `${Math.min(el.scrollHeight, line * MAX_ROWS)}px`;
     el.style.overflowY = el.scrollHeight > line * MAX_ROWS ? 'auto' : 'hidden';
-  }, [text]);
+  }, [text, ref]);
 
   // Models grouped by provider, with a separator between providers.
   const entries: MenuEntry[] = [];

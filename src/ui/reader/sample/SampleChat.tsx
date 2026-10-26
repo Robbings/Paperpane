@@ -203,7 +203,6 @@ export function SampleChat({ onLocateQuote }: { onLocateQuote: (quote: string) =
         const text = (current?.draft ?? newDraft).trim();
         if (text) ask(text);
       }}
-      onAsk={ask}
       onStop={stop}
       onRegenerate={(messageId) => {
         const message = current?.messages.find((m) => m.id === messageId);

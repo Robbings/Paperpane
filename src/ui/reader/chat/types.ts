@@ -18,7 +18,9 @@ export interface CitationView {
   label: string;
   quote: string;
   /** Resolved from the anchor by the logic layer, e.g. "第 3 页". */
-  pageLabel: string;
+  pageLabel?: string;
+  /** False when the quote could not be found in the paper; defaults to true. */
+  verified?: boolean;
 }
 
 export interface AttachmentView {

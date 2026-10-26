@@ -1,0 +1,56 @@
+/* Source markers: faint until the reader looks for them. */
+
+.pp-source-marker {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 13px;
+  height: 14px;
+  margin: 0 0 0 1px;
+  padding: 0 2px;
+  border: 0;
+  border-radius: 4px;
+  background: transparent;
+  color: var(--pp-text-3);
+  font-size: 10px;
+  font-weight: var(--pp-weight-medium);
+  font-variant-numeric: tabular-nums;
+  line-height: 1;
+  vertical-align: 0.45em;
+  opacity: 0.75;
+  transition:
+    color var(--pp-dur-fast) var(--pp-ease-out),
+    opacity var(--pp-dur-fast) var(--pp-ease-out),
+    background-color var(--pp-dur-fast) var(--pp-ease-out);
+}
+
+/* Hovering the sentence, list item or field brings its markers up. */
+.pp-md p:hover .pp-source-marker,
+.pp-md li:hover .pp-source-marker,
+.pp-ov-points li:hover .pp-source-marker,
+.pp-ov-fields > div:hover .pp-source-marker,
+.pp-source-marker:focus-visible {
+  color: var(--pp-accent);
+  opacity: 1;
+}
+
+.pp-source-marker:hover {
+  background: var(--pp-accent-soft);
+  color: var(--pp-accent);
+  opacity: 1;
+}
+
+.pp-source-marker[data-unverified='true'],
+.pp-md p:hover .pp-source-marker[data-unverified='true'],
+.pp-md li:hover .pp-source-marker[data-unverified='true'],
+.pp-ov-points li:hover .pp-source-marker[data-unverified='true'],
+.pp-ov-fields > div:hover .pp-source-marker[data-unverified='true'] {
+  color: var(--pp-text-3);
+  opacity: 0.6;
+  cursor: default;
+}
+
+.pp-source-marker[data-unverified='true']:hover {
+  background: var(--pp-fill);
+}
+

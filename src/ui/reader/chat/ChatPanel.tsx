@@ -1,10 +1,9 @@
 import { useEffect, useLayoutEffect, useRef, useState, type ReactNode } from 'react';
-import { Badge, Button, Dialog, EmptyState, IconButton, ScrollArea, Skeleton, cleanCopyHandlers } from '@/ui/components';
+import { Button, Dialog, EmptyState, Icon, IconButton, ScrollArea, Skeleton, cleanCopyHandlers } from '@/ui/components';
 import { PanelBody } from '../panels/PanelBody';
-import { PanelHeader } from '../panels/PanelHeader';
 import { ChatAnswer, ChatQuestion } from './ChatMessage';
 import { ChatComposer } from './ChatComposer';
-import { ChatHistory } from './ChatHistory';
+import { ChatSessions } from './ChatSessions';
 import type { ChatSessionView, CitationView, ErrorView, ModelChangeView, ModelView, SessionSummary } from './types';
 import './chat.css';
 
@@ -29,12 +28,11 @@ export interface ChatPanelProps {
   /** A pending switch to another provider that needs the reader's OK. */
   modelChange: ModelChangeView | null;
 
+  /** Draft edits; quick questions and suggested follow-ups also land here, to send or adjust. */
   onDraft: (text: string) => void;
   onRemoveAttachment: (id: string) => void;
   /** Sends the current draft. */
   onSend: () => void;
-  /** Sends a quick question or a suggested follow-up as is. */
-  onAsk: (question: string) => void;
   onStop: () => void;
   onRegenerate: (messageId: string) => void;
   onEditQuestion: (messageId: string, text: string) => void;
@@ -80,8 +78,10 @@ function useStickToBottom(dep: unknown) {
 
 export function ChatPanel(props: ChatPanelProps) {
   const { session, models } = props;
-  const [view, setView] = useState<'chat' | 'history'>('chat');
+  const [sessionsOpen, setSessionsOpen] = useState(false);
   const [removing, setRemoving] = useState<SessionSummary | null>(null);
+  const titleRef = useRef<HTMLButtonElement>(null);
+  const inputRef = useRef<HTMLTextAreaElement>(null);
   const messages = session?.messages ?? [];
   const last = messages[messages.length - 1];
   const busy = messages.some((m) => m.generation?.state === 'running' || m.generation?.state === 'queued');
@@ -89,44 +89,35 @@ export function ChatPanel(props: ChatPanelProps) {
   // Follow the text as it streams: the length of the last message changes on every chunk.
   const scroll = useStickToBottom(`${session?.id}:${messages.length}:${last?.markdown.length}:${session?.suggestions.state}`);
 
-  useEffect(() => {
-    if (session) setView('chat');
-  }, [session?.id]);
-
-  const send = (run: () => void) => {
-    scroll.pin();
-    run();
+  /** Puts a quick question or follow-up in the box, ready to send or adjust. */
+  const prefill = (question: string) => {
+    props.onDraft(question);
+    window.setTimeout(() => {
+      const el = inputRef.current;
+      el?.focus();
+      el?.setSelectionRange(el.value.length, el.value.length);
+    }, 0);
   };
 
   const header = (
-    <PanelHeader
-      title={view === 'history' ? '历史对话' : props.title}
-      meta={props.demo ? <Badge>演示，不会调用模型</Badge> : undefined}
-      actions={
-        <>
-          <IconButton
-            icon="history"
-            label={view === 'history' ? '返回对话' : '历史对话'}
-            size="md"
-            shape="pill"
-            active={view === 'history'}
-            aria-pressed={view === 'history'}
-            onClick={() => setView(view === 'history' ? 'chat' : 'history')}
-          />
-          <IconButton
-            icon="plus"
-            label="新对话"
-            size="md"
-            shape="pill"
-            disabled={busy || (!session && view === 'chat')}
-            onClick={() => {
-              props.onNewSession();
-              setView('chat');
-            }}
-          />
-        </>
-      }
-    />
+    <div className="pp-panel__header pp-chat__header">
+      <h2 className="pp-panel__title">{props.title}</h2>
+      {models.length > 0 && (
+        <button
+          ref={titleRef}
+          type="button"
+          className="pp-chat__session"
+          aria-haspopup="dialog"
+          aria-expanded={sessionsOpen}
+          onClick={() => setSessionsOpen((open) => !open)}
+        >
+          <span>{session?.title ?? '新对话'}</span>
+          <Icon name="chevronDown" size={11} strokeWidth={2} />
+        </button>
+      )}
+      <span className="pp-panel__spacer" />
+      <IconButton icon="plus" label="新对话" size="md" shape="pill" disabled={busy || !session} onClick={props.onNewSession} />
+    </div>
   );
 
   if (models.length === 0) {
@@ -134,16 +125,16 @@ export function ChatPanel(props: ChatPanelProps) {
       <div className="pp-panel pp-chat">
         {header}
         <PanelBody>
-        <EmptyState
-          icon="discuss"
-          title="还没有可用的模型"
-          description="在设置里填入你自己的模型接口和密钥后，就可以就这篇论文提问。阅读、批注和笔记不受影响。"
-          actions={
-            <Button size="sm" onClick={props.onConfigureModels}>
-              打开模型设置
-            </Button>
-          }
-        />
+          <EmptyState
+            icon="discuss"
+            title="还没有可用的模型"
+            description="在设置里填入你自己的模型接口和密钥后，就可以就这篇论文提问。阅读、批注和笔记不受影响。"
+            actions={
+              <Button size="sm" onClick={props.onConfigureModels}>
+                打开模型设置
+              </Button>
+            }
+          />
         </PanelBody>
       </div>
     );
@@ -152,105 +143,114 @@ export function ChatPanel(props: ChatPanelProps) {
   return (
     <div className="pp-panel pp-chat">
       {header}
-
-      {view === 'chat' && session && <div className="pp-chat__title">{session.title}</div>}
       <PanelBody>
-      {view === 'history' ? (
-        <ChatHistory
-          sessions={props.sessions}
-          currentId={session?.id ?? null}
-          onOpen={(id) => {
-            props.onOpenSession(id);
-            setView('chat');
+        <ScrollArea className="pp-chat__scroll" viewportClassName="pp-chat__viewport" viewportRef={scroll.ref} onScroll={scroll.onScroll} {...cleanCopyHandlers}>
+          {props.source}
+          {messages.length === 0 ? (
+            <div className="pp-chat-start">
+              <p className="pp-chat-start__title">就这篇论文提问</p>
+              <p className="pp-chat-start__lead">回答会注明出处，指向句末的小数字可以看到原文，点一下跳过去。</p>
+              {props.starters.length > 0 && (
+                <ul className="pp-chat-start__list" aria-label="快捷问题">
+                  {props.starters.map((question) => (
+                    <li key={question}>
+                      <button type="button" className="pp-chat-ask" onClick={() => prefill(question)}>
+                        {question}
+                      </button>
+                    </li>
+                  ))}
+                </ul>
+              )}
+            </div>
+          ) : (
+            <ol className="pp-chat__messages">
+              {messages.map((message) => (
+                <li key={message.id} data-role={message.role}>
+                  {message.role === 'user' ? (
+                    <ChatQuestion
+                      message={message}
+                      busy={busy}
+                      onEdit={(text) => {
+                        scroll.pin();
+                        props.onEditQuestion(message.id, text);
+                      }}
+                      onVersion={(direction) => props.onVersion(message.id, direction)}
+                    />
+                  ) : (
+                    <ChatAnswer
+                      message={message}
+                      latest={message === last}
+                      busy={busy}
+                      onRegenerate={() => {
+                        scroll.pin();
+                        props.onRegenerate(message.id);
+                      }}
+                      onVersion={(direction) => props.onVersion(message.id, direction)}
+                      onLocate={props.onLocate}
+                      onRecover={(action) => props.onRecover(message.id, action)}
+                    />
+                  )}
+                </li>
+              ))}
+            </ol>
+          )}
+
+          {session && last?.role === 'assistant' && !busy && session.suggestions.state !== 'idle' && (
+            <section className="pp-chat-follow" aria-label="可以接着问">
+              {session.suggestions.state === 'loading' ? (
+                <Skeleton lines={2} />
+              ) : session.suggestions.state === 'failed' ? (
+                <p className="pp-chat-follow__failed">
+                  没有生成推荐的追问。
+                  <Button size="sm" variant="quiet" onClick={props.onRetrySuggestions}>
+                    重试
+                  </Button>
+                </p>
+              ) : (
+                session.suggestions.questions.map((question) => (
+                  <button key={question} type="button" className="pp-chat-ask pp-chat-ask--follow" onClick={() => prefill(question)}>
+                    <Icon name="chevronRight" size={11} strokeWidth={2} />
+                    {question}
+                  </button>
+                ))
+              )}
+            </section>
+          )}
+        </ScrollArea>
+
+        <ChatComposer
+          inputRef={inputRef}
+          text={session?.draft.text ?? props.newDraft ?? ''}
+          attachments={session?.draft.attachments ?? []}
+          placeholder={props.placeholder ?? '就这篇论文提问'}
+          models={models}
+          modelId={modelId}
+          busy={busy}
+          draftSaveFailed={session?.draftSaveFailed}
+          onText={props.onDraft}
+          onRemoveAttachment={props.onRemoveAttachment}
+          onSend={() => {
+            scroll.pin();
+            props.onSend();
           }}
-          onRename={props.onRenameSession}
-          onRemove={(id) => setRemoving(props.sessions.find((s) => s.id === id) ?? null)}
+          onStop={props.onStop}
+          onModel={props.onModel}
         />
-      ) : (
-        <>
-          <ScrollArea className="pp-chat__scroll" viewportClassName="pp-chat__viewport" viewportRef={scroll.ref} onScroll={scroll.onScroll} {...cleanCopyHandlers}>
-            {props.source}
-            {messages.length === 0 ? (
-              <div className="pp-chat-start">
-                <p className="pp-chat-start__lead">就这篇论文提问。回答会注明出处，点出处可以跳回原文。</p>
-                {props.starters.length > 0 && (
-                  <ul className="pp-chat-start__list" aria-label="快捷问题">
-                    {props.starters.map((question) => (
-                      <li key={question}>
-                        <button type="button" className="pp-chat-ask" onClick={() => send(() => props.onAsk(question))}>
-                          {question}
-                        </button>
-                      </li>
-                    ))}
-                  </ul>
-                )}
-              </div>
-            ) : (
-              <ol className="pp-chat__messages">
-                {messages.map((message) => (
-                  <li key={message.id}>
-                    {message.role === 'user' ? (
-                      <ChatQuestion
-                        message={message}
-                        busy={busy}
-                        onEdit={(text) => send(() => props.onEditQuestion(message.id, text))}
-                        onVersion={(direction) => props.onVersion(message.id, direction)}
-                      />
-                    ) : (
-                      <ChatAnswer
-                        message={message}
-                        latest={message === last}
-                        busy={busy}
-                        onRegenerate={() => send(() => props.onRegenerate(message.id))}
-                        onVersion={(direction) => props.onVersion(message.id, direction)}
-                        onLocate={props.onLocate}
-                        onRecover={(action) => props.onRecover(message.id, action)}
-                      />
-                    )}
-                  </li>
-                ))}
-              </ol>
-            )}
-
-            {session && last?.role === 'assistant' && !busy && session.suggestions.state !== 'idle' && (
-              <section className="pp-chat-follow" aria-label="推荐追问">
-                {session.suggestions.state === 'loading' ? (
-                  <Skeleton lines={2} />
-                ) : session.suggestions.state === 'failed' ? (
-                  <p className="pp-chat-follow__failed">
-                    推荐追问没有生成。
-                    <Button size="sm" variant="quiet" onClick={props.onRetrySuggestions}>
-                      重试
-                    </Button>
-                  </p>
-                ) : (
-                  session.suggestions.questions.map((question) => (
-                    <button key={question} type="button" className="pp-chat-ask" onClick={() => send(() => props.onAsk(question))}>
-                      {question}
-                    </button>
-                  ))
-                )}
-              </section>
-            )}
-          </ScrollArea>
-
-          <ChatComposer
-            text={session?.draft.text ?? props.newDraft ?? ''}
-            attachments={session?.draft.attachments ?? []}
-            placeholder={props.placeholder ?? '就这篇论文提问，Enter 发送，Shift+Enter 换行'}
-            models={models}
-            modelId={modelId}
-            busy={busy}
-            draftSaveFailed={session?.draftSaveFailed}
-            onText={props.onDraft}
-            onRemoveAttachment={props.onRemoveAttachment}
-            onSend={() => send(props.onSend)}
-            onStop={props.onStop}
-            onModel={props.onModel}
-          />
-        </>
-      )}
+        <p className="pp-chat__footnote">{props.demo ? '演示内容，不会调用模型或保存' : '回答由模型生成，请以原文为准'}</p>
       </PanelBody>
+
+      <ChatSessions
+        anchorRef={titleRef}
+        open={sessionsOpen}
+        onClose={() => setSessionsOpen(false)}
+        sessions={props.sessions}
+        currentId={session?.id ?? null}
+        canCreate={!busy && Boolean(session)}
+        onNew={props.onNewSession}
+        onOpen={props.onOpenSession}
+        onRename={props.onRenameSession}
+        onRemove={(id) => setRemoving(props.sessions.find((s) => s.id === id) ?? null)}
+      />
 
       <Dialog
         open={props.modelChange !== null}
@@ -268,7 +268,7 @@ export function ChatPanel(props: ChatPanelProps) {
       >
         {props.modelChange && (
           <ul className="pp-chat-disclosure">
-            <li>本次对话中的 {props.modelChange.messageCount} 条消息</li>
+            <li>本次对话中的 {props.modelChange.messageCount} 条消息，以及还没发送的草稿</li>
             {props.modelChange.imageCount > 0 && <li>{props.modelChange.imageCount} 张截图</li>}
             {props.modelChange.documents.map((title) => (
               <li key={title}>《{title}》中与问题相关的段落</li>
@@ -281,7 +281,7 @@ export function ChatPanel(props: ChatPanelProps) {
         open={removing !== null}
         onClose={() => setRemoving(null)}
         title="删除这段对话？"
-        description={removing ? `「${removing.title}」的问答会从列表中移除。` : undefined}
+        description={removing ? `「${removing.title}」会从列表中移除，其他对话不受影响。` : undefined}
         footer={
           <>
             <Button onClick={() => setRemoving(null)}>取消</Button>

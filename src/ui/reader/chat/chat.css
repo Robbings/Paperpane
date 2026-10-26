@@ -1,117 +1,180 @@
-/* Discussion and explanation panels. */
+/* Discussion and explanation panels: the same reading type as the overview,
+   questions as soft bubbles, answers as plain text, tools only when wanted. */
 
-.pp-chat__title {
+/* ---- Header: panel name, then the conversation as a switcher ------------------- */
+
+.pp-chat__header .pp-panel__title {
   flex-shrink: 0;
-  overflow: hidden;
+}
+
+.pp-chat__session {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  min-width: 0;
+  height: 24px;
+  margin-left: -2px;
+  padding: 0 6px;
+  border: 0;
+  border-radius: var(--pp-radius-inner);
+  background: transparent;
   color: var(--pp-text-2);
-  font-size: var(--pp-text-sm);
+  font-size: 12.5px;
+}
+
+.pp-chat__session span {
+  min-width: 0;
+  overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
 }
 
+.pp-chat__session::before {
+  content: '·';
+  margin-right: 2px;
+  color: var(--pp-text-3);
+}
+
+.pp-chat__session svg {
+  flex-shrink: 0;
+  color: var(--pp-text-3);
+}
+
+.pp-chat__session:hover,
+.pp-chat__session[aria-expanded='true'] {
+  background: var(--pp-fill);
+  color: var(--pp-text);
+}
+
+/* ---- Transcript ------------------------------------------------------------------ */
+
 .pp-chat__scroll {
   flex: 1;
-  margin: var(--pp-space-2) -6px 0;
+  margin: 0 -6px;
 }
 
 .pp-chat__viewport {
-  padding: 4px 6px var(--pp-space-4);
+  padding: 8px 6px var(--pp-space-4);
 }
 
 /* Docked at the bottom the panel is wide: keep a readable column. */
 .pp-reader[data-placement='bottom'] .pp-chat__viewport > *,
-.pp-reader[data-placement='bottom'] .pp-composer {
+.pp-reader[data-placement='bottom'] .pp-composer,
+.pp-reader[data-placement='bottom'] .pp-chat__footnote {
   width: 100%;
-  max-width: 760px;
+  max-width: 720px;
   margin-inline: auto;
 }
 
 .pp-chat__messages {
   display: flex;
   flex-direction: column;
-  gap: 18px;
+  gap: 26px;
   margin: 0;
   padding: 0;
   list-style: none;
 }
 
-/* ---- Question --------------------------------------------------------------- */
+/* A question sits a little closer to its answer than to the turn before it. */
+.pp-chat__messages > li[data-role='user'] + li[data-role='assistant'] {
+  margin-top: -6px;
+}
+
+/* ---- Question --------------------------------------------------------------------- */
 
 .pp-chat-q {
+  position: relative;
   display: flex;
   flex-direction: column;
   align-items: flex-end;
-  gap: 2px;
-  margin-left: 10%;
+  gap: 6px;
+  margin-left: 12%;
 }
 
-.pp-chat-q__row {
-  display: flex;
-  align-items: flex-end;
-  justify-content: flex-end;
-  gap: 2px;
+.pp-chat-q__bubble {
   max-width: 100%;
-}
-
-.pp-chat-q__text {
-  min-width: 0;
-  padding: 8px 12px;
-  border-radius: 12px;
-  background: var(--pp-fill);
-  font-size: var(--pp-text-md);
-  line-height: 1.55;
+  padding: 8px 13px;
+  border-radius: 16px 16px 5px 16px;
+  background: var(--pp-fill-hover);
+  font-size: 14px;
+  line-height: 1.6;
   white-space: pre-wrap;
   overflow-wrap: anywhere;
 }
 
-.pp-chat-q__actions,
-.pp-chat-a__actions {
+/* Tools float just under the bubble, in the gap before the answer. */
+.pp-chat-q__tools {
+  position: absolute;
+  top: 100%;
+  right: -4px;
   display: flex;
   align-items: center;
-  gap: 2px;
+  margin-top: 1px;
+}
+
+.pp-chat-q__hover,
+.pp-chat-a__hover {
+  display: flex;
   opacity: 0;
   transition: opacity var(--pp-dur-fast) var(--pp-ease-out);
 }
 
-.pp-chat-q:hover .pp-chat-q__actions,
-.pp-chat-q:focus-within .pp-chat-q__actions,
-.pp-chat-a:hover .pp-chat-a__actions,
-.pp-chat-a:focus-within .pp-chat-a__actions,
-.pp-chat-a[data-latest='true'] .pp-chat-a__actions {
+.pp-chat-q:hover .pp-chat-q__hover,
+.pp-chat-q__tools:focus-within .pp-chat-q__hover,
+.pp-chat-a:hover .pp-chat-a__hover,
+.pp-chat-a__tools:focus-within .pp-chat-a__hover,
+.pp-chat-a[data-latest='true'] .pp-chat-a__hover {
   opacity: 1;
 }
 
-/* Touch screens have no hover: keep the actions visible. */
 @media (hover: none) {
-  .pp-chat-q__actions,
-  .pp-chat-a__actions {
+  .pp-chat-q__hover,
+  .pp-chat-a__hover {
     opacity: 1;
   }
 }
 
+.pp-chat-q__tools .pp-icon-btn,
+.pp-chat-a__tools .pp-icon-btn {
+  width: 24px;
+  height: 24px;
+  color: var(--pp-text-3);
+}
+
+.pp-chat-q__tools .pp-icon-btn:hover:not(:disabled),
+.pp-chat-a__tools .pp-icon-btn:hover:not(:disabled) {
+  color: var(--pp-text);
+}
+
+/* Editing a question in place. */
 .pp-chat-q--editing {
   align-items: stretch;
   margin-left: 0;
 }
 
-.pp-chat-q__hint {
-  margin: 0;
+.pp-chat-q__edit-bar {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.pp-chat-q__edit-bar > span {
+  flex: 1;
   color: var(--pp-text-3);
   font-size: var(--pp-text-xs);
 }
 
-.pp-chat-q__edit-actions {
-  display: flex;
-  justify-content: flex-end;
-  gap: 6px;
-}
-
-/* ---- Answer ------------------------------------------------------------------ */
+/* ---- Answer ----------------------------------------------------------------------- */
 
 .pp-chat-a {
   display: flex;
   flex-direction: column;
-  gap: 8px;
+  gap: 6px;
+}
+
+.pp-chat-a__text {
+  font-size: 14px;
+  line-height: 1.7;
 }
 
 .pp-chat-a__waiting {
@@ -136,16 +199,18 @@
   animation: pp-caret 1.1s steps(2, jump-none) infinite;
 }
 
-.pp-chat-a__foot {
+/* One line under the answer: copy, regenerate, versions, then the model in small grey. */
+.pp-chat-a__tools {
   display: flex;
   align-items: center;
-  gap: 6px;
-  min-height: 28px;
-  margin-top: -2px;
+  gap: 2px;
+  min-height: 24px;
+  margin: -2px 0 0 -5px;
 }
 
 .pp-chat-a__model {
   min-width: 0;
+  margin-left: 6px;
   overflow: hidden;
   color: var(--pp-text-3);
   font-size: var(--pp-text-xs);
@@ -153,112 +218,35 @@
   white-space: nowrap;
 }
 
-.pp-chat-a__spacer {
-  flex: 1;
-}
-
-/* Source markers inside the text: a small numbered tag that jumps to the passage. */
-.pp-chat-marker {
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  min-width: 16px;
-  height: 16px;
-  margin: 0 1px;
-  padding: 0 4px;
-  border: 0;
-  border-radius: var(--pp-radius-pill);
-  background: var(--pp-accent-soft);
-  color: var(--pp-accent);
-  font-size: 10.5px;
-  font-weight: var(--pp-weight-semibold);
-  line-height: 1;
-  vertical-align: 0.15em;
-}
-
-.pp-chat-marker:hover {
-  background: var(--pp-accent);
-  color: var(--pp-on-accent);
-}
-
-.pp-chat-marker--unknown {
-  background: var(--pp-fill);
-  color: var(--pp-text-3);
-}
-
-.pp-chat-sources {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 4px;
-}
-
-.pp-chat-source {
-  display: inline-flex;
-  align-items: center;
-  gap: 6px;
-  height: 24px;
-  padding: 0 9px 0 3px;
-  border: 0;
-  border-radius: var(--pp-radius-pill);
-  background: var(--pp-fill);
-  color: var(--pp-text-2);
-  font-size: var(--pp-text-xs);
-}
-
-.pp-chat-source:hover {
-  background: var(--pp-fill-hover);
-  color: var(--pp-text);
-}
-
-.pp-chat-source__label {
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  min-width: 18px;
-  height: 18px;
-  padding: 0 4px;
-  border-radius: var(--pp-radius-pill);
-  background: var(--pp-accent-soft);
-  color: var(--pp-accent);
-  font-weight: var(--pp-weight-semibold);
-}
-
+/* Problems read as a quiet line, not a coloured box. */
 .pp-chat-note {
   display: flex;
   flex-wrap: wrap;
   align-items: center;
-  gap: 4px 8px;
-  padding: 8px 6px 8px 10px;
-  border-radius: var(--pp-radius-control);
+  gap: 2px 6px;
+  margin: 0;
+  color: var(--pp-text-2);
   font-size: var(--pp-text-sm);
-  line-height: 1.45;
-}
-
-.pp-chat-note[data-tone='danger'] {
-  background: var(--pp-danger-soft);
-}
-
-.pp-chat-note[data-tone='danger'] > svg {
-  color: var(--pp-danger);
-}
-
-.pp-chat-note[data-tone='warn'] {
-  background: color-mix(in srgb, var(--pp-warn) 11%, transparent);
-}
-
-.pp-chat-note[data-tone='warn'] > svg {
-  color: var(--pp-warn);
+  line-height: 1.5;
 }
 
 .pp-chat-note > svg {
   flex-shrink: 0;
 }
 
-.pp-chat-note__text {
+.pp-chat-note[data-tone='danger'] > svg {
+  color: var(--pp-danger);
+}
+
+.pp-chat-note[data-tone='warn'] > svg {
+  color: var(--pp-warn);
+}
+
+.pp-chat-note > span {
   flex: 1 1 160px;
 }
 
-/* ---- Versions ------------------------------------------------------------------ */
+/* ---- Versions ------------------------------------------------------------------------ */
 
 .pp-chat-version {
   display: inline-flex;
@@ -270,14 +258,14 @@
 }
 
 .pp-chat-version__count {
-  min-width: 34px;
+  min-width: 26px;
   color: var(--pp-text-2);
   font-size: var(--pp-text-xs);
   font-variant-numeric: tabular-nums;
   text-align: center;
 }
 
-/* ---- Attachments ------------------------------------------------------------------ */
+/* ---- Attachments ----------------------------------------------------------------------- */
 
 .pp-chat-attachments {
   display: flex;
@@ -313,17 +301,23 @@
   font-size: 10.5px;
 }
 
-/* ---- Starting a conversation and follow-ups ----------------------------------------- */
+/* ---- Starting a conversation and follow-ups --------------------------------------------- */
 
 .pp-chat-start {
   display: flex;
   flex-direction: column;
-  gap: var(--pp-space-3);
-  padding-top: var(--pp-space-2);
+  gap: 6px;
+  padding-top: 6px;
+}
+
+.pp-chat-start__title {
+  margin: 0;
+  font-size: 15px;
+  font-weight: var(--pp-weight-medium);
 }
 
 .pp-chat-start__lead {
-  margin: 0;
+  margin: 0 0 10px;
   color: var(--pp-text-2);
   font-size: var(--pp-text-sm);
   line-height: var(--pp-leading-body);
@@ -332,45 +326,56 @@
 .pp-chat-start__list {
   display: flex;
   flex-direction: column;
-  gap: 6px;
   margin: 0;
   padding: 0;
   list-style: none;
 }
 
+.pp-chat-start__list li + li {
+  border-top: 0.5px solid var(--pp-hairline);
+}
+
 .pp-chat-ask {
-  display: block;
+  display: flex;
+  align-items: center;
+  gap: 6px;
   width: 100%;
-  padding: 7px 11px;
+  padding: 9px 2px;
   border: 0;
-  border-radius: var(--pp-radius-control);
   background: transparent;
-  box-shadow: inset 0 0 0 0.5px var(--pp-hairline-strong);
   color: var(--pp-text);
-  font-size: var(--pp-text-md);
+  font-size: 14px;
   line-height: 1.45;
   text-align: left;
 }
 
 .pp-chat-ask:hover {
-  background: var(--pp-fill);
+  color: var(--pp-accent);
 }
 
 .pp-chat-follow {
   display: flex;
   flex-direction: column;
-  gap: 6px;
-  margin-top: var(--pp-space-4);
+  align-items: flex-start;
+  gap: 2px;
+  margin-top: 18px;
 }
 
-.pp-chat-follow .pp-chat-ask {
+.pp-chat-ask--follow {
   width: auto;
-  align-self: flex-start;
+  padding: 4px 8px 4px 4px;
+  border-radius: var(--pp-radius-inner);
   color: var(--pp-text-2);
   font-size: var(--pp-text-sm);
 }
 
-.pp-chat-follow .pp-chat-ask:hover {
+.pp-chat-ask--follow svg {
+  flex-shrink: 0;
+  color: var(--pp-text-3);
+}
+
+.pp-chat-ask--follow:hover {
+  background: var(--pp-fill);
   color: var(--pp-text);
 }
 
@@ -383,24 +388,28 @@
   font-size: var(--pp-text-sm);
 }
 
-/* ---- Composer ------------------------------------------------------------------------ */
+/* ---- Composer ---------------------------------------------------------------------------- */
 
 .pp-composer {
   display: flex;
   flex-shrink: 0;
   flex-direction: column;
-  gap: 4px;
-  margin-top: var(--pp-space-2);
-  padding: 8px 6px 6px 12px;
-  border-radius: 12px;
-  background: var(--pp-surface);
-  box-shadow: inset 0 0 0 0.5px var(--pp-hairline-strong);
+  gap: 2px;
+  margin-top: 4px;
+  padding: 9px 6px 6px 12px;
+  border-radius: 14px;
+  background: var(--pp-fill);
+  box-shadow: inset 0 0 0 0.5px var(--pp-hairline);
   cursor: text;
+  transition:
+    background-color var(--pp-dur-fast) var(--pp-ease-out),
+    box-shadow var(--pp-dur-fast) var(--pp-ease-out);
 }
 
 .pp-composer:focus-within {
+  background: var(--pp-reading-surface);
   box-shadow:
-    inset 0 0 0 1px var(--pp-accent),
+    inset 0 0 0 1px color-mix(in srgb, var(--pp-accent) 55%, transparent),
     0 0 0 3px var(--pp-accent-soft);
 }
 
@@ -410,8 +419,8 @@
   padding: 0 6px 0 0;
   border: 0;
   background: transparent;
-  font-size: var(--pp-text-md);
-  line-height: 1.5;
+  font-size: 14px;
+  line-height: 1.55;
   resize: none;
 }
 
@@ -462,6 +471,12 @@
   flex: 1;
 }
 
+.pp-composer__send,
+.pp-composer__stop {
+  width: 28px !important;
+  height: 28px !important;
+}
+
 .pp-composer__send:not(:disabled) {
   background: var(--pp-accent);
   color: var(--pp-on-accent);
@@ -472,16 +487,22 @@
   filter: brightness(1.08);
 }
 
-.pp-composer__stop {
+.pp-composer__send:disabled {
   background: var(--pp-fill-press);
-  color: var(--pp-text);
+  color: var(--pp-text-3);
+  opacity: 1;
+}
+
+.pp-composer__stop {
+  background: var(--pp-text) !important;
+  color: var(--pp-reading-surface) !important;
 }
 
 .pp-composer__attachments {
   display: flex;
   flex-wrap: wrap;
   gap: 6px;
-  margin-bottom: 2px;
+  margin-bottom: 4px;
 }
 
 .pp-composer__attachment {
@@ -512,82 +533,122 @@
   box-shadow: 0 0 0 0.5px var(--pp-hairline-strong);
 }
 
-/* ---- History ------------------------------------------------------------------------ */
-
-.pp-chat-history {
-  flex: 1;
-  margin: var(--pp-space-2) -6px 0;
+.pp-chat__footnote {
+  flex-shrink: 0;
+  margin: 6px 0 0;
+  color: var(--pp-text-3);
+  font-size: 11px;
+  text-align: center;
 }
 
-.pp-chat-history__viewport {
-  padding: 0 6px;
+/* ---- Conversations popover ------------------------------------------------------------- */
+
+.pp-chat-sessions {
+  padding: 6px !important;
 }
 
-.pp-chat-history__list {
-  display: flex;
-  flex-direction: column;
-  gap: 1px;
-  margin: 0;
-  padding: 0;
-  list-style: none;
-}
-
-.pp-chat-history__item {
+.pp-chat-sessions__new {
   display: flex;
   align-items: center;
-  gap: 2px;
-  padding-right: 4px;
+  gap: 8px;
+  width: 100%;
+  height: 32px;
+  padding: 0 10px;
+  border: 0;
   border-radius: var(--pp-radius-control);
+  background: transparent;
+  color: var(--pp-text);
+  font-size: var(--pp-text-md);
+  text-align: left;
 }
 
-.pp-chat-history__item:hover {
+.pp-chat-sessions__new:hover:not(:disabled) {
   background: var(--pp-fill-hover);
 }
 
-.pp-chat-history__item[aria-current='true'] {
+.pp-chat-sessions__new:disabled {
+  color: var(--pp-text-3);
+}
+
+.pp-chat-sessions__label {
+  margin: 6px 10px 2px;
+  color: var(--pp-text-3);
+  font-size: var(--pp-text-xs);
+  font-weight: var(--pp-weight-semibold);
+}
+
+.pp-chat-sessions__list {
+  display: flex;
+  flex-direction: column;
+  max-height: 320px;
+  margin: 0;
+  padding: 0;
+  overflow-y: auto;
+  list-style: none;
+}
+
+.pp-chat-sessions__item {
+  position: relative;
+  display: flex;
+  align-items: center;
+  border-radius: var(--pp-radius-control);
+}
+
+.pp-chat-sessions__item:hover {
+  background: var(--pp-fill-hover);
+}
+
+.pp-chat-sessions__item[aria-current='true'] {
   background: var(--pp-accent-soft);
 }
 
-.pp-chat-history__open {
+.pp-chat-sessions__open {
   display: flex;
   flex: 1;
   flex-direction: column;
-  gap: 2px;
+  gap: 1px;
   min-width: 0;
-  padding: 7px 10px;
+  padding: 6px 10px;
   border: 0;
   background: transparent;
   color: var(--pp-text);
   text-align: left;
 }
 
-.pp-chat-history__title {
+.pp-chat-sessions__title {
   overflow: hidden;
   font-size: var(--pp-text-md);
   text-overflow: ellipsis;
   white-space: nowrap;
 }
 
-.pp-chat-history__meta {
+.pp-chat-sessions__meta {
   color: var(--pp-text-2);
   font-size: var(--pp-text-xs);
 }
 
-.pp-chat-history__more {
+.pp-chat-sessions__tools {
+  display: flex;
+  padding-right: 4px;
   opacity: 0;
 }
 
-.pp-chat-history__item:hover .pp-chat-history__more,
-.pp-chat-history__more:focus-visible,
-.pp-chat-history__more[aria-expanded='true'] {
+.pp-chat-sessions__item:hover .pp-chat-sessions__tools,
+.pp-chat-sessions__tools:focus-within {
   opacity: 1;
 }
 
-.pp-chat-history__rename {
+.pp-chat-sessions__tools .pp-icon-btn {
+  width: 24px;
+  height: 24px;
+  color: var(--pp-text-2);
+}
+
+.pp-chat-sessions__rename {
   flex: 1;
   min-width: 0;
-  height: 32px;
-  margin: 4px 0 4px 4px;
+  height: 30px;
+  margin: 4px;
   padding: 0 8px;
   border: 0;
   border-radius: var(--pp-radius-inner);
@@ -598,7 +659,7 @@
   font-size: var(--pp-text-md);
 }
 
-.pp-chat-history__rename:focus-visible {
+.pp-chat-sessions__rename:focus-visible {
   outline: none;
 }
 

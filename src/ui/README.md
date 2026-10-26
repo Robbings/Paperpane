@@ -114,10 +114,11 @@ toast.show({ message: '翻译失败：请求超时', tone: 'error', action: { la
 位于 `src/ui/reader/chat/`，视图模型在 `chat/types.ts`，与 PR #7 的会话契约一一对应；示例接线是 `reader/sample/SampleChat.tsx`。解释面板以后复用同一组件（`title="解释"`，用 `source` 显示被解释的段落或截图）。
 
 - 逻辑层把 `visibleMessages(session)` 映射成 `messages`；每条消息的 `version` 来自 `messageVersions`（第几个 / 共几个），`onVersion(id, ±1)` 由逻辑层用 `latestLeaf` + `selectBranch` 切换。
-- 出处：`citations` 的 `pageLabel` 由逻辑层从锚点算出；回答正文里写 `[^label]` 会显示为可点的小标记，`onLocate(citation)` 交给 `AnchorService.locate`。
+- 出处：回答正文里写 `[^label]`，显示为和概览相同的淡色小数字（`SourceMarker`，按出现顺序编号），悬停看原文，点击 `onLocate(citation)` 跳回原文。不再单独列出页码按钮。
 - 生成状态 `generation` 决定界面：排队、生成中（输入框的发送按钮变成停止）、已停止、被中断、失败、保存失败，各自带恢复按钮，`onRecover(id, action)`。
+- 对话切换、重命名、删除都在标题旁的下拉里（`ChatSessions`）。快捷问题和推荐追问点一下只填进输入框，由读者决定是否发送。
 - 换到另一家供应商的模型：`onModel` 之后，逻辑层返回的确认信息传给 `modelChange`，界面弹出说明；用户点「换用」调用 `onConfirmModelChange`。
-- 演示数据传 `demo`，标题旁会显示「演示，不会调用模型」。
+- 输入框下方有一行小字：演示时说明不会调用模型，正式时提示「回答由模型生成，请以原文为准」。
 
 ## 概览面板 `OverviewPanel`
 
