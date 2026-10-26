@@ -1,6 +1,6 @@
 import { useEffect, useRef, type ReactNode, type RefObject } from 'react';
 import { createPortal } from 'react-dom';
-import { useAnchoredPosition, type Placement } from './useAnchoredPosition';
+import { layerFor, useAnchoredPosition, type Placement } from './useAnchoredPosition';
 import './Popover.css';
 
 interface PopoverProps {
@@ -68,6 +68,6 @@ export function Popover({ anchorRef, open, onClose, label, placement = 'bottom',
     >
       {children}
     </div>,
-    document.body,
+    layerFor(anchorRef.current),
   );
 }

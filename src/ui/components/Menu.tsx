@@ -1,6 +1,7 @@
 import { useEffect, useLayoutEffect, useRef, useState, type KeyboardEvent, type RefObject } from 'react';
 import { createPortal } from 'react-dom';
 import { Icon, type IconName } from './Icon';
+import { layerFor } from './useAnchoredPosition';
 import './Menu.css';
 
 export type MenuEntry =
@@ -120,6 +121,6 @@ export function Menu({ label, entries, anchor, align = 'start', triggerRef, mult
         ),
       )}
     </div>,
-    document.body,
+    layerFor(triggerRef?.current),
   );
 }

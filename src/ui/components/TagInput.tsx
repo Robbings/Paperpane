@@ -1,7 +1,7 @@
 import { useId, useMemo, useRef, useState, type KeyboardEvent } from 'react';
 import { createPortal } from 'react-dom';
 import { Icon } from './Icon';
-import { useAnchoredPosition } from './useAnchoredPosition';
+import { layerFor, useAnchoredPosition } from './useAnchoredPosition';
 import './TagInput.css';
 
 export interface TagOption {
@@ -153,7 +153,7 @@ export function TagInput({ label, selected, options, onAdd, onRemove, placeholde
               </li>
             ))}
           </ul>,
-          document.body,
+          layerFor(boxRef.current),
         )}
     </div>
   );

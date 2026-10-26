@@ -174,9 +174,9 @@
 /* ---- Content forms ------------------------------------------------------------------ */
 
 /* The opening lines: the page's anchor. */
+/* The opening lines: same type as the rest; their place at the top is emphasis enough. */
 .pp-ov-lead {
-  font-size: 15px;
-  font-weight: var(--pp-weight-medium);
+  font-size: 14px;
   line-height: 1.7;
 }
 

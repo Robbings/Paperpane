@@ -40,12 +40,19 @@ export function OverviewSettings({ open, onClose, cards, defaults, onSave }: Ove
   const [draft, setDraft] = useState<OverviewCardDef[]>([...cards]);
   const [selectedId, setSelectedId] = useState<string | null>(cards[0]?.id ?? null);
   const [dragging, setDragging] = useState<string | null>(null);
+  // Problems show once a field has been left empty, or after trying to save; a fresh card starts clean.
+  const [touched, setTouched] = useState<ReadonlySet<string>>(() => new Set());
+  const [tried, setTried] = useState(false);
+  const touch = (id: string, field: string) => setTouched((all) => new Set(all).add(`${id}:${field}`));
+  const shows = (id: string, field: string) => tried || touched.has(`${id}:${field}`);
 
   // Start from the saved list each time it opens; closing without saving drops the draft.
   useEffect(() => {
     if (!open) return;
     setDraft([...cards]);
     setSelectedId((id) => (cards.some((c) => c.id === id) ? id : (cards[0]?.id ?? null)));
+    setTouched(new Set());
+    setTried(false);
   }, [open]); // only when it opens
 
   const selected = draft.find((card) => card.id === selectedId) ?? null;
@@ -109,8 +116,14 @@ export function OverviewSettings({ open, onClose, cards, defaults, onSave }: Ove
           <Button onClick={onClose}>取消</Button>
           <Button
             variant="primary"
-            disabled={!valid || !changed}
+            disabled={!changed}
             onClick={() => {
+              if (!valid) {
+                // Point at the first card that needs something.
+                setTried(true);
+                setSelectedId(draft.find((card) => problems.get(card.id))?.id ?? selectedId);
+                return;
+              }
               onSave(draft);
               onClose();
             }}
@@ -150,7 +163,7 @@ export function OverviewSettings({ open, onClose, cards, defaults, onSave }: Ove
                 <button type="button" className="pp-ov-settings__open" onClick={() => setSelectedId(card.id)}>
                   <span className="pp-ov-settings__name">
                     {card.name || '未命名'}
-                    {problems.get(card.id) && <span className="pp-ov-settings__problem" aria-label="有内容需要补充" />}
+                    {tried && problems.get(card.id) && <span className="pp-ov-settings__problem" aria-label="有内容需要补充" />}
                   </span>
                   <span className="pp-ov-settings__kind">
                     {kindOf(card)}
@@ -171,7 +184,13 @@ export function OverviewSettings({ open, onClose, cards, defaults, onSave }: Ove
             <p className="pp-ov-settings__empty">选择左侧的一张卡片来编辑。</p>
           ) : (
             <>
-              <TextField label="名称" value={selected.name} onChange={(name) => patch(selected.id, { name })} error={selected.name.trim() ? undefined : '请填写名称。'} />
+              <TextField
+                label="名称"
+                value={selected.name}
+                onChange={(name) => patch(selected.id, { name })}
+                onBlur={() => touch(selected.id, 'name')}
+                error={selected.name.trim() || !shows(selected.id, 'name') ? undefined : '请填写名称'}
+              />
 
               <div className="pp-ov-settings__field">
                 <HintLabel htmlFor="pp-ov-prompt" hint="对整篇论文的要求，会和正文一起发给模型">
@@ -186,7 +205,8 @@ export function OverviewSettings({ open, onClose, cards, defaults, onSave }: Ove
                   rows={3}
                   maxRows={10}
                   placeholder="例如：列出这篇论文的主要贡献，每条一句话"
-                  error={selected.prompt.trim() ? undefined : '请填写提示词。'}
+                  onBlur={() => touch(selected.id, 'prompt')}
+                  error={selected.prompt.trim() || !shows(selected.id, 'prompt') ? undefined : '请填写提示词'}
                 />
               </div>
 
