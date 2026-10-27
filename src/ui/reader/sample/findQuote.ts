@@ -7,7 +7,7 @@ import { viewToPage } from './pageFrame';
 const normalize = (text: string) => text.replace(/\s+/g, ' ').toLowerCase();
 
 /** Finds a quote on one of the pages under `root` and returns its page element and line boxes in the page's own (unturned) coordinates. */
-export function findQuote(root: HTMLElement, quote: string): { page: HTMLElement; rects: PageRect[] } | null {
+export function findQuote(root: HTMLElement, quote: string): { page: HTMLElement; rects: PageRect[]; range: Range } | null {
   const target = normalize(quote).trim();
   if (!target) return null;
   for (const page of Array.from(root.querySelectorAll<HTMLElement>('[data-page-index]'))) {
@@ -34,7 +34,7 @@ export function findQuote(root: HTMLElement, quote: string): { page: HTMLElement
     const rects = Array.from(range.getClientRects())
       .filter((r) => r.width > 1 && r.height > 1)
       .map((r) => viewToPage(page, r));
-    return { page, rects };
+    return { page, rects, range };
   }
   return null;
 }
