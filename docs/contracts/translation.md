@@ -206,3 +206,10 @@ Targets requiring scrolling land approximately one third down the reading viewpo
 targets do not move. A 1.9-second transient accent mark fades after every locate, including a
 no-scroll locate; it tracks current projection and never changes saved highlights. Explicit page
 navigation and PDF-native destinations retain their existing semantics.
+
+### 暂停与离开当前论文
+
+- 启动任务在第一个异步步骤前创建取消信号；读取配置、初始落盘之后和派发前均检查。暂停或关闭已先发生时，不得再发起模型请求。
+- 全文和选区翻译会话都注册到阅读器的离开检查。切换论文、返回文献库前先暂停任务并等待写入队列完成；保存失败则保留当前论文、内存译文和重试保存入口。
+- `prepareToLeave()` 暂停任务、阻止新任务启动并返回是否已安全保存；中止切换时用 `cancelLeave()` 恢复操作。`dispose()` 返回 false 表示仍有未保存译文，不得丢弃该会话。
+- 文档加载或渲染阶段变化不会单独销毁翻译会话。关闭浏览器页签时，进行中的请求、写入或保存失败会触发浏览器离开提示；用户强制离开或浏览器崩溃仍无法保证保留未落盘数据。

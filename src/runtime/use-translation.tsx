@@ -19,12 +19,16 @@ export function useTranslation(owner:ReaderController|undefined,preferences:Pref
   const followGuard=useRef({suppressUntil:0,manualUntil:0});
   const document=owner?.reader.getSnapshot().data.document;const phase=owner?.reader.getSnapshot().data.phase;
   useEffect(()=>{
-    if(!owner||!document||phase!=='ready')return;
+    if(!owner||!document)return;
     let alive=true;const s=new TranslationSession(document,(signal,progress)=>owner.reader.extractTranslation(signal,progress),()=>{if(alive)render(n=>n+1);});
-    setSession(s);setActive(null);setReveal(null);void s.load();
-
-    return()=>{alive=false;void s.dispose();setSession(undefined);};
-  },[owner,document?.documentId,document?.fileVersion,phase]);
+    owner.trackTranslation(s);
+    setSession(s);setActive(null);setReveal(null);
+    return()=>{alive=false;void owner.releaseTranslation(s);};
+  },[owner,document?.documentId,document?.fileVersion]);
+  // Loading/render phase changes must not dispose a session holding unsaved text.
+  useEffect(()=>{
+    if(session&&phase==='ready'&&session.ref.documentId===document?.documentId&&session.ref.fileVersion===document?.fileVersion)void session.load();
+  },[session,phase,document?.documentId,document?.fileVersion]);
   const sentences=session?.paper?.sentences??[];
   const rects=(s:TranslationSentence)=>s.anchor.pages.flatMap(p=>{const result=owner?.reader.project({...s.anchor,pages:[p]},'viewport');return result?.state==='ready'?result.rects.map(r=>r.rect):[];});
   useEffect(()=>{
@@ -111,7 +115,7 @@ export function useTranslation(owner:ReaderController|undefined,preferences:Pref
     !session?.paper?<EmptyState icon="file" title="原文尚未就绪" description={session?.error??'请先打开 PDF。'}/>:
     <div style={{display:'contents','--pp-text-read':`${(preferences.translationFontSize??preferences.uiFontSize)*.875}px`} as CSSProperties}>
       <TranslationPane renderText={s=><TranslationMarkdown text={s.text} inferredMath={s.inferredMath}/>} pages={pages} mode={mode} onMode={setMode} follow={follow} onFollow={setFollow} onClose={()=>{setOpen(false);setActive(null);}} activeId={active} onHover={setActive} onLocate={id=>{const s=sentences.find(x=>x.id===id);if(s){followGuard.current.suppressUntil=Date.now()+1500;setActive(id);void owner?.reader.locate(s.anchor);}}} reveal={reveal}
-        task={{completedSentences:run?.requested.filter(id=>run.outputs[id]?.state==='done').length,totalSentences:run?.requested.length,phase:session.error?'failed':run?.phase??'idle',completedPages:pages.filter(p=>p.state==='done').length,totalPages:pageCount,current:session.retrying.size?`${session.activeRequests} 个请求进行中，${session.retrying.values().next().value}`:session.activeRequests?`${session.activeRequests} 个请求并发`:undefined,error:session.error??run?.error}}
+        task={{saveFailed:session.saveFailed,completedSentences:run?.requested.filter(id=>run.outputs[id]?.state==='done').length,totalSentences:run?.requested.length,phase:session.error?'failed':run?.phase??'idle',completedPages:pages.filter(p=>p.state==='done').length,totalPages:pageCount,current:session.retrying.size?`${session.activeRequests} 个请求进行中，${session.retrying.values().next().value}`:session.activeRequests?`${session.activeRequests} 个请求并发`:undefined,error:session.error??run?.error}}
         onTranslatePage={p=>start(p,session.needsRepeat(p))} onTranslateAll={()=>start()} onPause={()=>void session.pause()} onResume={()=>session.saveFailed?void session.retrySave():void session.resume(run?.profile.language??preferences.translationLanguage)} onRetryPage={p=>start(p,true)} onRetranslatePage={page=>setConfirm({page,replace:true})} onRetranslateAll={()=>setConfirm({replace:true})}/>
     </div>;
   return {shell:{open,onToggle:()=>setOpen(o=>!o),pane:panel},overlay,confirmation:<Dialog open={!!confirm} onClose={()=>setConfirm(null)} title={confirm?.replace?(confirm.page===undefined?"重新翻译全文":"重新翻译本页"):"重试未完成的译文"} description={confirm?.replace?"会再次请求模型并计费，用当前提示词生成新版本。旧译文记录仍保留；当前尚无历史版本浏览界面。":"会再次请求模型，可能再次计费。此前收到的内容仍保留，已完成的句子不会重复请求。"} footer={<><Button onClick={()=>setConfirm(null)}>取消</Button><Button variant="primary" onClick={()=>{const c=confirm;setConfirm(null);if(c)void session?.start(preferences.translationLanguage,c.page,true,c.ids,c.replace);}}>{confirm?.replace?"重新翻译":"重试未完成部分"}</Button></>}/>};

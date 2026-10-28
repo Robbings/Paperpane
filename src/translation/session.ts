@@ -28,6 +28,9 @@ export class TranslationSession {
   private taskAbort?: AbortController;
   private loadingTask?: Promise<void>;
   private disposed = false;
+  private leaving = false;
+  private closing?: Promise<boolean>;
+  private pendingWrites = 0;
   private pauseRequested = false;
   private persistedRevision?: string;
   private writeTail: Promise<void> = Promise.resolve();
@@ -54,6 +57,7 @@ export class TranslationSession {
   }
   /** All workers share one revisioned write queue. Snapshot when dequeued, never stale worker copies. */
   private save(recover = false): Promise<void> {
+    this.pendingWrites++;
     const write = this.writeTail.catch(() => {}).then(async () => {
       if (!this.run) return;
       if (this.saveFailed && !recover) throw new TranslationError('译文尚未保存，请先重试保存。', false, true);
@@ -67,7 +71,8 @@ export class TranslationSession {
       }
       this.update();
     });
-    this.writeTail = write; return write;
+    const tracked = write.finally(() => { this.pendingWrites--; this.update(); });
+    this.writeTail = tracked; return tracked;
   }
   needsRepeat(page?: number) {
     return this.paper?.sentences.some(s => (page === undefined || s.anchor.pages.some(p => p.pageIndex === page)) && ['partial', 'failed', 'streaming'].includes(this.run?.outputs[s.id]?.state ?? '')) ?? false;
@@ -77,21 +82,29 @@ export class TranslationSession {
   }
   start(language: string, page?: number, retry = false, onlyIds?: string[], replace = false): Promise<void> {
     if (this.active) return this.active;
-    if (this.loading || !this.paper || this.disposed) return Promise.resolve();
+    if (this.loading || !this.paper || this.disposed || this.leaving) return Promise.resolve();
+    this.taskAbort = new AbortController();
+    const signal = AbortSignal.any([this.abort.signal, this.taskAbort.signal]);
     this.pauseRequested = false; this.requestScope = { page, ids: onlyIds };
-    this.active = this.execute(language, page, retry, onlyIds, replace).catch(e => {
+    this.active = this.execute(language, page, retry, signal, onlyIds, replace).catch(async e => {
+      if (signal.aborted && !this.saveFailed) {
+        if (this.run) { this.run.phase = 'paused'; this.run.error = undefined; await this.save(); }
+        return;
+      }
       this.error = message(e); if (this.run) { this.run.phase = 'failed'; this.run.error = this.error; } this.update();
-    }).finally(() => { this.active = undefined; this.taskAbort = undefined; this.retrying.clear(); this.update(); });
+    }).catch(e => { this.error = message(e); if (this.run) this.run.phase = 'failed'; this.update(); }).finally(() => { this.active = undefined; this.taskAbort = undefined; this.retrying.clear(); this.update(); });
     return this.active;
   }
-  private async execute(language: string, page: number | undefined, retry: boolean, onlyIds?: string[], replace = false) {
+  private async execute(language: string, page: number | undefined, retry: boolean, signal: AbortSignal, onlyIds?: string[], replace = false) {
     if (!navigator.locks) throw new Error('当前浏览器不支持任务互斥锁，请使用新版 Chrome 或 Edge。');
     await navigator.locks.request(`paperpane-translation:${this.ref.documentId}:${this.ref.fileVersion}${this.selection ? `:selection:${this.selection.key}` : ''}`, { ifAvailable: true }, async lock => {
       if (!lock) throw new Error('这篇论文正在另一个窗口翻译，请在那里暂停后再操作。');
-      this.abort.signal.throwIfAborted(); this.error = undefined;
+      signal.throwIfAborted(); this.error = undefined;
       if (this.saveFailed) await this.save(true);
+      signal.throwIfAborted();
       const latest = await this.db.latest(this.ref, this.selection?.key); this.persistedRevision = latest?.revision;
-      const c = await this.settings.resolveConnection(); this.abort.signal.throwIfAborted(); if (this.pauseRequested) return;
+      signal.throwIfAborted();
+      const c = await this.settings.resolveConnection(); signal.throwIfAborted();
       const same = latest && latest.extractionVersion === this.paper!.version && latest.profile.language === language && latest.profile.modelId === c.model.id && latest.profile.modelName === c.model.modelId && latest.profile.endpointId === c.endpoint.id && latest.profile.endpointUrl === c.endpoint.baseUrl && latest.profile.protocol === c.endpoint.protocol && (latest.profile.sourceLanguage ?? 'auto') === (this.selection?.sourceLanguage ?? 'auto') && [PROMPT_VERSION, 'sentence-markdown-math-2'].includes(latest.profile.promptVersion);
       if (retry && onlyIds && latest && !same) throw new Error('本次任务的模型或语言已变化，请使用原配置继续，或重新选择页面开始新版本。');
       const candidates = this.paper!.sentences.filter(s => s.kind !== 'formula' && (!onlyIds || onlyIds.includes(s.id)) && (page === undefined || s.anchor.pages.some(p => p.pageIndex === page)));
@@ -117,6 +130,7 @@ export class TranslationSession {
       this.run.phase = 'running'; this.run.error = undefined;
       for (const s of selected) this.run.outputs[s.id] = { ...this.run.outputs[s.id], text: this.run.outputs[s.id]?.text ?? '', state: 'pending' };
       await this.save();
+      signal.throwIfAborted();
       // Pack adjacent paragraphs without crossing a page boundary. Avoid one request per heading.
       const batches: TranslationSentence[][] = [];
       const batching = llmTranslationSettings(c.view.runtime);
@@ -126,8 +140,6 @@ export class TranslationSession {
         if (last && last[0]!.anchor.pages[0]?.pageIndex === s.anchor.pages[0]?.pageIndex && last.length < batching.batchSentences && last.reduce((n, x) => n + x.source.length, 0) + s.source.length < charLimit) last.push(s);
         else batches.push([s]);
       }
-      this.taskAbort = new AbortController();
-      const signal = AbortSignal.any([this.abort.signal, this.taskAbort.signal]);
       const engine = createLlmEngine(c);
       const result = await runTranslationQueue(batches, {
         concurrency: c.view.runtime.concurrency, signal, minInterval: Math.ceil(60000 / batching.requestsPerMinute),
@@ -194,5 +206,25 @@ export class TranslationSession {
   async pause() { if (!this.active) return; this.pauseRequested = true; if (this.run) this.run.phase = 'pausing'; this.taskAbort?.abort(); this.update(); await this.active; }
   async retrySave() { try { await this.save(true); this.error = undefined; this.update(); } catch (e) { this.error = message(e); this.update(); } }
   output(id: string): SentenceTranslation { return this.run?.outputs[id] ?? { text: '', state: 'pending' }; }
-  async dispose() { this.disposed = true; this.pauseRequested = true; this.abort.abort(); this.taskAbort?.abort(); await Promise.all([this.active, this.loadingTask]); await this.writeTail.catch(() => {}); await Promise.all([this.db.close(), this.settings.close()]); }
+  get hasUnsavedChanges() { return !!this.active || this.pendingWrites > 0 || this.saveFailed; }
+  /** Hold new starts while a document switch waits for in-flight output and durable writes. */
+  async prepareToLeave(): Promise<boolean> {
+    this.leaving = true;
+    await this.pause();
+    await this.writeTail.catch(() => {});
+    return !this.saveFailed;
+  }
+  cancelLeave() { if (!this.disposed) this.leaving = false; }
+  dispose(): Promise<boolean> {
+    if (this.disposed) return Promise.resolve(true);
+    if (this.closing) return this.closing;
+    this.closing = (async () => {
+      if (!await this.prepareToLeave()) { this.cancelLeave(); return false; }
+      this.abort.abort(); await this.loadingTask;
+      this.disposed = true;
+      await Promise.all([this.db.close(), this.settings.close()]);
+      return true;
+    })().finally(() => { this.closing = undefined; });
+    return this.closing;
+  }
 }

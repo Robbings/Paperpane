@@ -39,6 +39,7 @@ export interface TranslationPageView {
 
 /** The translation task as a whole, shown in the collapsed toolbar status control. */
 export interface TranslationTaskView {
+  saveFailed?: boolean;
   phase: 'idle' | 'running' | 'pausing' | 'paused' | 'interrupted' | 'failed' | 'completed';
   /** What is being translated now, e.g. "第 2 页". */
   current?: string;

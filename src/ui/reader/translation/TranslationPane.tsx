@@ -55,7 +55,7 @@ function TaskStatus({ task, pages, onTranslateAll, onPause, onResume }: Pick<Tra
       {task.error && <p className="pp-tr__task-error">{task.error}</p>}
       <div className="pp-tr__task-actions">
         {running ? <Button size="sm" disabled={task.phase === 'pausing'} onClick={onPause}>暂停</Button> : <>
-          {resumable && <Button size="sm" onClick={onResume}>{task.phase === 'failed' ? '重试未完成部分' : '继续'}</Button>}
+          {resumable && <Button size="sm" onClick={onResume}>{task.saveFailed ? '重试保存' : task.phase === 'failed' ? '重试未完成部分' : '继续'}</Button>}
           {pages.some(p => p.state !== 'done') && <Button size="sm" variant="quiet" onClick={onTranslateAll}>翻译全文</Button>}
         </>}
       </div>
