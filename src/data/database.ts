@@ -4,7 +4,7 @@ import { itemFromDocument, enrichItem, LIBRARY, FOLDERS, TAGS, PREFERENCES } fro
 import type { LibraryItem, PdfBibliography } from '@/contracts/library';
 
 const DB_NAME = 'paperpane';
-const DB_VERSION = 2;
+const DB_VERSION = 3;
 const DOCUMENTS = 'documents';
 const ASSETS = 'assets';
 const CHANGES = 'changes';
@@ -75,6 +75,12 @@ export class PaperDatabase {
           tags.createIndex('byNormalized', 'normalized', { unique: true });
         }
         if (!db.objectStoreNames.contains(PREFERENCES)) db.createObjectStore(PREFERENCES, { keyPath: 'key' });
+        for (const name of ['annotations', 'annotationLayouts']) {
+          if (!db.objectStoreNames.contains(name)) {
+            const store = db.createObjectStore(name, { keyPath: 'id' });
+            store.createIndex('byDocument', 'documentKey');
+          }
+        }
       };
       req.onblocked = () => { abandoned = true; reject(new StorageFault('blocked', '请关闭其他 Paperpane 页面后重试数据库升级')); };
       req.onerror = () => reject(req.error);

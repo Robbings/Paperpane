@@ -16,6 +16,7 @@ interface CommentNotesProps {
   container: HTMLElement | null;
   /** Changes when the paper is laid out anew (zoom, docking), so passages are measured again. */
   layoutKey: string;
+  zoomPercent: number;
   annotationRects: (id: string) => readonly ViewRect[] | null;
   /** Geometry updates from the runtime (pages rendered, zoom, relayout). */
   subscribeGeometry: (listener: () => void) => () => void;
@@ -24,6 +25,7 @@ interface CommentNotesProps {
   onClose: (id: string) => void;
   onComment: (id: string, comment: string) => void;
   onLocate: (id: string) => void;
+  onRemoveComment: (id: string) => void;
 }
 
 const dot = (color: string) => ({ '--pp-dot': `var(--pp-hl-${color}-dot)` }) as CSSProperties;
@@ -124,7 +126,13 @@ export function CommentNotes(props: CommentNotesProps) {
     connector = { x1: start.x, y1: start.y, x2: target.x, y2: target.y };
   }
 
-  const bounds = { width: container.scrollWidth, height: container.scrollHeight };
+  // Reserve one generous screen of margin beside the PDF. Derive it from pages,
+  // never scrollWidth (which includes notes and would grow on each drag).
+  const viewport = container.getBoundingClientRect();
+  const pages = [...container.querySelectorAll<HTMLElement>('.page, [data-page-index]')];
+  const pageRight = Math.max(container.clientWidth, ...pages.map(page=>page.getBoundingClientRect().right-viewport.left+container.scrollLeft));
+  const pageBottom = Math.max(container.clientHeight, ...pages.map(page=>page.getBoundingClientRect().bottom-viewport.top+container.scrollTop));
+  const bounds = { width: pageRight + Math.max(520, container.clientWidth), height: pageBottom + 300 };
 
   return (
     <>
@@ -140,6 +148,7 @@ export function CommentNotes(props: CommentNotesProps) {
       {createPortal(
         // Inside the scroll container, so notes move with the paper. Runtimes ignore pointer events from here.
         <div className="pp-notes-layer" data-pp-overlay="">
+          {openIds && <div aria-hidden="true" style={{position:'absolute',width:bounds.width,height:bounds.height,pointerEvents:'none'}}/>}
           {notes.map((note) => {
             const annotation = props.annotations.find((a) => a.id === note.id);
             const anchor = anchors.get(note.id);
@@ -150,6 +159,8 @@ export function CommentNotes(props: CommentNotesProps) {
                 note={note}
                 anchor={anchor}
                 bounds={bounds}
+                container={container}
+                scale={props.zoomPercent / (note.zoom ?? 100)}
                 annotation={annotation}
                 register={(el) => (el ? elements.current.set(note.id, el) : elements.current.delete(note.id))}
                 onHover={(on) => setHovered((current) => (on ? note.id : current === note.id ? null : current))}
@@ -161,6 +172,7 @@ export function CommentNotes(props: CommentNotesProps) {
                 }}
                 onComment={(text) => props.onComment(note.id, text)}
                 onLocate={() => props.onLocate(note.id)}
+                onRemoveComment={() => props.onRemoveComment(note.id)}
               />
             );
           })}
@@ -177,6 +189,8 @@ interface CommentNoteProps {
   anchor: { x: number; y: number };
   /** The paper's scrollable size: notes stay inside it. */
   bounds: { width: number; height: number };
+  container: HTMLElement;
+  scale: number;
   annotation: AnnotationView;
   register: (element: HTMLElement | null) => void;
   onHover: (on: boolean) => void;
@@ -185,11 +199,15 @@ interface CommentNoteProps {
   onClose: () => void;
   onComment: (text: string) => void;
   onLocate: () => void;
+  onRemoveComment: () => void;
 }
 
-function CommentNote({ note, anchor, bounds, annotation, register, onHover, onChange, onRaise, onClose, onComment, onLocate }: CommentNoteProps) {
+function CommentNote({ note, anchor, bounds, container, scale, annotation, register, onHover, onChange, onRaise, onClose, onComment, onLocate, onRemoveComment }: CommentNoteProps) {
   const [draft, setDraft] = useState(annotation.note ?? '');
-  const gesture = useRef<{ kind: 'move' | 'resize'; x: number; y: number; start: NoteLayout; moved: boolean } | null>(null);
+  const gesture = useRef<{ kind:'move'|'resize'; pointerId:number; target:HTMLElement; x:number;y:number;px:number;py:number;scrollX:number;scrollY:number;start:NoteLayout;moved:boolean }|null>(null);
+  const frame = useRef(0);
+  const current = useRef({note,anchor,bounds,scale,onChange});
+  current.current = {note,anchor,bounds,scale,onChange};
   const textRef = useRef<HTMLTextAreaElement>(null);
 
   // Take outside changes (e.g. edited in the annotation list) unless typing here.
@@ -197,49 +215,66 @@ function CommentNote({ note, anchor, bounds, annotation, register, onHover, onCh
     if (document.activeElement !== textRef.current) setDraft(annotation.note ?? '');
   }, [annotation.note]);
 
-  const left = anchor.x + note.dx;
-  const top = anchor.y + note.dy;
+  const left = anchor.x + note.dx * scale;
+  const top = anchor.y + note.dy * scale;
   const width = note.collapsed ? undefined : note.width;
   const height = note.collapsed ? PILL_HEIGHT : note.height;
 
-  const begin = (kind: 'move' | 'resize') => (event: ReactPointerEvent<HTMLElement>) => {
-    if (event.button !== 0 || (kind === 'move' && (event.target as HTMLElement).closest('button, textarea'))) return;
-    event.preventDefault();
-    event.currentTarget.setPointerCapture(event.pointerId);
-    gesture.current = { kind, x: event.clientX, y: event.clientY, start: note, moved: false };
-    onRaise();
-  };
-  const move = (event: ReactPointerEvent<HTMLElement>) => {
-    const g = gesture.current;
-    if (!g) return;
-    const dx = event.clientX - g.x;
-    const dy = event.clientY - g.y;
-    if (Math.abs(dx) + Math.abs(dy) > 3) g.moved = true;
-    const own = (event.currentTarget.closest('.pp-note') as HTMLElement | null)?.getBoundingClientRect();
-    if (g.kind === 'move') {
-      // Stay on the paper: within its scrollable area.
-      const w = own?.width ?? g.start.width;
-      onChange({
-        ...g.start,
-        dx: clamp(anchor.x + g.start.dx + dx, 0, bounds.width - w) - anchor.x,
-        dy: clamp(anchor.y + g.start.dy + dy, 0, bounds.height - height) - anchor.y,
-      });
-    } else {
-      onChange({
-        ...g.start,
-        width: clamp(g.start.width + dx, NOTE_SIZE.minWidth, NOTE_SIZE.maxWidth),
-        height: clamp(g.start.height + dy, NOTE_SIZE.minHeight, NOTE_SIZE.maxHeight),
-      });
+  const finish = (expand = false) => {
+    const g=gesture.current; gesture.current=null; cancelAnimationFrame(frame.current);
+    if(g?.target.hasPointerCapture(g.pointerId))g.target.releasePointerCapture(g.pointerId);
+    if(expand && g?.moved && g.kind==='move') {
+      const {note,anchor,scale}=current.current;
+      const left=anchor.x+note.dx*scale, right=left+note.width*scale;
+      if(right>container.scrollLeft+container.clientWidth-16)container.scrollLeft=right-container.clientWidth+16;
+      else if(left<container.scrollLeft+16)container.scrollLeft=Math.max(0,left-16);
     }
+    if(expand && g && !g.moved && g.kind==='move' && current.current.note.collapsed)
+      current.current.onChange({...current.current.note,collapsed:false});
   };
-  const end = () => {
-    const g = gesture.current;
-    gesture.current = null;
-    // A click (no drag) on a folded note opens it.
-    if (g && !g.moved && g.kind === 'move' && note.collapsed) onChange({ ...note, collapsed: false });
+  useEffect(()=>{
+    const stop=()=>finish();
+    const up=(event:PointerEvent)=>{if(event.pointerId===gesture.current?.pointerId)finish(event.type==='pointerup');};
+    window.addEventListener('pointerup',up);window.addEventListener('pointercancel',up);window.addEventListener('blur',stop);
+    return ()=>{stop();window.removeEventListener('pointerup',up);window.removeEventListener('pointercancel',up);window.removeEventListener('blur',stop);};
+  },[container,scale]);
+  const updateGesture = () => {
+    const g=gesture.current;if(!g)return;
+    const {anchor,bounds,scale,note:latest,onChange}=current.current;
+    const dx=g.px-g.x+container.scrollLeft-g.scrollX, dy=g.py-g.y+container.scrollTop-g.scrollY;
+    if(Math.abs(dx)+Math.abs(dy)>3)g.moved=true;
+    if(!g.moved)return;
+    if(g.kind==='move')onChange({...latest,
+      dx:(clamp(anchor.x+g.start.dx*scale+dx,0,bounds.width-g.start.width*scale)-anchor.x)/scale,
+      dy:(clamp(anchor.y+g.start.dy*scale+dy,0,bounds.height-(g.start.collapsed?PILL_HEIGHT:g.start.height)*scale)-anchor.y)/scale,
+    });
+    else onChange({...latest,width:clamp(g.start.width+dx/scale,NOTE_SIZE.minWidth,NOTE_SIZE.maxWidth),height:clamp(g.start.height+dy/scale,NOTE_SIZE.minHeight,NOTE_SIZE.maxHeight)});
   };
-
-  const drag = { onPointerDown: begin('move'), onPointerMove: move, onPointerUp: end, onPointerCancel: end };
+  const pan = () => {
+    const g=gesture.current;if(!g)return;
+    if(g.kind==='move' && g.moved){
+      const box=container.getBoundingClientRect();
+      const speed=(p:number,start:number,end:number)=>p>end-40?Math.min(18,(p-end+40)/4):p<start+40?-Math.min(18,(start+40-p)/4):0;
+      container.scrollLeft+=speed(g.px,box.left,box.right);
+      container.scrollTop+=speed(g.py,box.top,box.bottom);
+      updateGesture();
+    }
+    frame.current=requestAnimationFrame(pan);
+  };
+  const begin = (kind:'move'|'resize') => (event:ReactPointerEvent<HTMLElement>) => {
+    if(event.button!==0 || !event.isPrimary || (kind==='move' && (event.target as HTMLElement).closest('button, textarea')))return;
+    event.preventDefault();event.stopPropagation();finish();
+    event.currentTarget.setPointerCapture(event.pointerId);
+    gesture.current={kind,pointerId:event.pointerId,target:event.currentTarget,x:event.clientX,y:event.clientY,px:event.clientX,py:event.clientY,scrollX:container.scrollLeft,scrollY:container.scrollTop,start:note,moved:false};
+    onRaise();frame.current=requestAnimationFrame(pan);
+  };
+  const move = (event:ReactPointerEvent<HTMLElement>) => {
+    const g=gesture.current;if(!g || g.pointerId!==event.pointerId)return;
+    if(!(event.buttons&1)){finish();return;}
+    g.px=event.clientX;g.py=event.clientY;updateGesture();
+  };
+  const end = (event:ReactPointerEvent<HTMLElement>) => {if(event.pointerId===gesture.current?.pointerId)finish(event.type==='pointerup');};
+  const drag={onPointerDown:begin('move'),onPointerMove:move,onPointerUp:end,onPointerCancel:end,onLostPointerCapture:()=>finish()};
   const title = noteTitle({ ...annotation, note: draft });
 
   return (
@@ -248,7 +283,7 @@ function CommentNote({ note, anchor, bounds, annotation, register, onHover, onCh
       className={note.collapsed ? 'pp-glass pp-note pp-note--pill' : 'pp-glass pp-note'}
       data-tone="float"
       aria-label={`评论：${title}`}
-      style={{ left, top, width, height, zIndex: note.z }}
+      style={{ left, top, width, height, zIndex: note.z, transform:`scale(${scale})`, transformOrigin:'top left' }}
       onPointerEnter={() => onHover(true)}
       onPointerLeave={() => onHover(false)}
       onFocus={() => onHover(true)}
@@ -278,6 +313,7 @@ function CommentNote({ note, anchor, bounds, annotation, register, onHover, onCh
               shape="pill"
               onClick={() => onChange({ ...note, collapsed: true })}
             />
+            {annotation.note && <IconButton icon="trash" label="仅删除评论（保留高亮）" size="md" shape="pill" onClick={onRemoveComment} />}
             <IconButton
               icon="close"
               label="关闭评论"
@@ -302,7 +338,7 @@ function CommentNote({ note, anchor, bounds, annotation, register, onHover, onCh
               if (event.key === 'Escape') onChange({ ...note, collapsed: true });
             }}
           />
-          <span className="pp-note__resize" aria-hidden="true" onPointerDown={begin('resize')} onPointerMove={move} onPointerUp={end} onPointerCancel={end} />
+          <span className="pp-note__resize" aria-hidden="true" onPointerDown={begin('resize')} onPointerMove={move} onPointerUp={end} onPointerCancel={end} onLostPointerCapture={()=>finish()} />
         </>
       )}
     </section>

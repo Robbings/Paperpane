@@ -63,6 +63,7 @@ export interface ReaderLayout {
 interface ReaderShellProps {
   header: DocumentHeaderView;
   outline: readonly OutlineItemView[];
+  navigationPending?: boolean;
   /** 0-based. */
   pageIndex: number;
   zoomPercent: number;
@@ -462,11 +463,19 @@ export function ReaderShell(props: ReaderShellProps) {
       // Start under the passage, shifted left if it would run past the visible paper area.
       const visibleRight = (scrollRef.current?.getBoundingClientRect().right ?? window.innerWidth) - 12;
       const dx = first ? Math.min(0, visibleRight - NOTE_SIZE.width - first.left) : 0;
-      return [...current, { id, dx, dy: first ? bottom - first.top + 10 : 0, width: NOTE_SIZE.width, height: NOTE_SIZE.height, collapsed: false, open: true, z }];
+      return [...current, { id, dx, dy: first ? bottom - first.top + 10 : 0, width: NOTE_SIZE.width, height: NOTE_SIZE.height, zoom: zoomPercent, collapsed: false, open: true, z }];
     });
 
-  const deleteAnnotation = (id: string) => {
-    interaction.onAnnotationDelete(id);
+  const removeComment = async (id: string) => {
+    const undo = interaction.onAnnotationCommentDelete
+      ? await interaction.onAnnotationCommentDelete(id)
+      : (interaction.onAnnotationComment(id, ''), undefined);
+    if (undo === null) return;
+    setNoteLayouts(current=>current.map(n=>n.id===id?{...n,open:false}:n));
+    toast.show({message:'已删除评论，高亮保留',action:undo?{label:'撤销',onAction:undo}:undefined});
+  };
+  const deleteAnnotation = async (id: string) => {
+    if (await interaction.onAnnotationDelete(id) === false) return;
     toast.show({
       message: '已删除批注',
       action: interaction.onAnnotationRestore ? { label: '撤销', onAction: () => interaction.onAnnotationRestore?.(id) } : undefined,
@@ -593,6 +602,7 @@ export function ReaderShell(props: ReaderShellProps) {
       <ReaderSidebar
         open={sidebarOpen}
         outline={outline}
+        navigationPending={props.navigationPending}
         pageCount={header.pageCount}
         pageIndex={pageIndex}
         // Floating or docked is decided by room, not by open state, so it
@@ -705,6 +715,7 @@ export function ReaderShell(props: ReaderShellProps) {
                     onColor={interaction.onAnnotationColor}
                     onComment={interaction.onAnnotationComment}
                     onDelete={deleteAnnotation}
+                    onRemoveComment={removeComment}
                     onCopyAll={() => props.onTool('copy-annotations')}
                     onExport={() => props.onTool('export-annotations')}
                   />
@@ -794,6 +805,7 @@ export function ReaderShell(props: ReaderShellProps) {
 
       <CommentNotes
         notes={noteLayouts}
+        zoomPercent={zoomPercent}
         annotations={annotations}
         container={paperElement}
         layoutKey={`${zoomPercent}:${interaction.rotation}:${effectivePlacement}:${effectiveWidth}:${effectiveHeight}:${sidebarOpen}:${translationDocked ? translationWidth : 0}`}
@@ -803,6 +815,7 @@ export function ReaderShell(props: ReaderShellProps) {
         onRaise={(id) => setNoteLayouts((current) => current.map((n) => (n.id === id && n.z !== topZ.current ? { ...n, z: ++topZ.current } : n)))}
         onClose={(id) => setNoteLayouts((current) => current.map((n) => (n.id === id ? { ...n, open: false } : n)))}
         onComment={interaction.onAnnotationComment}
+        onRemoveComment={removeComment}
         onLocate={props.onLocateAnnotation}
       />
     </div>

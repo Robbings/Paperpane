@@ -8,7 +8,7 @@ import type { DocumentHeaderView, DockPlacement, Rotation } from './types';
  */
 export type ToolbarDensity = 'full' | 'compact' | 'tight';
 
-export type ToolbarTool = 'region' | 'export' | 'settings';
+export type ToolbarTool = 'open' | 'region' | 'export' | 'settings';
 
 interface ReaderToolbarProps {
   header: DocumentHeaderView;
@@ -165,6 +165,7 @@ export function ReaderToolbar({
           { kind: 'separator', id: 'sep-zoom' },
         ] as MenuEntry[])
       : []),
+    { id: 'open', label: '打开论文', icon: 'file' },
     { id: 'region', label: '框选图像', icon: 'region' },
     { id: 'rotate', label: rotateLabel, icon: 'rotate' },
     ...(rotation !== 0 ? [resetEntry] : []),
@@ -179,9 +180,8 @@ export function ReaderToolbar({
     else if (id === 'zoom-out') onZoom('out');
     else if (id === 'rotate') onRotate();
     else if (id === 'rotate-reset') onResetRotation();
-    // After the 更多 menu has closed, so the export menu is not closed with it.
     else if (id === 'export') window.setTimeout(() => openExport(moreRef.current), 0);
-    else if (id === 'region') onTool(id);
+    else if (id === 'open' || id === 'region') onTool(id);
   };
 
   return (

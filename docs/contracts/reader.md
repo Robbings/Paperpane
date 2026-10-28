@@ -1,29 +1,33 @@
-# Reader surface contract (proposed)
+# Reader surface contract
 
-Extends the existing document/anchor contracts; does not replace them. Import jobs describe acquisition and inspection. ReaderState describes one mounted reading session. A readable import does not imply its pages have rendered.
+Import jobs describe acquisition and inspection. `ReaderState` describes one mounted reading session; a readable import does not imply its pages have rendered.
 
-## Ownership
+## Ownership and mounting
 
-The runtime owns PDF bytes, worker, PDFViewer, selection capture, geometry and cleanup. UI owns ReaderShell, ReaderToolbar, SelectionMenu, OverlayScrollbar and visual interaction. Mounting receives the shell's one absolute-positioned scroll container and a child viewer element. No second scrolling viewport and no complete upstream viewer UI are inserted. React refs and PDF.js objects stay outside shared DTOs.
+The runtime owns the document reference, original-file read, PDF worker/viewer, text selections, geometry and cleanup. UI owns ReaderShell, ReaderToolbar, SelectionMenu, CommentNotes and the annotation list. The shell supplies its actual scroll container through `ReaderInteraction.onScrollContainer`; the runtime supplies one child PDF surface. No ancestor-selector bridge, duplicate scroll viewport or complete upstream viewer chrome is inserted.
 
-The proposed controlled shell takes ReaderSelection, dismissal/action callbacks, and a scroll-container ref/callback. This is an integration agreement for review, not a new React component owned by the logic layer. Until that interface lands, a separately labelled proof page may use the existing shell with a local compatibility bridge; it cannot be treated as the final integration.
+The UI view models remain separate from portable shared DTOs. `reader-page` maps them; React refs and PDF.js instances stay outside contracts. Both reader entry URLs now use the controlled integration. Sample reader components remain design examples and are not the production entry.
 
-## Selection and geometry
+## Selection, menus and geometry
 
-Selection captures have immutable IDs and exact document/file identities. Mouse/keyboard selection is captured from PDF.js's text layer, converted through page viewport transforms. Store unrotated crop-box-relative PDF points with bottom-left origin, as DocumentAnchor already specifies; never persist CSS rectangles. Cross-page selection has one PageAnchor per selected page. A different selection, document switch or disposed session invalidates old IDs. Menu focus alone does not invalidate the captured selection. Dismissal explicitly clears it; any UI action captures/resolves the ID before dismissing.
+`ReaderMenuTarget` distinguishes a new selection from an existing annotation. A new capture has an immutable ID, exact document/file identity, quote and per-page anchors. Mouse/keyboard ranges are clipped to leaf text nodes within each PDF.js text layer. Convert through page viewport transforms into unrotated crop-box-relative PDF points, origin bottom-left. Never persist CSS rectangles.
 
-AnchorService.project('page') gives page content CSS pixels; project('viewport') gives window CSS pixels for a fixed menu. Scrolling invalidates viewport projection; zoom/rotation/reflow invalidates both. Unrendered pages return pending, not stale rectangles. Source-file mismatch returns unavailable. Locate loads/navigates to the target first; the UI draws its existing LocateFlash from fresh projection.
+A new selection, dismissal, document switch or disposal invalidates the capture. Menu focus alone does not invalidate it. Actions resolve/copy the capture before dismissing, so a pending save cannot accidentally use a later selection. A cross-page capture creates one annotation; visible per-page projections can be used while other pages are not rendered.
 
-## Commands and state
+`AnchorService.project('page')` returns page-content CSS pixels. `project('viewport')` returns window CSS pixels for fixed overlays. Scrolling invalidates viewport geometry; zoom, rotation and rendering invalidate both spaces. Unrendered pages return pending rather than stale rectangles. Version mismatch returns unavailable. Note placement and click detection use current projections, including after restoration.
 
-Public page indexes are zero-based; page labels may differ. Zoom=1 means 100% at 96 CSS pixels/inch. Native PDF.js uses one-based page numbers internally; only the adapter converts them. Commands before ready return BUSY. Invalid pages/zoom/rotation return INVALID_INPUT. Passwords are passed only to the current request callback, never persisted or logged. New requests invalidate earlier request IDs.
+## Interaction and state
 
-Snapshot objects remain stable until a change; subscriptions do not fire immediately. Opening a new document invalidates all outstanding work from the previous session. Runtime disposal releases observers/listeners, cancels loading/rendering and terminates its worker.
+- `select`: highlighting through the menu is a one-time operation and never enables the pen.
+- `auto-highlight`: a completed selection is saved in the last chosen highlight color, then becomes an existing-annotation menu target. It uses the same controlled menu and database path as manual highlighting. Only the top toolbar changes this mode.
+- Clicking an existing highlight opens its full menu. Color, comment, delete and restore operate on its stable business ID, never a PDF.js editor ID.
+- Page indexes are zero-based. Zoom 1 means 100% at 96 CSS pixels/inch. First open fits the page width; a saved reading position restores numeric zoom and rotation. Native one-based page conversion stays inside the adapter.
+- Commands before readiness return BUSY; invalid page/zoom/rotation values return INVALID_INPUT. Password request IDs expire when replaced/cancelled; passwords only reach the active in-memory callback. Cancel destroys the loading task.
+- Load progress, text-layer availability, page labels and search state have explicit fields. Unknown text availability is not a claim that a scan is selectable. Page labels/complete navigation remain pending in this slice; unavailable navigation is visibly labelled rather than showing sample thumbnails.
+- Snapshots remain stable between notifications. Disposal cancels loading, releases listeners/observers and destroys the worker. Switching documents flushes accepted business writes first.
 
-## Highlights and staged delivery
+## Persistence and rendering
 
-Creation remains AnnotationService.create({selection, color, ...}); ReaderService is not a second annotation database. The proof only exercises a session highlight using the native PDF.js editor. It visibly states that edits are not saved; it does not claim AnnotationService persistence or synchronization.
+See [annotation-storage.md](annotation-storage.md). The business database is authoritative for annotations, comments, tombstones and note layouts. Native PDF.js editor state is reconstructed display state. Native pen switching, menus and keyboard editing are not forwarded. The accepted continuous highlight geometry and light native colors/opacity are retained for both creation and restoration.
 
-Preserve the accepted continuous bands and PDF.js native light colors/opacity. UI color dots are separate from PDF appearance. Contract color purple remains purple; a proposed pale purple must be visually reviewed rather than mapped to PDF.js red. Default yellow/green are the acceptance baseline. Native floating menus are disabled; commands originate from the existing Paperpane menu.
-
-The library runtime now persists and restores reading position and recent reading. Full search, annotation CRUD persistence/undo/export and AI actions are subsequent slices. This contract does not claim those features are implemented. Ordinary build/typecheck and manual checks accompany the proof; no test framework or CI is introduced.
+This slice reuses the library's file identity/storage and reading-position writer. It does not implement WebDAV, full reading navigation or annotated-PDF export. Existing search/rotation controls are connected to PDF.js; broad reading/extension validation is a later step. Ordinary type/build checks and temporary behavioral probes do not introduce a test framework or CI.

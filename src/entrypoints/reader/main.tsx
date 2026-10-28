@@ -1,6 +1,5 @@
 import { mountPage } from '@/runtime/mount-page';
-import { ReaderProof } from '@/runtime/reader-proof';
+import { LiveReaderPage } from '@/runtime/reader-page';
 import { ReaderPage } from '@/ui/pages/ReaderPage';
-
-const item = new URLSearchParams(location.search).get('item');
-mountPage(item ? <ReaderProof libraryItemId={item} /> : <ReaderPage />);
+const view = new URLSearchParams(location.search).get('view');
+mountPage(view === 'gallery' || view === 'selbar' || view === 'sample' ? <ReaderPage /> : <LiveReaderPage />);
