@@ -66,7 +66,7 @@ export function useSampleTranslation(onLocateQuote: (quote: string) => void) {
           return current;
         }
         const now = current[next.id] ?? { state: 'pending', chars: 0 };
-        if (failOnce.current.has(next.id) && now.chars >= 6) return { ...current, [next.id]: { state: 'failed', chars: 0 } };
+        if (failOnce.current.has(next.id) && now.chars >= 6) return { ...current, [next.id]: { ...now, state: 'failed' } };
         const chars = Math.min(next.text.length, now.chars + STREAM_STEP);
         return { ...current, [next.id]: { state: chars === next.text.length ? 'done' : 'streaming', chars } };
       });
@@ -206,7 +206,7 @@ export function useSampleTranslation(onLocateQuote: (quote: string) => void) {
         onResume={() => setTask((current) => ({ ...current, phase: 'running' }))}
         onRetryPage={(pageIndex) => {
           for (const s of sampleSentences) if (s.pageIndex === pageIndex) failOnce.current.delete(s.id);
-          setStatus((current) => Object.fromEntries(Object.entries(current).map(([id, p]) => [id, p.state === 'failed' ? { state: 'pending', chars: 0 } : p])));
+          setStatus((current) => Object.fromEntries(Object.entries(current).map(([id, p]) => [id, p.state === 'failed' && sampleSentences.some(s => s.id === id && s.pageIndex === pageIndex) ? { ...p, state: 'pending' } : p])));
           setTask((current) => ({ phase: 'running', queue: [...new Set([...current.queue, pageIndex])] }));
         }}
         reveal={reveal}

@@ -118,8 +118,8 @@ export function TranslationPane(props: TranslationPaneProps) {
         </Tooltip>
       );
     }
-    // Untranslated or failed: the original, greyed, still lit and located like the rest.
-    const missing = !s.text && (s.state === 'pending' || s.state === 'failed' || s.state === 'partial');
+    // Received text remains visible while failed or queued for retry.
+    const missing = !s.text.trim();
     const crossPage = s.endsOnPage !== undefined && s.endsOnPage !== s.pageIndex && (
       <span className="pp-tr__cont" title="原句跨页">
         至第 {s.endsOnPage + 1} 页
@@ -205,12 +205,12 @@ export function TranslationPane(props: TranslationPaneProps) {
               <div className="pp-tr__page" aria-label={`第 ${page.pageIndex + 1} 页`}>
                 <span>第 {page.pageIndex + 1} 页</span>
                 <span className="pp-tr__page-rule" aria-hidden="true" />
-                <Button size="sm" variant="quiet" disabled={!taskIdle(props.task) || !!page.error}
-                  onClick={() => page.sentences.some(s => s.kind !== 'formula' && !!s.text) && props.onRetranslatePage ? props.onRetranslatePage(page.pageIndex) : props.onTranslatePage(page.pageIndex)}>
-                  {page.sentences.some(s => s.kind !== 'formula' && !!s.text) && props.onRetranslatePage ? '重新翻译本页' : '翻译本页'}
+                <Button size="sm" variant="quiet" disabled={!taskIdle(props.task) || (!!page.error && !page.sentences.some(s => s.kind !== 'formula'))}
+                  onClick={() => page.state === 'failed' ? props.onRetryPage(page.pageIndex) : page.sentences.some(s => s.kind !== 'formula' && !!s.text) && props.onRetranslatePage ? props.onRetranslatePage(page.pageIndex) : props.onTranslatePage(page.pageIndex)}>
+                  {page.state === 'failed' && page.sentences.some(s => s.kind !== 'formula') ? '重试本页' : page.sentences.some(s => s.kind !== 'formula' && !!s.text) && props.onRetranslatePage ? '重新翻译本页' : '翻译本页'}
                 </Button>
               </div>
-              {page.error && <p className="pp-tr__missing">{page.error}</p>}
+              {(page.error || page.state === 'failed') && <p className="pp-tr__missing">{page.error ?? '这一页没能翻译完，已收到的译文保留'}</p>}
                   {paragraphs(page.sentences).map((group) =>
                     group[0]!.kind === 'heading' ? (
                       <h3 key={group[0]!.id} className="pp-tr__heading">
