@@ -112,6 +112,8 @@ export interface ReaderInteraction {
    * document switch; a deleted annotation simply ignores later calls.
    */
   onAnnotationComment: (annotationId: string, comment: string) => void;
+  /** Resolves after saving; returned undo is tied to that deletion revision. Null means deletion failed. */
+  onAnnotationCommentDelete?: (annotationId: string) => Promise<(() => void | Promise<void>) | null>;
   onAnnotationDelete: (annotationId: string) => void | Promise<boolean>;
   /** Undoes a delete (offered right after deleting). */
   onAnnotationRestore?: (annotationId: string) => void | Promise<void>;

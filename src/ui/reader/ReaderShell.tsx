@@ -360,11 +360,13 @@ export function ReaderShell(props: ReaderShellProps) {
       return [...current, { id, dx, dy: first ? bottom - first.top + 10 : 0, width: NOTE_SIZE.width, height: NOTE_SIZE.height, zoom: zoomPercent, collapsed: false, open: true, z }];
     });
 
-  const removeComment = (id: string) => {
-    const previous = annotations.find(item=>item.id===id)?.note ?? '';
-    interaction.onAnnotationComment(id, '');
+  const removeComment = async (id: string) => {
+    const undo = interaction.onAnnotationCommentDelete
+      ? await interaction.onAnnotationCommentDelete(id)
+      : (interaction.onAnnotationComment(id, ''), undefined);
+    if (undo === null) return;
     setNoteLayouts(current=>current.map(n=>n.id===id?{...n,open:false}:n));
-    toast.show({message:'已删除评论，高亮保留',action:{label:'撤销',onAction:()=>interaction.onAnnotationComment(id,previous)}});
+    toast.show({message:'已删除评论，高亮保留',action:undo?{label:'撤销',onAction:undo}:undefined});
   };
   const deleteAnnotation = async (id: string) => {
     if (await interaction.onAnnotationDelete(id) === false) return;

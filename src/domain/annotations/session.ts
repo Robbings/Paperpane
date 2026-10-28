@@ -122,6 +122,27 @@ export class AnnotationSession implements AnnotationService {
     await this.queue; const revision = this.undoRevisions.get(id);
     if (revision && (await this.restore(id, revision)).ok) this.undoRevisions.delete(id);
   }
+  /** Capture the durable deletion revision in this particular undo action. */
+  async deleteComment(id: string): Promise<(() => Promise<void>) | null> {
+    const result = await this.enqueue(async () => {
+      const row = this.rows.get(id);
+      if (!row || row.deletedAt || this.drafts.has(id)) throw new AnnotationFault('CONFLICT', '评论已变化或有未保存的草稿，请先处理后再删除。');
+      const previous = row.comment;
+      const saved = await this.db.mutate(this.document, id, row.revision, { comment: '' });
+      this.rows.set(id, saved); this.changed();
+      return { previous, revision: saved.revision };
+    });
+    if (!result.ok) return null;
+    const { previous, revision } = result.value;
+    return async () => {
+      if (this.disposed) return;
+      await this.enqueue(async () => {
+        if (this.drafts.has(id)) throw new AnnotationFault('CONFLICT', '评论已有新的草稿，无法撤销旧删除。');
+        const saved = await this.db.mutate(this.document, id, revision, { comment: previous });
+        this.rows.set(id, saved); this.changed();
+      });
+    };
+  }
   setLayouts(next: readonly AnnotationNoteLayout[]) {
     for (const layout of next) {
       const previous = this.layoutDrafts.get(layout.id) ?? this.layouts.get(layout.id)?.layout;
