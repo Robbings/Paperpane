@@ -70,7 +70,9 @@ export function useAnchoredPosition(
       const anchor = anchorRef.current;
       const floating = floatingRef.current;
       if (!anchor || !floating) return;
-      setPosition(place(anchor.getBoundingClientRect(), floating.getBoundingClientRect(), placement, offset));
+      // Entrance transforms temporarily shrink the visual rectangle. Position
+      // using the final layout size so enlarged menus stay inside the viewport.
+      setPosition(place(anchor.getBoundingClientRect(), new DOMRect(0, 0, floating.offsetWidth, floating.offsetHeight), placement, offset));
     };
     update();
     const resize = new ResizeObserver(update);

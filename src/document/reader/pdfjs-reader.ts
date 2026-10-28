@@ -1,7 +1,8 @@
+import { setPaperpaneViewerTheme } from 'pdfjs-dist/build/paperpane-theme.mjs';
 import { TextLayer, AnnotationEditorType, GlobalWorkerOptions, PasswordResponses, getDocument, type PDFDocumentLoadingTask, type PDFDocumentProxy } from 'pdfjs-dist';
 import { mergeHighlightRects } from 'pdfjs-dist/build/paperpane-highlight-geometry.mjs';
 import workerUrl from 'pdfjs-dist/build/pdf.worker.min.mjs?url';
-import { EventBus, PDFFindController, PDFLinkService, PDFViewer } from 'pdfjs-dist/web/pdf_viewer.mjs';
+import { EventBus, PDFFindController, PDFLinkService, PDFViewer, ScrollMode, SpreadMode } from 'pdfjs-dist/web/pdf_viewer.mjs';
 import type { AnnotationEditorUIManager } from 'pdfjs-dist/types/src/display/editor/tools';
 import type { AnchorService, DocumentAnchor, DocumentRef, Projection, ProjectionSpace, SelectionSnapshot } from '@/contracts/document';
 import type { ReaderService, ReaderState } from '@/contracts/reader';
@@ -27,6 +28,7 @@ export class PdfjsReader implements ReaderService, AnchorService {
   private projections = { page: new Set<() => void>(), viewport: new Set<() => void>() };
   private eventBus = new EventBus();
   private viewer: PDFViewer;
+  private pageTheme: {background:string;foreground:string} | null = null;
   private links: PDFLinkService;
   private task?: PDFDocumentLoadingTask;
   private pdf?: PDFDocumentProxy;
@@ -39,6 +41,7 @@ export class PdfjsReader implements ReaderService, AnchorService {
   private findScrollLeft?: number;
   private locateFlash:LocateFlash;
   private disposed = false;
+  private lastWheelTurn = 0;
   private pointerStart?: {x:number;y:number};
   private observer: ResizeObserver;
   private lifecycle = new AbortController();
@@ -81,7 +84,7 @@ export class PdfjsReader implements ReaderService, AnchorService {
     this.eventBus.on('updatefindmatchescount', matches);
     this.eventBus.on('updatefindcontrolstate', matches);
     this.eventBus.on('pagechanging', ({ pageNumber }: { pageNumber: number }) => this.position({ pageIndex: pageNumber - 1 }));
-    this.eventBus.on('scalechanging', ({ scale }: { scale: number }) => { this.position({ zoom: scale }); this.invalidate(true); });
+    this.eventBus.on('scalechanging', ({ scale, presetValue }: { scale: number; presetValue?: string }) => { this.position({ zoom: scale, zoomMode: presetValue === 'page-width' ? 'width' : 'manual' }); this.invalidate(true); });
     this.eventBus.on('rotationchanging', ({ pagesRotation }: { pagesRotation: 0 | 90 | 180 | 270 }) => { this.position({ rotation: pagesRotation }); this.invalidate(true); });
     this.eventBus.on('pagerendered', () => this.invalidate(true));
     // Paperpane owns the pen and menus; native editor mode stays NONE.
@@ -90,9 +93,31 @@ export class PdfjsReader implements ReaderService, AnchorService {
     surface.addEventListener('mouseup', this.captureSelection, { ...options, capture: true });
     surface.addEventListener('keyup', this.captureSelection, options);
     container.addEventListener('scroll', () => { this.invalidate(false); this.capturePosition(); }, { ...options, passive: true });
+    container.addEventListener('wheel', this.scrollPages, {...options, passive:false});
     window.addEventListener('resize', () => this.invalidate(true), options);
-    this.observer = new ResizeObserver(() => this.invalidate(true)); this.observer.observe(container);
+    this.observer = new ResizeObserver(() => {
+      if (this.ready().ok && this.snapshot.data.position.zoomMode === 'width') {
+        this.applyWidthScale();
+      }
+      this.invalidate(true);
+    }); this.observer.observe(container);
   }
+  private scrollPages = (event: WheelEvent) => {
+    if(!this.ready().ok||event.ctrlKey||event.metaKey||(event.target as Element).closest('[data-pp-overlay]'))return;
+    if(this.viewer.scrollMode===ScrollMode.HORIZONTAL&&!event.shiftKey&&!event.deltaX&&event.deltaY){
+      event.preventDefault();
+      this.container.scrollLeft+=event.deltaY*(event.deltaMode===1?16:event.deltaMode===2?this.container.clientWidth:1);
+      return;
+    }
+    if(this.viewer.scrollMode!==ScrollMode.PAGE||Math.abs(event.deltaX)>Math.abs(event.deltaY)||!event.deltaY)return;
+    const forward=event.deltaY>0;
+    const atEdge=forward?this.container.scrollTop+this.container.clientHeight>=this.container.scrollHeight-2:this.container.scrollTop<=2;
+    if(!atEdge)return;
+    event.preventDefault();
+    const now=performance.now();if(now-this.lastWheelTurn<400)return;
+    const changed=forward?this.viewer.nextPage():this.viewer.previousPage();
+    if(changed){this.lastWheelTurn=now;if(!forward)this.container.scrollTop=this.container.scrollHeight-this.container.clientHeight;this.invalidate(true);}
+  };
   /** Visible paper viewport, for clipping transient translation geometry. */
   translationViewport = () => this.container.getBoundingClientRect();
   translationScrollElement = () => this.container;
@@ -124,7 +149,7 @@ export class PdfjsReader implements ReaderService, AnchorService {
     const ready = this.ready(); if (!ready.ok) return ready;
     if (!Number.isFinite(position.offset) || position.offset < 0 || position.offset > 1) return failure('INVALID_INPUT', '阅读位置无效');
     const rotated = this.setRotation(position.rotation); if (!rotated.ok) return rotated;
-    const zoomed = this.setZoom(position.zoom); if (!zoomed.ok) return zoomed;
+    const zoomed = position.zoomMode === 'width' ? this.fitWidth() : this.setZoom(position.zoom); if (!zoomed.ok) return zoomed;
     const navigated = await this.navigate(position.pageIndex); if (!navigated.ok) return navigated;
     const session = this.snapshot.data.sessionId;
     await new Promise<void>(resolve => requestAnimationFrame(() => resolve()));
@@ -159,7 +184,7 @@ export class PdfjsReader implements ReaderService, AnchorService {
       const initialized = this.waitForEvent('pagesinit', this.sessionLifecycle.signal);
       this.viewer.setDocument(pdf); await initialized;
       if (this.disposed || this.snapshot.data.sessionId !== sessionId) return;
-      this.viewer.currentScaleValue = 'page-width';
+      this.applyWidthScale();
       this.publish({ phase: 'ready', pageCount: pdf.numPages, passwordRequest: undefined, loadProgress: 1 });
       this.invalidate(true);
     } catch { if (!this.disposed && this.snapshot.data.sessionId === sessionId) this.publish({ phase: 'failed', error: { code: 'CORRUPT_FILE', message: '无法打开这份 PDF，请换一份文件重试。', recovery: ['choose-file'] } }); }
@@ -167,8 +192,44 @@ export class PdfjsReader implements ReaderService, AnchorService {
   submitPassword(requestId: string, password: string): Result<void> { if (!this.password || this.password.id !== requestId) return failure('STALE_CONFIRMATION', '密码请求已过期'); const submit = this.password.submit; this.password = undefined; this.publish({ phase: 'loading', passwordRequest: undefined }); submit(password); return success(undefined); }
   private ready(): Result<void> { return !this.disposed && this.snapshot.data.phase === 'ready' ? success(undefined) : failure('BUSY', '论文尚未就绪'); }
   async navigate(pageIndex: number): Promise<Result<void>> { this.locateFlash.clear(); ++this.locateRequest; const ready = this.ready(); if (!ready.ok) return ready; if (!Number.isInteger(pageIndex) || pageIndex < 0 || pageIndex >= this.snapshot.data.pageCount) return failure('INVALID_INPUT', '页码超出范围'); this.viewer.scrollPageIntoView({ pageNumber: pageIndex + 1 }); return success(undefined); }
-  setZoom(zoom: number): Result<void> { const ready = this.ready(); if (!ready.ok) return ready; if (!Number.isFinite(zoom) || zoom < .25 || zoom > 4) return failure('INVALID_INPUT', '缩放须在 25% 至 400% 之间'); this.viewer.currentScale = zoom; return success(undefined); }
-  setRotation(rotation: 0 | 90 | 180 | 270): Result<void> { const ready = this.ready(); if (!ready.ok) return ready; if (![0,90,180,270].includes(rotation)) return failure('INVALID_INPUT', '旋转角度无效'); this.viewer.pagesRotation = rotation; return success(undefined); }
+  setZoom(zoom: number): Result<void> { const ready = this.ready(); if (!ready.ok) return ready; if (!Number.isFinite(zoom) || zoom < .25 || zoom > 4) return failure('INVALID_INPUT', '缩放须在 25% 至 400% 之间'); this.viewer.currentScale = zoom; this.position({zoomMode:'manual'}); return success(undefined); }
+  private applyWidthScale() {
+    const page = this.viewer.getPageView(this.viewer.currentPageNumber - 1);
+    if (!page) return;
+    // The reader reserves real padding for its floating bar and page actions.
+    // PDF.js' native page-width preset only subtracts its own viewer borders.
+    const style = getComputedStyle(this.container);
+    const room = this.container.clientWidth - parseFloat(style.paddingLeft) - parseFloat(style.paddingRight);
+    const spread = this.viewer.spreadMode !== SpreadMode.NONE && this.viewer.scrollMode !== ScrollMode.HORIZONTAL;
+    const scale = Math.max(.01, (room - (spread ? 8 : 0)) / (page.width / page.scale) / (spread ? 2 : 1));
+    this.viewer.currentScale = scale;
+    this.position({zoomMode:'width'});
+  }
+  fitWidth(): Result<void> {
+    const ready = this.ready(); if (!ready.ok) return ready;
+    this.applyWidthScale(); return success(undefined);
+  }
+  setDisplay(options: {scroll:'vertical'|'horizontal'|'page'; spread:'none'|'odd'|'even'; theme:'original'|'dark'|'black'|'sepia'}) {
+    if(this.disposed)return;
+    const colors = options.theme==='dark' ? {background:'#2f3440',foreground:'#d9dce3'}
+      : options.theme==='black' ? {background:'#101114',foreground:'#e1e1e5'}
+      : options.theme==='sepia' ? {background:'#f4ecd8',foreground:'#4d4233'} : null;
+    if(JSON.stringify(this.pageTheme)!==JSON.stringify(colors)) {
+      this.pageTheme=colors;
+      setPaperpaneViewerTheme(this.surface, colors);
+      this.surface.style.setProperty('--page-bg-color',colors?.background??'#ffffff');
+      for(let i=0;i<this.viewer.pagesCount;i++){
+        const page=this.viewer.getPageView(i);
+        page.reset({keepAnnotationLayer:true,keepAnnotationEditorLayer:true,keepTextLayer:true});
+      }
+      this.viewer.update();
+    }
+    this.viewer.scrollMode=options.scroll==='horizontal'?ScrollMode.HORIZONTAL:options.scroll==='page'?ScrollMode.PAGE:ScrollMode.VERTICAL;
+    this.viewer.spreadMode=options.spread==='odd'?SpreadMode.ODD:options.spread==='even'?SpreadMode.EVEN:SpreadMode.NONE;
+    if(this.snapshot.data.position.zoomMode==='width')this.applyWidthScale();
+    this.invalidate(true);
+  }
+  setRotation(rotation: 0 | 90 | 180 | 270): Result<void> { const ready = this.ready(); if (!ready.ok) return ready; if (![0,90,180,270].includes(rotation)) return failure('INVALID_INPUT', '旋转角度无效'); const fit = this.snapshot.data.position.zoomMode === 'width'; this.viewer.pagesRotation = rotation; if(fit)this.applyWidthScale(); return success(undefined); }
   async extractTranslation(signal: AbortSignal, progress: (n:number)=>void) {
     const pdf=this.pdf, ref=this.snapshot.data.document;
     if(!pdf||!ref||this.snapshot.data.phase!=='ready')throw new Error('论文尚未就绪。');
@@ -331,5 +392,5 @@ export class PdfjsReader implements ReaderService, AnchorService {
     if (this.password?.id !== id) return failure('STALE_CONFIRMATION','密码请求已结束');
     await this.cancelOpen(); return success(undefined);
   }
-  async dispose() { if (this.disposed) return; this.locateFlash.clear(); this.disposed = true; this.sessionLifecycle.abort(); this.lifecycle.abort(); this.observer.disconnect(); this.listeners.clear(); Object.values(this.projections).forEach(s=>s.clear()); this.password = undefined; this.highlights?.dispose(); this.highlights = undefined; this.links.setDocument(null); this.viewer.setDocument(null); await this.task?.destroy().catch(()=>{}); }
+  async dispose() { if (this.disposed) return; setPaperpaneViewerTheme(this.surface, null); this.locateFlash.clear(); this.disposed = true; this.sessionLifecycle.abort(); this.lifecycle.abort(); this.observer.disconnect(); this.listeners.clear(); Object.values(this.projections).forEach(s=>s.clear()); this.password = undefined; this.highlights?.dispose(); this.highlights = undefined; this.links.setDocument(null); this.viewer.setDocument(null); await this.task?.destroy().catch(()=>{}); }
 }

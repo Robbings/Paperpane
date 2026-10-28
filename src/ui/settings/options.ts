@@ -20,5 +20,5 @@ export const mathOptions: SegmentedOption<Preferences['mathDelimiter']>[] = [
   { value: 'none', label: '不加' },
 ];
 
-/** The text size reads as a percentage of the designed size (16). */
-export const fontSizeLabel = (size: number) => `${Math.round((size / 16) * 100)}%`;
+/** Reading text size keeps the existing preference scale (16 = designed size). */
+export const fontSizeLabel = (size: number) => String(size);

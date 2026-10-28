@@ -1,4 +1,5 @@
 import { useEffect, useState, useSyncExternalStore } from 'react';
+import { useLocalPreferences } from './use-local-preferences';
 import { LibraryView } from '@/ui/library/LibraryView';
 import type { PaperView } from '@/ui/library/types';
 import { Button, Dialog, EmptyState, Toaster, toast } from '@/ui/components';
@@ -29,6 +30,7 @@ const pending = (job: LibraryImportJob) => !['completed', 'failed', 'cancelled']
 
 /** Connects the library service to its view, dialogs and controls. */
 export function LibraryPage({ owner }: { owner: Runtime }) {
+  useLocalPreferences();
   const { service, imports } = owner;
   const snapshot = useSyncExternalStore(service.subscribe, service.getSnapshot);
   const jobs = useSyncExternalStore(imports.subscribe, imports.getSnapshot);

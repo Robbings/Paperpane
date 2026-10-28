@@ -16,7 +16,7 @@ export function TranslationSection({draft,onChange,preferences,onPreference}:{dr
     <SettingRow label="每分钟请求上限" description="每项大模型翻译任务均匀发送，包括重试；遇到限流会进一步降速。并非账户总额度，其他任务和应用仍会占用接口额度。保存后新启动或继续任务生效。"><Stepper label="每分钟请求上限" value={batching.requestsPerMinute} min={1} max={120} onChange={requestsPerMinute=>setBatching({requestsPerMinute})}/></SettingRow>
     <SettingRow label="翻译模型"><Select label="翻译模型" value={feature.modelId??'default'} options={[{value:'default',label:'使用默认模型'},...draft.models.map(m=>({value:m.id,label:m.label||m.modelId}))]} onChange={modelId=>edit({modelId:modelId==='default'?null:modelId})}/></SettingRow>
     <SettingRow label="默认翻译到" description="用于之后启动的论文和选区翻译，立即保存。选区悬浮窗可单独选择语言；不影响讨论回答语言或已有译文。"><Select label="默认翻译到" value={preferences.translationLanguage} options={TRANSLATION_LANGUAGES} onChange={v=>onPreference('translationLanguage',v)}/></SettingRow>
-    <SettingRow label="译文字号跟随正文"><Switch label="译文字号跟随正文" checked={preferences.translationFontSize===null} onChange={follow=>onPreference('translationFontSize',follow?null:preferences.uiFontSize)}/></SettingRow>
+    <SettingRow label="译文字号跟随阅读字号"><Switch label="译文字号跟随阅读字号" checked={preferences.translationFontSize===null} onChange={follow=>onPreference('translationFontSize',follow?null:preferences.uiFontSize)}/></SettingRow>
     {preferences.translationFontSize!==null&&<SettingRow label="译文字号"><Stepper label="译文字号" value={preferences.translationFontSize} min={FONT_SIZE.min} max={FONT_SIZE.max} onChange={v=>onPreference('translationFontSize',v)}/></SettingRow>}
   </SettingGroup>;
 }

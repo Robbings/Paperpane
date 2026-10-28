@@ -45,6 +45,7 @@
     "@types/react": "19.3.0",
     "@types/react-dom": "19.3.0",
     "@wxt-dev/module-react": "1.2.2",
+    "postcss-pxtorem": "6.1.0",
     "typescript": "7.0.2",
     "vite": "8.3.5",
     "wxt": "0.21.4"

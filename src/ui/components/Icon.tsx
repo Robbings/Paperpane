@@ -11,6 +11,7 @@ const paths = {
   search: 'M10.5 17a6.5 6.5 0 1 0 0-13 6.5 6.5 0 0 0 0 13z M15.5 15.5 20 20',
   minus: 'M7 12h10',
   plus: 'M12 7v10 M7 12h10',
+  pageDisplay: 'M4 5h16v14H4z M8 9h8 M8 12h5 M8 15h7',
   rotate: 'M18.5 12a6.5 6.5 0 1 1-1.9-4.6 M18.5 4.5v3.6h-3.6',
   marker: 'M4.5 19.5h6 M14.5 4.5l5 5-8.5 8.5H6.5v-4.5z',
   region: 'M4.5 8.5v-4h4 M15.5 4.5h4v4 M19.5 15.5v4h-4 M8.5 19.5h-4v-4',
@@ -92,6 +93,7 @@ export function Icon({ name, size = 18, strokeWidth = 1.6, className, title }: I
       viewBox="0 0 24 24"
       width={size}
       height={size}
+      style={{ width: `${size / 16}rem`, height: `${size / 16}rem` }}
       className={className}
       fill="none"
       stroke="currentColor"

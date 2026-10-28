@@ -28,16 +28,19 @@ export interface Preferences {
   /** Default target for new PDF and selection translations; independent of AI answers. */
   translationLanguage: import('@/translation/languages').TranslationLanguage;
   theme: 'system' | 'light' | 'dark';
+  pdfTheme: 'auto' | 'original' | 'dark' | 'black' | 'sepia';
+  pdfScroll: 'vertical' | 'horizontal' | 'page';
+  pdfSpread: 'none' | 'odd' | 'even';
   /** Interface language. */
   locale: UiLocale;
   /** Language of AI answers; only affects tasks started afterwards. */
   answerLanguage: UiLocale;
   /** 14–24, default 16: reading text in panels, notes and answers. Not the toolbar, not PDF zoom. */
   uiFontSize: number;
+  /** UI scale in percent; independent of the PDF coordinate system. */
+  uiScale: number;
   /** 14–24, or null to follow uiFontSize. */
   translationFontSize: number | null;
-  /** In dark mode, dim the pages a little. */
-  dimPagesInDark: boolean;
   /** How copied formulas are delimited: \(…\) \[…\], $…$ $$…$$, or bare LaTeX. */
   mathDelimiter: 'brackets' | 'dollars' | 'none';
   /** The bar over selected text and highlights: what it shows, in what order, and how. */
@@ -53,15 +56,20 @@ export interface PreferencesState {
 
 export const DEFAULT_PREFERENCES: Preferences = {
   theme: 'system',
+  pdfTheme: 'auto',
+  pdfScroll: 'vertical',
+  pdfSpread: 'none',
   locale: 'zh-CN',
   answerLanguage: 'zh-CN',
   translationLanguage: 'zh-CN',
   uiFontSize: 16,
+  uiScale: 100,
   translationFontSize: null,
-  dimPagesInDark: true,
   mathDelimiter: 'brackets',
   selectionBar: DEFAULT_SELECTION_BAR,
 };
+
+export const UI_SCALE = { min: 80, max: 150, default: 100, step: 10 } as const;
 
 export const FONT_SIZE = { min: 14, max: 24, default: 16 } as const;
 

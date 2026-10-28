@@ -1,8 +1,8 @@
 import type { RefObject } from 'react';
-import { Button, Popover, Segmented, Select, Stepper, Switch, type SelectOption } from '@/ui/components';
+import { Button, Popover, Segmented, Select, Stepper, type SelectOption } from '@/ui/components';
 import { fontSizeLabel, localeOptions, themeOptions } from '@/ui/settings/options';
 import { StatusLine } from '@/ui/settings/StatusLine';
-import { FONT_SIZE, type Preferences, type SettingsSection, type StatusSummary } from '@/ui/settings/types';
+import { FONT_SIZE, UI_SCALE, type Preferences, type SettingsSection, type StatusSummary } from '@/ui/settings/types';
 
 /** What the reader's quick settings need; the rest lives on the settings page. */
 export interface ReaderSettingsProps {
@@ -43,12 +43,12 @@ export function QuickSettings({ anchorRef, open, onClose, ...props }: QuickSetti
           <Segmented label="主题" size="sm" options={themeOptions} value={p.theme} onChange={(theme) => props.onPreference('theme', theme)} />
         </div>
         <div className="pp-quick__row">
-          <span className="pp-quick__label">正文字号</span>
-          <Stepper label="正文字号" value={p.uiFontSize} min={FONT_SIZE.min} max={FONT_SIZE.max} format={fontSizeLabel} onChange={(size) => props.onPreference('uiFontSize', size)} />
+          <span className="pp-quick__label">界面大小</span>
+          <Stepper label="界面大小" value={p.uiScale} min={UI_SCALE.min} max={UI_SCALE.max} step={UI_SCALE.step} resetValue={UI_SCALE.default} format={(value) => `${value}%`} onChange={(value) => props.onPreference('uiScale', value)} />
         </div>
         <div className="pp-quick__row">
-          <span className="pp-quick__label">深色模式下页面减光</span>
-          <Switch label="深色模式下页面减光" hideLabel checked={p.dimPagesInDark} onChange={(on) => props.onPreference('dimPagesInDark', on)} />
+          <span className="pp-quick__label">阅读字号</span>
+          <Stepper label="阅读字号" value={p.uiFontSize} min={FONT_SIZE.min} max={FONT_SIZE.max} format={fontSizeLabel} onChange={(size) => props.onPreference('uiFontSize', size)} />
         </div>
         <div className="pp-quick__row">
           <span className="pp-quick__label">回答语言</span>

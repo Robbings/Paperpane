@@ -1,3 +1,4 @@
+import { useUiScale } from '@/ui/use-ui-scale';
 import { useEffect, useMemo, useRef, useState, type DragEvent } from 'react';
 import { Button, Dialog, EmptyState, GlassSurface, Icon, IconButton, Menu, type MenuEntry } from '@/ui/components';
 import { useViewport } from '@/ui/reader/useViewport';
@@ -78,7 +79,9 @@ export function LibraryView(props: LibraryViewProps) {
     lastJobCount.current = jobCount;
   }, [jobCount]);
 
-  const { width } = useViewport();
+  const viewport = useViewport();
+  const uiScale = useUiScale();
+  const width = viewport.width / uiScale;
 
   // Panes follow the window width until the reader toggles them.
   const sidebarOpen = prefs.sidebarOpen ?? width >= 920;
@@ -169,7 +172,7 @@ export function LibraryView(props: LibraryViewProps) {
         props.onImport('pdf', files, currentFolder);
       }}
     >
-      <div className="pp-lib-pane" data-side="left" data-state={paneState(sidebarOpen, sidebarDocked)} style={{ ['--pp-pane-w' as string]: `${SIDEBAR_WIDTH}px` }} inert={!sidebarOpen}>
+      <div className="pp-lib-pane" data-side="left" data-state={paneState(sidebarOpen, sidebarDocked)} style={{ ['--pp-pane-w' as string]: `${SIDEBAR_WIDTH / 16}rem` }} inert={!sidebarOpen}>
       <LibrarySidebar
         collection={query.collection}
         onCollection={(collection) => changeQuery({ collection })}
@@ -278,7 +281,7 @@ export function LibraryView(props: LibraryViewProps) {
         </section>
       </main>
 
-      <div className="pp-lib-pane" data-side="right" data-state={paneState(detailOpen, detailDocked)} style={{ ['--pp-pane-w' as string]: `${DETAIL_WIDTH}px` }} inert={!detailOpen}>
+      <div className="pp-lib-pane" data-side="right" data-state={paneState(detailOpen, detailDocked)} style={{ ['--pp-pane-w' as string]: `${DETAIL_WIDTH / 16}rem` }} inert={!detailOpen}>
       <PaperDetail
         paper={active}
         selectionCount={selectedIds.length}
