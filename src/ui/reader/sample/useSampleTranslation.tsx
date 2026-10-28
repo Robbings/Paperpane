@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { TranslationPane } from '../translation/TranslationPane';
-import type { TranslationMode, TranslationPageView, TranslationSentenceView } from '../translation/types';
+import type { TranslationMode, TranslationPageView, TranslationSentenceState, TranslationSentenceView, TranslationTaskView } from '../translation/types';
 import { findQuote } from './findQuote';
 import { sampleSentences } from './sampleTranslation';
 
@@ -11,6 +11,11 @@ const PAGES = [0, 1];
 const STREAM_STEP = 3;
 const STREAM_MS = 28;
 
+/** "Blocks are built bottom-up." fails once, to show a failed sentence and its retry. */
+const FAILING_ID = 's27';
+
+type Progress = { state: TranslationSentenceState; chars: number };
+
 const scroller = () => document.querySelector<HTMLElement>('.pp-reader__paper');
 
 export function useSampleTranslation(onLocateQuote: (quote: string) => void) {
@@ -19,40 +24,70 @@ export function useSampleTranslation(onLocateQuote: (quote: string) => void) {
   const [follow, setFollow] = useState(true);
   const [activeId, setActiveId] = useState<string | null>(null);
   const [reveal, setReveal] = useState<{ id: string; key: number; smooth: boolean; flash: boolean } | null>(null);
-  // How far each page's translation has arrived: characters shown, by sentence id.
-  const [shown, setShown] = useState<Record<string, number>>(() =>
-    Object.fromEntries(sampleSentences.filter((s) => s.pageIndex === 0).map((s) => [s.id, s.text.length])),
+  // Each sentence's translation so far, and the task that produces them.
+  const [status, setStatus] = useState<Record<string, Progress>>(() =>
+    Object.fromEntries(sampleSentences.filter((s) => s.pageIndex === 0).map((s) => [s.id, { state: 'done', chars: s.text.length }])),
   );
-  const [translating, setTranslating] = useState<number | null>(null);
+  const [task, setTask] = useState<{ phase: TranslationTaskView['phase']; queue: number[] }>({ phase: 'idle', queue: [] });
+  // The demo's one failing request, until it is retried.
+  const failOnce = useRef(new Set([FAILING_ID]));
 
   const pages = useMemo<TranslationPageView[]>(
     () =>
       PAGES.map((pageIndex) => {
         const all = sampleSentences.filter((s) => s.pageIndex === pageIndex);
-        const sentences: TranslationSentenceView[] = all
-          .filter((s) => (shown[s.id] ?? 0) > 0)
-          .map((s) => ({ ...s, text: s.text.slice(0, shown[s.id]), streaming: translating === pageIndex && shown[s.id]! < s.text.length }));
-        const done = all.every((s) => shown[s.id] === s.text.length);
-        return { pageIndex, state: done ? 'done' : translating === pageIndex ? 'translating' : 'untranslated', sentences };
+        const started = all.some((s) => status[s.id]);
+        const sentences: TranslationSentenceView[] = started
+          ? all.map((s) => {
+              const p = status[s.id] ?? { state: 'pending', chars: 0 };
+              return { ...s, text: s.text.slice(0, p.chars), state: p.state };
+            })
+          : [];
+        const state: TranslationPageView['state'] = !started
+          ? 'untranslated'
+          : sentences.every((x) => x.state === 'done')
+            ? 'done'
+            : task.queue.includes(pageIndex) && (task.phase === 'running' || task.phase === 'pausing')
+              ? 'translating'
+              : 'partial';
+        return { pageIndex, state, sentences };
       }),
-    [shown, translating],
+    [status, task],
   );
 
   // Simulated streaming: one sentence after another, a few characters at a time.
   useEffect(() => {
-    if (translating === null) return;
+    if (task.phase !== 'running') return;
     const timer = window.setInterval(() => {
-      setShown((current) => {
-        const next = sampleSentences.find((s) => s.pageIndex === translating && (current[s.id] ?? -1) < s.text.length);
+      setStatus((current) => {
+        const next = sampleSentences.find((s) => task.queue.includes(s.pageIndex) && ['pending', 'streaming', 'partial'].includes(current[s.id]?.state ?? 'pending'));
         if (!next) {
-          setTranslating(null);
+          setTask({ phase: 'completed', queue: [] });
           return current;
         }
-        return { ...current, [next.id]: Math.min(next.text.length, (current[next.id] ?? 0) + STREAM_STEP) };
+        const now = current[next.id] ?? { state: 'pending', chars: 0 };
+        if (failOnce.current.has(next.id) && now.chars >= 6) return { ...current, [next.id]: { ...now, state: 'failed' } };
+        const chars = Math.min(next.text.length, now.chars + STREAM_STEP);
+        return { ...current, [next.id]: { state: chars === next.text.length ? 'done' : 'streaming', chars } };
       });
     }, STREAM_MS);
     return () => window.clearInterval(timer);
-  }, [translating]);
+  }, [task]);
+
+  const start = (pageIndexes: number[]) => {
+    setStatus((current) => {
+      const next = { ...current };
+      for (const s of sampleSentences) if (pageIndexes.includes(s.pageIndex) && !next[s.id]) next[s.id] = { state: 'pending', chars: 0 };
+      return next;
+    });
+    setTask((current) => ({ phase: 'running', queue: [...new Set([...current.queue, ...pageIndexes])] }));
+  };
+  const taskView: TranslationTaskView = {
+    phase: task.phase === 'completed' ? 'idle' : task.phase,
+    current: task.queue.length ? `第 ${task.queue[0]! + 1} 页` : undefined,
+    completedPages: pages.filter((p) => p.state === 'done').length,
+    totalPages: pages.length,
+  };
 
   // Where each translated sentence is in the paper, found from its original text.
   const ranges = useRef(new Map<string, Range>());
@@ -65,7 +100,8 @@ export function useSampleTranslation(onLocateQuote: (quote: string) => void) {
     if (found) ranges.current.set(id, found.range);
     return found?.range ?? null;
   }, []);
-  const available = useMemo(() => sampleSentences.filter((s) => (shown[s.id] ?? 0) > 0), [shown]);
+  // Every sentence of a started page stays locatable, translated or not.
+  const available = useMemo(() => sampleSentences.filter((s) => status[s.id]), [status]);
 
   // The lit sentence, drawn in the paper with the CSS highlight registry.
   useEffect(() => {
@@ -156,10 +192,22 @@ export function useSampleTranslation(onLocateQuote: (quote: string) => void) {
           const sentence = sampleSentences.find((s) => s.id === id);
           if (sentence) onLocateQuote(sentence.source);
         }}
-        onTranslatePage={(pageIndex) => {
-          if (translating !== null) return;
-          setShown((current) => ({ ...current, ...Object.fromEntries(sampleSentences.filter((s) => s.pageIndex === pageIndex).map((s) => [s.id, 0])) }));
-          setTranslating(pageIndex);
+        task={taskView}
+        onTranslatePage={(pageIndex) => start([pageIndex])}
+        onTranslateAll={() => start(pages.filter((p) => p.state === 'untranslated').map((p) => p.pageIndex))}
+        onPause={() => {
+          setTask((current) => ({ ...current, phase: 'pausing' }));
+          // In-flight text is kept: what arrived stays as a partial sentence.
+          window.setTimeout(() => {
+            setStatus((current) => Object.fromEntries(Object.entries(current).map(([id, p]) => [id, p.state === 'streaming' ? { ...p, state: 'partial' } : p])));
+            setTask((current) => ({ ...current, phase: 'paused' }));
+          }, 450);
+        }}
+        onResume={() => setTask((current) => ({ ...current, phase: 'running' }))}
+        onRetryPage={(pageIndex) => {
+          for (const s of sampleSentences) if (s.pageIndex === pageIndex) failOnce.current.delete(s.id);
+          setStatus((current) => Object.fromEntries(Object.entries(current).map(([id, p]) => [id, p.state === 'failed' && sampleSentences.some(s => s.id === id && s.pageIndex === pageIndex) ? { ...p, state: 'pending' } : p])));
+          setTask((current) => ({ phase: 'running', queue: [...new Set([...current.queue, pageIndex])] }));
         }}
         reveal={reveal}
       />
