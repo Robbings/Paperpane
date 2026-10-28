@@ -1,12 +1,11 @@
 import { useEffect, useRef, useState } from 'react';
 import { ReaderShell } from '@/ui/reader/ReaderShell';
-import { Button, Dialog, EmptyState, ProgressBar, TextField, Toaster } from '@/ui/components';
+import { Button, Dialog, EmptyState, ProgressBar, TextField, Toaster, toast } from '@/ui/components';
 import type { ReaderInteraction } from '@/ui/reader/types';
 import { ReaderController } from './reader-controller';
 import '@/document/reader/surface.css';
 import { useTranslation } from './use-translation';
 import { useModelSettings } from './use-model-settings';
-import { toast } from '@/ui/components';
 import { toDraft } from '@/ui/settings/types';
 import { useLocalPreferences } from './use-local-preferences';
 import { downloadFile } from './library-page';
@@ -56,6 +55,7 @@ export function LiveReaderPage() {
     onAnnotationAction:(id,action)=>{const row=owner?.item(id);if(row){if(action==='translate'&&owner?.translateSelection)owner.translateSelection(row.anchor,row.quote);else owner?.textAction(row.quote,action);}},
     onAnnotationColor:(id,color)=>owner?.colorAnnotation(id,color),
     onAnnotationComment:(id,comment)=>owner?.annotations?.edit(id,{comment}),
+    onAnnotationCommentDelete:async id=>owner?.annotations?.deleteComment(id)??null,
     onAnnotationDelete:async id=>{const ok=await owner?.annotations?.deleteCurrent(id)??false;if(ok)owner?.reader.dismissMenu();return ok;},
     onAnnotationRestore:async id=>{await owner?.annotations?.restoreDeleted(id);},
     annotationRects:id=>{const row=owner?.item(id);return row ? owner?.rects(row.anchor)??null : null;},
