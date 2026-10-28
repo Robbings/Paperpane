@@ -1,3 +1,5 @@
+import { ModelsSection } from './sections/ModelsSection';
+import { TranslationSection } from './sections/TranslationSection';
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { EmptyState, GlassSurface, Icon, ScrollArea, type IconName } from '@/ui/components';
 import { SaveBar, type SaveBarState } from './SaveBar';
@@ -207,6 +209,10 @@ export function SettingsView(props: SettingsViewProps) {
             </header>
             {section === 'general' ? (
               <GeneralSection state={props.preferences} onPreference={props.onPreference} onRetry={props.onRetryPreferences} />
+            ) : section === 'models' ? (
+              <ModelsSection draft={draft} onChange={edit} />
+            ) : section === 'features' ? (
+              <TranslationSection draft={draft} onChange={edit} preferences={props.preferences.preferences} onPreference={props.onPreference} />
             ) : section === 'advanced' ? (
               <AdvancedSection runtime={draft.runtime} onChange={(runtime) => edit({ ...draft, runtime })} problems={problems} />
             ) : (

@@ -24,42 +24,7 @@
   border-bottom: 0.5px solid var(--pp-hairline);
 }
 
-.pp-tr__title {
-  flex-shrink: 0;
-  color: var(--pp-text);
-  white-space: nowrap;
-  font-size: var(--pp-text-md);
-  font-weight: var(--pp-weight-semibold);
-}
-
-.pp-tr__summary {
-  overflow: hidden;
-  color: var(--pp-text-2);
-  font-size: var(--pp-text-xs);
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-
-.pp-tr__spacer {
-  flex: 1;
-}
-
-/* Narrow: the progress goes first, then the title; the controls stay on one line. */
-@container (max-width: 400px) {
-  .pp-tr__summary {
-    display: none;
-  }
-}
-
-@container (max-width: 330px) {
-  .pp-tr__title {
-    display: none;
-  }
-
-  .pp-tr__head {
-    padding-left: 10px;
-  }
-}
+.pp-tr__spacer { flex: 1; }
 
 .pp-tr__head .pp-seg {
   margin-right: 2px;
@@ -92,8 +57,7 @@
   letter-spacing: 0.02em;
 }
 
-.pp-tr__page::after {
-  content: '';
+.pp-tr__page-rule {
   flex: 1;
   height: 0.5px;
   background: var(--pp-hairline);
@@ -204,33 +168,6 @@
   }
 }
 
-.pp-tr__pending {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 12px;
-  margin: 4px 0 8px;
-  padding: 8px 6px 8px 12px;
-  border-radius: var(--pp-radius-control);
-  background: var(--pp-fill);
-  color: var(--pp-text-2);
-  font-size: var(--pp-text-sm);
-}
-
-.pp-tr__pending[data-tone='danger'] {
-  background: var(--pp-danger-soft);
-  color: var(--pp-danger);
-}
-
-.pp-tr__waiting {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  margin: 4px 0 10px;
-  color: var(--pp-text-2);
-  font-size: var(--pp-text-sm);
-}
-
 /* The same sentence in the paper (CSS highlight registry on the sample; a text-layer class on PDFs). */
 ::highlight(pp-trans) {
   background-color: var(--pp-trans-link);
@@ -267,48 +204,6 @@
   opacity: 1;
 }
 
-/* ---- Task status under the header ---------------------------------------------- */
-
-.pp-tr__status {
-  position: relative;
-  display: flex;
-  flex-shrink: 0;
-  align-items: center;
-  gap: 8px;
-  min-height: 34px;
-  padding: 0 8px 0 16px;
-  border-bottom: 0.5px solid var(--pp-hairline);
-  background: var(--pp-fill);
-  color: var(--pp-text-2);
-  font-size: var(--pp-text-sm);
-}
-
-.pp-tr__status[data-tone='danger'] {
-  background: var(--pp-danger-soft);
-  color: var(--pp-danger);
-}
-
-.pp-tr__status-text {
-  flex: 1;
-  min-width: 0;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-
-/* A hairline of progress along the bottom of the status line. */
-.pp-tr__status-bar {
-  position: absolute;
-  right: 0;
-  bottom: -0.5px;
-  left: 0;
-}
-
-.pp-tr__status-bar .pp-progress__track {
-  height: 2px;
-  border-radius: 0;
-}
-
 /* Sentences without a translation: the original, greyed. */
 .pp-tr__missing {
   color: var(--pp-text-3);
@@ -337,3 +232,19 @@
   white-space: nowrap;
   vertical-align: 0.1em;
 }
+
+
+.pp-tr__page > span:first-child, .pp-tr__page .pp-btn { flex-shrink: 0; }
+.pp-tr__task-heading, .pp-tr__task-actions { display: flex; align-items: center; gap: 8px; justify-content: space-between; }
+.pp-tr__task { font-size: var(--pp-text-sm); }
+.pp-tr__task p { margin: 8px 0; color: var(--pp-text-2); line-height: 1.6; overflow-wrap: anywhere; }
+.pp-tr__task-actions { justify-content: flex-end; margin-top: 12px; }
+.pp-tr__task-error { max-height: 160px; overflow: auto; }
+.pp-tr__head [data-tone='danger'] { color: var(--pp-danger); }
+.pp-tr__task-running svg { animation: pp-tr-task-spin 2s linear infinite; }
+@keyframes pp-tr-task-spin { to { transform: rotate(360deg); } }
+@media (prefers-reduced-motion: reduce) { .pp-tr__task-running svg { animation: none; } }
+/* Reserve a narrow gutter only for the live PDF's page actions. */
+.pp-reader__paper.pp-translation-page-actions { padding-right: 52px; }
+.pp-tr-page-actions { position: absolute; top: 0; left: 0; pointer-events: none; z-index: 3; }
+.pp-tr-page-action { position: absolute; pointer-events: auto; border-radius: var(--pp-radius-pill); }

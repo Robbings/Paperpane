@@ -25,6 +25,8 @@ export const DEFAULT_SELECTION_BAR: SelectionBarPrefs = {
 };
 
 export interface Preferences {
+  /** Default target for new PDF and selection translations; independent of AI answers. */
+  translationLanguage: import('@/translation/languages').TranslationLanguage;
   theme: 'system' | 'light' | 'dark';
   /** Interface language. */
   locale: UiLocale;
@@ -53,6 +55,7 @@ export const DEFAULT_PREFERENCES: Preferences = {
   theme: 'system',
   locale: 'zh-CN',
   answerLanguage: 'zh-CN',
+  translationLanguage: 'zh-CN',
   uiFontSize: 16,
   translationFontSize: null,
   dimPagesInDark: true,
@@ -127,6 +130,8 @@ export interface RuntimeConfig {
   concurrency: number;
   /** null: the model's own default. */
   maxOutputTokens: number | null;
+  /** LLM translation only. Missing values use conservative defaults. */
+  translation?: { batchSentences: number; batchCharacters: number; requestsPerMinute: number };
 }
 
 export interface SyncConfigView {

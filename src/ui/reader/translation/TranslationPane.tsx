@@ -1,11 +1,13 @@
-import { Fragment, useEffect, useRef, type ReactNode } from 'react';
-import { Button, Icon, IconButton, ProgressBar, ScrollArea, Segmented, Spinner, Tooltip } from '@/ui/components';
+import { Fragment, useEffect, useRef, useState, type ReactNode } from 'react';
+import { Button, Icon, IconButton, Popover, ProgressBar, ScrollArea, Segmented, Tooltip } from '@/ui/components';
 import { useTranslationDock } from './dock';
 import type { TranslationMode, TranslationPageView, TranslationSentenceView, TranslationTaskView } from './types';
 import './translation.css';
 
 interface TranslationPaneProps {
   pages: readonly TranslationPageView[];
+  /** Runtime can render model Markdown without changing this pane's layout. */
+  renderText?: (sentence: TranslationSentenceView) => ReactNode;
   mode: TranslationMode;
   onMode: (mode: TranslationMode) => void;
   /** Keep the translation lined up with where the paper is being read. */
@@ -24,68 +26,42 @@ interface TranslationPaneProps {
   onResume: () => void;
   /** Retries the failed and unfinished sentences of a page; may be charged again. */
   onRetryPage: (pageIndex: number) => void;
+  onRetranslatePage?: (pageIndex: number) => void;
+  onRetranslateAll?: () => void;
   /** Bring a sentence into view: `key` changes on every request, `smooth` for follow vs. a jump. */
   reveal: { id: string; key: number; smooth: boolean; flash: boolean } | null;
 }
 
-const REPEAT_CHARGE = '会再次请求模型，可能再次计费；已收到的译文会保留';
-
-/** The line under the header: progress, and pause / resume / translate all. Hidden when all is done. */
-function StatusLine({ task, pages, onTranslateAll, onPause, onResume }: Pick<TranslationPaneProps, 'task' | 'pages' | 'onTranslateAll' | 'onPause' | 'onResume'>) {
-  const untranslated = pages.filter((p) => p.state === 'untranslated').length;
-  const progress = task.totalPages ? task.completedPages / task.totalPages : undefined;
-  if (task.phase === 'running' || task.phase === 'pausing') {
-    return (
-      <div className="pp-tr__status" role="status">
-        <Spinner size={12} />
-        <span className="pp-tr__status-text">{task.phase === 'pausing' ? '正在暂停…' : `正在翻译${task.current ? task.current : ''}…`}</span>
-        <Button size="sm" variant="quiet" disabled={task.phase === 'pausing'} onClick={onPause}>
-          暂停
-        </Button>
-        <span className="pp-tr__status-bar">
-          <ProgressBar label="翻译进度" value={progress} />
-        </span>
+const taskIdle = (task: TranslationTaskView) => task.phase !== 'running' && task.phase !== 'pausing';
+/** Task details stay in an opt-in popover, never between the reader and its text. */
+function TaskStatus({ task, pages, onTranslateAll, onPause, onResume }: Pick<TranslationPaneProps, 'task' | 'pages' | 'onTranslateAll' | 'onPause' | 'onResume'>) {
+  const [open, setOpen] = useState(false);
+  const anchor = useRef<HTMLButtonElement>(null);
+  const running = task.phase === 'running' || task.phase === 'pausing';
+  const waiting = running && !!task.error;
+  const resumable = ['paused', 'interrupted', 'failed'].includes(task.phase);
+  const title = waiting ? '等待恢复' : ({ idle: '翻译任务', running: '正在翻译', pausing: '正在暂停', paused: '已暂停', interrupted: '翻译已中断', failed: '翻译需要处理', completed: '翻译完成' }[task.phase]);
+  const progress = task.totalSentences ? (task.completedSentences ?? 0) / task.totalSentences : task.totalPages ? task.completedPages / task.totalPages : undefined;
+  return <>
+    <IconButton ref={anchor} icon={task.phase === 'failed' ? 'alert' : waiting || resumable ? 'clock' : running ? 'sync' : 'gauge'}
+      label={`翻译任务：${title}`} size="md" shape="pill" active={open} aria-expanded={open} aria-haspopup="dialog" tooltip={!open}
+      className={running && !waiting ? 'pp-tr__task-running' : undefined} data-tone={task.phase === 'failed' ? 'danger' : undefined}
+      onClick={() => setOpen(value => !value)} />
+    <Popover anchorRef={anchor} open={open} onClose={() => setOpen(false)} label="翻译任务详情" placement="bottom" width={280} className="pp-tr__task">
+      <div className="pp-tr__task-heading"><strong>{title}</strong><IconButton icon="close" label="收起翻译状态" size="md" shape="pill" onClick={() => setOpen(false)} /></div>
+      <p>{task.totalSentences ? `本次任务已完成 ${task.completedSentences ?? 0} / ${task.totalSentences} 句` : `已有 ${pages.filter(p => p.state === 'done').length} / ${pages.length} 页译文`}</p>
+      {task.totalSentences !== undefined && <ProgressBar label="翻译进度" value={progress} />}
+      {task.current && running && <p>{task.current}</p>}
+      {task.error && <p className="pp-tr__task-error">{task.error}</p>}
+      <div className="pp-tr__task-actions">
+        {running ? <Button size="sm" disabled={task.phase === 'pausing'} onClick={onPause}>暂停</Button> : <>
+          {resumable && <Button size="sm" onClick={onResume}>{task.saveFailed ? '重试保存' : task.phase === 'failed' ? '重试未完成部分' : '继续'}</Button>}
+          {pages.some(p => p.state !== 'done') && <Button size="sm" variant="quiet" onClick={onTranslateAll}>翻译全文</Button>}
+        </>}
       </div>
-    );
-  }
-  if (task.phase === 'paused' || task.phase === 'interrupted') {
-    return (
-      <div className="pp-tr__status" role="status">
-        <Icon name="clock" size={13} />
-        <span className="pp-tr__status-text">{task.phase === 'paused' ? '已暂停' : '上次翻译中断了'}，收到的译文都已保存</span>
-        <Button size="sm" variant="quiet" onClick={onResume}>
-          继续
-        </Button>
-      </div>
-    );
-  }
-  if (task.phase === 'failed') {
-    return (
-      <div className="pp-tr__status" data-tone="danger" role="alert">
-        <Icon name="alert" size={13} />
-        <span className="pp-tr__status-text">{task.error ?? '翻译出错了'}</span>
-        <Tooltip label={REPEAT_CHARGE} labelsChild>
-          <Button size="sm" variant="quiet" onClick={onResume}>
-            重试
-          </Button>
-        </Tooltip>
-      </div>
-    );
-  }
-  if (untranslated > 0) {
-    return (
-      <div className="pp-tr__status">
-        <span className="pp-tr__status-text">还有 {untranslated} 页没翻译</span>
-        <Button size="sm" variant="quiet" onClick={onTranslateAll}>
-          整篇翻译
-        </Button>
-      </div>
-    );
-  }
-  return null;
+    </Popover>
+  </>;
 }
-
-const summary = (pages: readonly TranslationPageView[]) => `已翻译 ${pages.filter((p) => p.state === 'done').length} / ${pages.length} 页`;
 
 /** Groups a page's sentences into paragraphs for the flow. */
 function paragraphs(sentences: readonly TranslationSentenceView[]) {
@@ -112,8 +88,11 @@ export function TranslationPane(props: TranslationPaneProps) {
     const box = viewport.current;
     const target = request && box?.querySelector<HTMLElement>(`[data-sentence="${CSS.escape(request.id)}"]`);
     if (!request || !box || !target) return;
-    const top = target.getBoundingClientRect().top - box.getBoundingClientRect().top + box.scrollTop - (request.smooth ? 16 : box.clientHeight * 0.3);
-    box.scrollTo({ top: Math.max(0, top), behavior: 'smooth' });
+    const bounds = box.getBoundingClientRect(), targetBounds = target.getBoundingClientRect();
+    // Automatic following leaves a sentence already visible in place. Explicit clicks still locate it.
+    if (request.smooth && targetBounds.top >= bounds.top + 24 && targetBounds.bottom <= bounds.bottom - 24) return;
+    const top = targetBounds.top - bounds.top + box.scrollTop - box.clientHeight * 0.3;
+    box.scrollTo({ top: Math.max(0, top), behavior: request.smooth ? 'smooth' : 'auto' });
     if (request.flash) {
       target.classList.remove('pp-tr__s--flash');
       void target.offsetWidth;
@@ -152,7 +131,7 @@ export function TranslationPane(props: TranslationPaneProps) {
       </span>
     ) : (
       <>
-        {s.text}
+        {props.renderText ? props.renderText(s) : s.text}
         {s.state === 'partial' && <span className="pp-tr__cut">…</span>}
         {s.state === 'streaming' && <span className="pp-tr__caret" aria-hidden="true" />}
       </>
@@ -185,9 +164,6 @@ export function TranslationPane(props: TranslationPaneProps) {
           if (dock?.floating && !(event.target as Element).closest('button')) dock.onHeaderPointerDown(event);
         }}
       >
-        <span className="pp-tr__title">译文</span>
-        <span className="pp-tr__summary">{summary(pages)}</span>
-        <span className="pp-tr__spacer" />
         <Segmented
           label="显示方式"
           size="sm"
@@ -198,6 +174,8 @@ export function TranslationPane(props: TranslationPaneProps) {
           value={mode}
           onChange={props.onMode}
         />
+        <span className="pp-tr__spacer" />
+        <TaskStatus task={props.task} pages={pages} onTranslateAll={props.onTranslateAll} onPause={props.onPause} onResume={props.onResume} />
         <IconButton
           icon="link"
           label={props.follow ? '跟随阅读：开' : '跟随阅读：关'}
@@ -207,6 +185,7 @@ export function TranslationPane(props: TranslationPaneProps) {
           aria-pressed={props.follow}
           onClick={() => props.onFollow(!props.follow)}
         />
+        {props.onRetranslateAll && <IconButton icon="sync" label="重新翻译全文" size="md" shape="pill" disabled={!taskIdle(props.task) || !pages.some(p => p.sentences.some(s => s.kind !== 'formula' && !!s.text))} onClick={props.onRetranslateAll} />}
         {dock && (
           <IconButton
             icon={dock.floating ? 'paneRight' : 'float'}
@@ -219,31 +198,19 @@ export function TranslationPane(props: TranslationPaneProps) {
         <IconButton icon="close" label="关闭译文" size="md" shape="pill" onClick={props.onClose} />
       </header>
 
-      <StatusLine task={props.task} pages={pages} onTranslateAll={props.onTranslateAll} onPause={props.onPause} onResume={props.onResume} />
-
       <ScrollArea className="pp-tr__scroll" viewportClassName="pp-tr__viewport" viewportRef={viewport}>
         <div className="pp-tr__flow" data-mode={mode}>
           {pages.map((page) => (
             <Fragment key={page.pageIndex}>
               <div className="pp-tr__page" aria-label={`第 ${page.pageIndex + 1} 页`}>
                 <span>第 {page.pageIndex + 1} 页</span>
+                <span className="pp-tr__page-rule" aria-hidden="true" />
+                <Button size="sm" variant="quiet" disabled={!taskIdle(props.task) || (!!page.error && !page.sentences.some(s => s.kind !== 'formula'))}
+                  onClick={() => page.state === 'failed' ? props.onRetryPage(page.pageIndex) : page.sentences.some(s => s.kind !== 'formula' && !!s.text) && props.onRetranslatePage ? props.onRetranslatePage(page.pageIndex) : props.onTranslatePage(page.pageIndex)}>
+                  {page.state === 'failed' && page.sentences.some(s => s.kind !== 'formula') ? '重试本页' : page.sentences.some(s => s.kind !== 'formula' && !!s.text) && props.onRetranslatePage ? '重新翻译本页' : '翻译本页'}
+                </Button>
               </div>
-              {page.state === 'untranslated' && !page.sentences.some(s => s.text.trim()) ? (
-                <div className="pp-tr__pending">
-                  <span>这一页还没翻译</span>
-                  <Button size="sm" variant="quiet" onClick={() => props.onTranslatePage(page.pageIndex)}>
-                    翻译这一页
-                  </Button>
-                </div>
-              ) : page.state === 'failed' && !page.sentences.some(s => s.text.trim()) ? (
-                <div className="pp-tr__pending" data-tone="danger">
-                  <span>{page.error ?? '这一页没能翻译'}</span>
-                  <Button size="sm" variant="quiet" onClick={() => props.onRetryPage(page.pageIndex)}>
-                    重试
-                  </Button>
-                </div>
-              ) : (
-                <>
+              {(page.error || page.state === 'failed') && <p className="pp-tr__missing">{page.error ?? '这一页没能翻译完，已收到的译文保留'}</p>}
                   {paragraphs(page.sentences).map((group) =>
                     group[0]!.kind === 'heading' ? (
                       <h3 key={group[0]!.id} className="pp-tr__heading">
@@ -263,44 +230,10 @@ export function TranslationPane(props: TranslationPaneProps) {
                       </p>
                     ),
                   )}
-                  {page.state === 'translating' && page.sentences.every((x) => x.state === 'pending') && (
-                    <p className="pp-tr__waiting">
-                      <Spinner size={13} /> 正在翻译这一页…
-                    </p>
-                  )}
-                  {page.state === 'failed' && (
-                    <div className="pp-tr__pending" data-tone="danger"><span>{page.error ?? '这一页没能翻译完，已收到的译文保留'}</span><Button size="sm" variant="quiet" onClick={() => props.onRetryPage(page.pageIndex)}>重试</Button></div>
-                  )}
-                  {page.state === 'partial' && (
-                    <PageGaps page={page} task={props.task} onRetry={() => props.onRetryPage(page.pageIndex)} />
-                  )}
-                </>
-              )}
             </Fragment>
           ))}
         </div>
       </ScrollArea>
     </section>
-  );
-}
-
-/** Under a partly translated page: how many sentences are missing, and a retry when some failed. */
-function PageGaps({ page, task, onRetry }: { page: TranslationPageView; task: TranslationTaskView; onRetry: () => void }) {
-  const failed = page.sentences.filter((s) => s.state === 'failed').length;
-  const unfinished = page.sentences.filter((s) => s.state === 'pending' || s.state === 'partial').length;
-  if (failed === 0 && unfinished === 0) return null;
-  // While paused, unfinished sentences resume with the task; only failures need a retry here.
-  const waiting = failed === 0 && (task.phase === 'paused' || task.phase === 'interrupted' || task.phase === 'running');
-  return (
-    <div className="pp-tr__pending" data-tone={failed ? 'danger' : undefined}>
-      <span>{failed ? `${failed} 句没翻译成${unfinished ? `，${unfinished} 句未完成` : ''}` : `${unfinished} 句未完成`}</span>
-      {!waiting && (
-        <Tooltip label={REPEAT_CHARGE} labelsChild>
-          <Button size="sm" variant="quiet" onClick={onRetry}>
-            {failed ? '重试这些句子' : '翻译剩下的'}
-          </Button>
-        </Tooltip>
-      )}
-    </div>
   );
 }

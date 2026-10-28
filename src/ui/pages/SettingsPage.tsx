@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
 import { Toaster } from '@/ui/components';
-import { useSampleSettings } from '@/ui/settings/sample/useSampleSettings';
+import { useModelSettings } from '@/runtime/use-model-settings';
 import { SettingsView } from '@/ui/settings/SettingsView';
 import type { Preferences, PreferencesState, SettingsSection } from '@/ui/settings/types';
 
@@ -18,10 +18,10 @@ interface SettingsPageProps {
   };
 }
 
-/** 设置页：偏好接正式存储；模型等配置仍是示例，直到设置服务接入。地址中的 #models 等直达对应一节。 */
+/** 设置页：偏好接正式存储；模型配置接本机版本化存储。地址中的 #models 等直达对应一节。 */
 export function SettingsPage({ preferences }: SettingsPageProps) {
   const [section, setSection] = useState<SettingsSection>(fromHash);
-  const settings = useSampleSettings();
+  const settings = useModelSettings();
 
   useEffect(() => {
     const onHash = () => setSection(fromHash());

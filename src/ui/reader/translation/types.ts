@@ -21,6 +21,7 @@ export interface TranslationSentenceView {
   source: string;
   /** What has arrived of the translation. Formulas keep their label, e.g. "公式 (1)". */
   text: string;
+  inferredMath?: boolean;
   state: TranslationSentenceState;
   /** Starts a new paragraph in the flow. */
   paragraphStart?: boolean;
@@ -36,14 +37,17 @@ export interface TranslationPageView {
   error?: string;
 }
 
-/** The translation task as a whole, for the status line under the header. */
+/** The translation task as a whole, shown in the collapsed toolbar status control. */
 export interface TranslationTaskView {
+  saveFailed?: boolean;
   phase: 'idle' | 'running' | 'pausing' | 'paused' | 'interrupted' | 'failed' | 'completed';
   /** What is being translated now, e.g. "第 2 页". */
   current?: string;
   completedPages: number;
   totalPages: number;
   error?: string;
+  completedSentences?: number;
+  totalSentences?: number;
 }
 
 /** Only the translation, or each translated sentence under its original. */

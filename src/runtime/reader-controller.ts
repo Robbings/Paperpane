@@ -5,6 +5,7 @@ import { PdfjsReader } from '@/document/reader/pdfjs-reader';
 import type { Annotation, HighlightColor } from '@/contracts/annotations';
 import type { DocumentAnchor } from '@/contracts/document';
 import type { StoredDocument } from '@/data/database';
+import type { TranslationSession } from '@/translation/session';
 import { readingPersistence } from './reading-persistence';
 
 /** Session ownership and UI mapping only; file identity/import remains with the library. */
@@ -15,6 +16,12 @@ export class ReaderController {
   annotations?: AnnotationSession;
   document?: StoredDocument;
   message = '';
+  translateSelection?: (anchor: DocumentAnchor, text?: string) => void;
+  private translations = new Set<TranslationSession>();
+  isChangingDocument = false;
+  private transition: Promise<void> = Promise.resolve();
+  private endTransition?: () => void;
+  private beforeUnload = (event: BeforeUnloadEvent) => { if ([...this.translations].some(s => s.hasUnsavedChanges)) event.preventDefault(); };
   private reading?: ReturnType<typeof readingPersistence>;
   private unsubscribeAnnotations?: () => void;
   private cleanups: (() => void)[] = [];
@@ -25,6 +32,7 @@ export class ReaderController {
   private creations = new Map<string, Promise<string | null>>();
   private lastColor: HighlightColor = 'yellow';
   constructor(container: HTMLDivElement, surface: HTMLDivElement, private update: () => void) {
+    window.addEventListener('beforeunload', this.beforeUnload);
     this.reader = new PdfjsReader(container, surface);
     this.cleanups.push(this.reader.subscribe(() => {
       const state = this.reader.getSnapshot().data;
@@ -45,11 +53,39 @@ export class ReaderController {
     if (id) await this.open(id);
     else { const docs = await this.db.list().catch(() => []); if (!this.disposed && docs[0]) await this.open(docs[0].id); }
   }
+  trackTranslation(session: TranslationSession) { this.translations.add(session); }
+  async releaseTranslation(session: TranslationSession) {
+    if (!await session.dispose()) return false;
+    this.translations.delete(session); return true;
+  }
+  private releaseDocumentChange() {
+    this.isChangingDocument = false;
+    this.endTransition?.(); this.endTransition = undefined;
+    this.translations.forEach(s => s.cancelLeave());
+  }
+  private async prepareDocumentChange() {
+    if (this.isChangingDocument || this.disposed) return false;
+    this.isChangingDocument = true;
+    this.transition = new Promise(resolve => { this.endTransition = resolve; });
+    try {
+      const saved = await Promise.all([...this.translations].map(s => s.prepareToLeave()));
+      await this.annotations?.flush();
+      if (saved.some(ok => !ok)) throw new Error('译文尚未保存，已保留当前论文和翻译窗口。请先重试保存，再切换论文。');
+      if (this.annotations?.getSnapshot().data.hasDrafts) throw new Error('当前批注有未保存的更改，请处理后再切换论文。');
+      return true;
+    } catch (error) {
+      this.report(error instanceof Error ? error.message : '保存未完成，请保持当前论文打开。');
+      this.releaseDocumentChange(); return false;
+    }
+  }
+  async leaveForLibrary() {
+    if (!await this.prepareDocumentChange()) return;
+    try { location.href = 'library.html'; } finally { this.releaseDocumentChange(); }
+  }
   async open(id: string) {
+    if (!await this.prepareDocumentChange()) return;
     const epoch = ++this.epoch;
     try {
-      await this.annotations?.flush();
-      if (this.annotations?.getSnapshot().data.hasDrafts) { this.report('当前批注有未保存的更改，请处理后再切换论文。'); return; }
       const doc = await this.db.resolveReaderDocument(id);
       if (!doc) throw new Error('文献没有可读取的 PDF，请先在文献库关联原文件。');
       const blob = await this.db.readFile(doc);
@@ -74,6 +110,7 @@ export class ReaderController {
       this.restoring = false;
       if (this.reader.getSnapshot().data.phase === 'ready') this.reading.update(this.reader.getSnapshot().data.position);
     } catch (error) { if (!this.disposed && epoch === this.epoch) this.report(error instanceof Error ? error.message : '无法打开 PDF'); }
+    finally { this.releaseDocumentChange(); }
   }
   createHighlight(id: string, color = this.lastColor): Promise<string | null> {
     const existing = this.creations.get(id); if (existing) return existing;
@@ -97,7 +134,7 @@ export class ReaderController {
     return anchor.pages.flatMap(page => { const p=this.reader.project({...anchor,pages:[page]},'viewport'); return p.state==='ready' ? p.rects.map(item=>item.rect) : []; });
   }
   item(id: string): Annotation | undefined { return this.annotations?.getSnapshot().data.items.find(row => row.id === id && !row.deletedAt); }
-  selectionAction(id: string, action: string) { const selection=this.reader.resolveSelection(id); if(selection.ok) this.textAction(selection.value.text,action); else this.report(selection.error.message); }
+  selectionAction(id: string, action: string) { const selection=this.reader.resolveSelection(id); if(selection.ok) { if(action==='translate'&&this.translateSelection)this.translateSelection(selection.value.anchor,selection.value.text);else this.textAction(selection.value.text,action); } else this.report(selection.error.message); }
   textAction(text: string, action: string) {
     if (action === 'copy') void navigator.clipboard.writeText(text).catch(() => this.report('复制失败，请使用系统复制快捷键。'));
     else this.report('翻译、解释和问答将在后续接入，目前没有发送模型请求。');
@@ -110,7 +147,13 @@ export class ReaderController {
     const a=document.createElement('a'); a.href=url; a.download=result.value.filename; a.click(); setTimeout(()=>URL.revokeObjectURL(url),1000);
   }
   async dispose() {
+    if (this.isChangingDocument) await this.transition;
+    if (this.disposed) return true;
+    if (!await this.prepareDocumentChange()) return false;
+    const released = await Promise.all([...this.translations].map(s => this.releaseTranslation(s)));
+    if (released.some(ok => !ok)) { this.releaseDocumentChange(); return false; }
+    window.removeEventListener('beforeunload', this.beforeUnload);
     this.disposed=true; this.epoch++; this.cleanups.forEach(fn=>fn()); this.unsubscribeAnnotations?.(); this.imports.dispose();
-    await Promise.all([this.annotations?.dispose(),this.reading?.dispose(),this.reader.dispose()]); await this.db.close();
+    await Promise.all([this.annotations?.dispose(),this.reading?.dispose(),this.reader.dispose()]); await this.db.close(); this.releaseDocumentChange(); return true;
   }
 }

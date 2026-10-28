@@ -56,7 +56,7 @@ export function GeneralSection({ state, onPreference, onRetry }: GeneralSectionP
         <SettingRow label="界面语言">
           <Segmented label="界面语言" size="sm" options={localeOptions} value={p.locale} onChange={(locale) => onPreference('locale', locale)} />
         </SettingRow>
-        <SettingRow label="回答语言" description="翻译、解释、讨论和概览使用的语言。只影响之后的回答，已有内容不会重写。">
+        <SettingRow label="回答语言" description="解释、讨论和概览使用的语言。翻译的默认目标语言在「功能 → 翻译」中设置；已有内容不会重写。">
           <Segmented label="回答语言" size="sm" options={localeOptions} value={p.answerLanguage} onChange={(language) => onPreference('answerLanguage', language)} />
         </SettingRow>
       </SettingGroup>
