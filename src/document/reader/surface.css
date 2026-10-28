@@ -7,3 +7,20 @@
 
 /* Canonical business annotations are changed only through the controlled UI. */
 .pp-pdf-surface .annotationEditorLayer, .pp-pdf-surface .highlightEditor { pointer-events: none !important; }
+
+/* Runtime SVG counterpart of the existing UI LocateFlash, without its rectangular background. */
+.pp-pdf-locate-feedback {
+  position: absolute;
+  z-index: 2;
+  pointer-events: none;
+  overflow: hidden;
+  animation: pp-locate 1900ms var(--pp-ease-out) both;
+}
+.pp-pdf-locate-feedback path {
+  fill: color-mix(in srgb, var(--pp-accent) 22%, transparent);
+  stroke: color-mix(in srgb, var(--pp-accent) 45%, transparent);
+  stroke-width: 1.5;
+}
+@media (prefers-reduced-motion: reduce) {
+  .pp-pdf-locate-feedback { animation: none; }
+}

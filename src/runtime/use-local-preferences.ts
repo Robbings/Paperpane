@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
+import { isTranslationLanguage } from '@/translation/languages';
 import { PreferenceStore } from '@/data/preference-store';
 import { applyAppearance } from '@/ui/theme';
 import { DEFAULT_PREFERENCES, DEFAULT_SELECTION_BAR, FONT_SIZE, type Preferences, type PreferencesState } from '@/ui/settings/types';
@@ -10,6 +11,8 @@ function valid<K extends keyof Preferences>(key: K, value: unknown): value is Pr
     case 'locale':
     case 'answerLanguage':
       return value === 'zh-CN' || value === 'en';
+    case 'translationLanguage':
+      return isTranslationLanguage(value);
     case 'translationFontSize':
       return (
         value === null ||
@@ -43,6 +46,8 @@ function normalize(value: Record<string, unknown>): Preferences {
   for (const key of Object.keys(DEFAULT_PREFERENCES) as (keyof Preferences)[]) {
     if (valid(key, value[key])) Object.assign(preferences, { [key]: value[key] });
   }
+  // Preserve the old target on upgrade; do not change a user's translation language.
+  if (!isTranslationLanguage(value.translationLanguage) && isTranslationLanguage(value.answerLanguage)) preferences.translationLanguage = value.answerLanguage;
   return preferences;
 }
 

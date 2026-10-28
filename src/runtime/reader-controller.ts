@@ -15,6 +15,7 @@ export class ReaderController {
   annotations?: AnnotationSession;
   document?: StoredDocument;
   message = '';
+  translateSelection?: (anchor: DocumentAnchor, text?: string) => void;
   private reading?: ReturnType<typeof readingPersistence>;
   private unsubscribeAnnotations?: () => void;
   private cleanups: (() => void)[] = [];
@@ -97,7 +98,7 @@ export class ReaderController {
     return anchor.pages.flatMap(page => { const p=this.reader.project({...anchor,pages:[page]},'viewport'); return p.state==='ready' ? p.rects.map(item=>item.rect) : []; });
   }
   item(id: string): Annotation | undefined { return this.annotations?.getSnapshot().data.items.find(row => row.id === id && !row.deletedAt); }
-  selectionAction(id: string, action: string) { const selection=this.reader.resolveSelection(id); if(selection.ok) this.textAction(selection.value.text,action); else this.report(selection.error.message); }
+  selectionAction(id: string, action: string) { const selection=this.reader.resolveSelection(id); if(selection.ok) { if(action==='translate'&&this.translateSelection)this.translateSelection(selection.value.anchor,selection.value.text);else this.textAction(selection.value.text,action); } else this.report(selection.error.message); }
   textAction(text: string, action: string) {
     if (action === 'copy') void navigator.clipboard.writeText(text).catch(() => this.report('复制失败，请使用系统复制快捷键。'));
     else this.report('翻译、解释和问答将在后续接入，目前没有发送模型请求。');

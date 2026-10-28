@@ -8,6 +8,9 @@ import type { ReaderService, ReaderState } from '@/contracts/reader';
 import { failure, success, type Result, type Snapshot } from '@/contracts/common';
 import type { Annotation } from '@/contracts/annotations';
 import { SavedHighlights, pdfHighlightColors } from './saved-highlights';
+import { extractPaper } from '@/translation/extract';
+import { passageScroll } from './locate-scroll';
+import { LocateFlash } from './locate-flash';
 
 GlobalWorkerOptions.workerSrc = workerUrl;
 // Pin the invisible fallback used by both PDF.js canvas measurement and DOM.
@@ -32,6 +35,9 @@ export class PdfjsReader implements ReaderService, AnchorService {
   private find: PDFFindController;
   private password?: { id: string; submit: (value: string) => void };
   private revision = 0;
+  private locateRequest = 0;
+  private findScrollLeft?: number;
+  private locateFlash:LocateFlash;
   private disposed = false;
   private pointerStart?: {x:number;y:number};
   private observer: ResizeObserver;
@@ -39,6 +45,7 @@ export class PdfjsReader implements ReaderService, AnchorService {
   private sessionLifecycle = new AbortController();
 
   constructor(private container: HTMLDivElement, private surface: HTMLDivElement) {
+    this.locateFlash=new LocateFlash(container);
     this.links = new PDFLinkService({ eventBus: this.eventBus, externalLinkTarget: 2, externalLinkRel: 'noopener noreferrer' });
     this.find = new PDFFindController({ eventBus: this.eventBus, linkService: this.links });
     this.viewer = new PDFViewer({ container, viewer: surface, eventBus: this.eventBus, linkService: this.links, findController: this.find,
@@ -47,6 +54,15 @@ export class PdfjsReader implements ReaderService, AnchorService {
       annotationEditorHighlightColors: Object.entries(pdfHighlightColors).map(([k,v])=>`${k}=${v}`).join(','),
       enablePermissions: true, enableAutoLinking: false, removePageBorders: true });
     this.links.setViewer(this.viewer);
+    // Keep PDF.js match selection and its one-shot scroll guard; use the same landing policy as annotations.
+    this.find.scrollMatchIntoView = ({element,pageIndex,matchIndex}) => {
+      if(!this.find._scrollMatches||!element||pageIndex<0||matchIndex<0||pageIndex!==this.find.selected?.pageIdx||matchIndex!==this.find.selected?.matchIdx)return;
+      this.find._scrollMatches=false;
+      ++this.locateRequest;
+      this.revealPassage([element.getBoundingClientRect()],this.findScrollLeft);
+      this.findScrollLeft=undefined;
+      this.locateFlash.show(()=>element.isConnected?[...element.getClientRects()]:[]);
+    };
     this.eventBus.on('annotationeditoruimanager', ({ uiManager }: { uiManager: AnnotationEditorUIManager }) => {
       this.highlights?.dispose();
       this.highlights = new SavedHighlights(uiManager, this.viewer, message => this.publish({ error: {code: 'UNSUPPORTED_CONTENT', message, recovery: ['reload']} }));
@@ -77,6 +93,17 @@ export class PdfjsReader implements ReaderService, AnchorService {
     window.addEventListener('resize', () => this.invalidate(true), options);
     this.observer = new ResizeObserver(() => this.invalidate(true)); this.observer.observe(container);
   }
+  /** Visible paper viewport, for clipping transient translation geometry. */
+  translationViewport = () => this.container.getBoundingClientRect();
+  translationScrollElement = () => this.container;
+  /** Geometry only: page actions are rendered by Paperpane, outside the PDF canvas. */
+  translationPageRects = () => {
+    const viewport = this.container.getBoundingClientRect();
+    return Array.from({ length: this.snapshot.data.pageCount }, (_, pageIndex) => {
+      const rect = this.viewer.getPageView(pageIndex)?.div.getBoundingClientRect();
+      return rect && rect.bottom > viewport.top && rect.top < viewport.bottom ? { pageIndex, rect } : null;
+    }).filter((page): page is { pageIndex: number; rect: DOMRect } => page !== null);
+  };
   getSnapshot = () => this.snapshot;
   subscribe = (listener: () => void) => { this.listeners.add(listener); return () => this.listeners.delete(listener); };
   private reset(state: ReaderState) { if (this.disposed) return; this.snapshot = freeze({mode:'live',state:'ready',data:state}); this.listeners.forEach(fn=>fn()); }
@@ -110,9 +137,10 @@ export class PdfjsReader implements ReaderService, AnchorService {
     }
     return success(undefined);
   }
-  private invalidate(page: boolean) { this.revision++; if (page) this.projections.page.forEach(fn=>fn()); this.projections.viewport.forEach(fn=>fn()); }
+  private invalidate(page: boolean) { this.locateFlash?.paint(); this.revision++; if (page) this.projections.page.forEach(fn=>fn()); this.projections.viewport.forEach(fn=>fn()); }
   subscribeProjection(space: ProjectionSpace, listener: () => void) { this.projections[space].add(listener); return () => this.projections[space].delete(listener); }
   async open(blob: Blob, ref: DocumentRef): Promise<void> {
+    this.locateFlash.clear();
     this.sessionLifecycle.abort(); this.sessionLifecycle = new AbortController();
     const sessionId = crypto.randomUUID(); const previous = this.task; this.task = undefined;
     this.password = undefined; this.highlights?.dispose(); this.highlights = undefined; this.annotations = []; this.pdf = undefined;
@@ -138,9 +166,14 @@ export class PdfjsReader implements ReaderService, AnchorService {
   }
   submitPassword(requestId: string, password: string): Result<void> { if (!this.password || this.password.id !== requestId) return failure('STALE_CONFIRMATION', '密码请求已过期'); const submit = this.password.submit; this.password = undefined; this.publish({ phase: 'loading', passwordRequest: undefined }); submit(password); return success(undefined); }
   private ready(): Result<void> { return !this.disposed && this.snapshot.data.phase === 'ready' ? success(undefined) : failure('BUSY', '论文尚未就绪'); }
-  async navigate(pageIndex: number): Promise<Result<void>> { const ready = this.ready(); if (!ready.ok) return ready; if (!Number.isInteger(pageIndex) || pageIndex < 0 || pageIndex >= this.snapshot.data.pageCount) return failure('INVALID_INPUT', '页码超出范围'); this.viewer.scrollPageIntoView({ pageNumber: pageIndex + 1 }); return success(undefined); }
+  async navigate(pageIndex: number): Promise<Result<void>> { this.locateFlash.clear(); ++this.locateRequest; const ready = this.ready(); if (!ready.ok) return ready; if (!Number.isInteger(pageIndex) || pageIndex < 0 || pageIndex >= this.snapshot.data.pageCount) return failure('INVALID_INPUT', '页码超出范围'); this.viewer.scrollPageIntoView({ pageNumber: pageIndex + 1 }); return success(undefined); }
   setZoom(zoom: number): Result<void> { const ready = this.ready(); if (!ready.ok) return ready; if (!Number.isFinite(zoom) || zoom < .25 || zoom > 4) return failure('INVALID_INPUT', '缩放须在 25% 至 400% 之间'); this.viewer.currentScale = zoom; return success(undefined); }
   setRotation(rotation: 0 | 90 | 180 | 270): Result<void> { const ready = this.ready(); if (!ready.ok) return ready; if (![0,90,180,270].includes(rotation)) return failure('INVALID_INPUT', '旋转角度无效'); this.viewer.pagesRotation = rotation; return success(undefined); }
+  async extractTranslation(signal: AbortSignal, progress: (n:number)=>void) {
+    const pdf=this.pdf, ref=this.snapshot.data.document;
+    if(!pdf||!ref||this.snapshot.data.phase!=='ready')throw new Error('论文尚未就绪。');
+    return extractPaper(pdf,ref,AbortSignal.any([signal,this.sessionLifecycle.signal]),progress);
+  }
   private matches(ref: DocumentRef) { const current = this.snapshot.data.document; return current?.documentId === ref.documentId && current.fileVersion === ref.fileVersion; }
   private captureSelection = (event: Event) => {
     if (!this.ready().ok) return;
@@ -221,16 +254,33 @@ export class PdfjsReader implements ReaderService, AnchorService {
     }
     return pending.length ? { space, state: 'pending', pageIndexes: pending } : { space, state: 'ready', accuracy: 'exact', revision: String(this.revision), rects };
   }
+  private revealPassage(rects:readonly {left:number;top:number;width:number;height:number}[],preferredLeft?:number){
+    if(!rects.length)return;
+    const left=Math.min(...rects.map(r=>r.left)),top=Math.min(...rects.map(r=>r.top));
+    const right=Math.max(...rects.map(r=>r.left+r.width)),bottom=Math.max(...rects.map(r=>r.top+r.height));
+    const el=this.container,box=el.getBoundingClientRect();
+    const destination=passageScroll({left,top,width:right-left,height:bottom-top},{left:box.left+el.clientLeft,top:box.top+el.clientTop,width:el.clientWidth,height:el.clientHeight,scrollLeft:el.scrollLeft,scrollTop:el.scrollTop,scrollWidth:el.scrollWidth,scrollHeight:el.scrollHeight},preferredLeft);
+    el.scrollTo({...destination,behavior:'instant'});
+    this.viewer.update();this.capturePosition();this.invalidate(false);
+  }
   async locate(anchor: DocumentAnchor) {
     if (!this.matches(anchor) || !anchor.pages.length || !this.pdf) return { state: 'unavailable' as const, error: { code: 'NOT_FOUND' as const, message: '定位目标不属于当前文档', recovery: [] } };
-    const page = anchor.pages[0]!; const session = this.snapshot.data.sessionId;
-    const result = await this.navigate(page.pageIndex);
-    if (!result.ok) return { state: 'unavailable' as const, error: result.error };
+    this.locateFlash.clear();
+    const page=anchor.pages[0]!,session=this.snapshot.data.sessionId,ticket=++this.locateRequest;
     try {
-      const pdfPage = await this.pdf.getPage(page.pageIndex + 1);
-      if (this.disposed || this.snapshot.data.sessionId !== session) throw new Error('Stale session');
-      const rect = page.rects[0];
-      if (rect) this.viewer.scrollPageIntoView({ pageNumber: page.pageIndex + 1, destArray: [null, { name: 'XYZ' }, rect.x + pdfPage.view[0]!, rect.y + rect.height + pdfPage.view[1]!, null] });
+      const pdfPage=await this.pdf.getPage(page.pageIndex+1);
+      if(this.disposed||this.snapshot.data.sessionId!==session||ticket!==this.locateRequest)throw new Error('Stale location');
+      const view=this.viewer.getPageView(page.pageIndex);
+      if(!view)throw new Error('Missing page');
+      // Load the page's true crop/rotation geometry without first jumping to its upper-left corner.
+      if(!view.pdfPage)view.setPdfPage(pdfPage);
+      const projection=this.project({...anchor,pages:[page]},'viewport');
+      if(projection.state!=='ready')throw new Error('Missing geometry');
+      this.revealPassage(projection.rects.length?projection.rects.map(r=>r.rect):[view.div.getBoundingClientRect()]);
+      this.locateFlash.show(()=>anchor.pages.flatMap(part=>{
+        const current=this.project({...anchor,pages:[part]},'viewport');
+        return current.state==='ready'?current.rects.map(r=>r.rect):[];
+      }));
       return { state: 'exact' as const, anchor };
     } catch { return { state: 'unavailable' as const, error: { code: 'NOT_FOUND' as const, message: '原文位置暂时不可用', recovery: [] } }; }
   }
@@ -261,13 +311,15 @@ export class PdfjsReader implements ReaderService, AnchorService {
   setTool(tool: ReaderState['tool']) { this.publish({tool}); }
   dismissMenu() { if (this.snapshot.data.menuTarget || this.snapshot.data.selection) this.publish({menuTarget:null,selection:null}); }
   search(query: string, options: {matchCase: boolean; wholeWord: boolean}) {
+    this.locateFlash.clear();this.findScrollLeft=this.container.scrollLeft;++this.locateRequest;
     this.publish({search:{query,...options,status:query?'searching':'idle',total:0,current:0}});
     if (!query) { this.eventBus.dispatch('findbarclose', {source:this}); return; }
     this.eventBus.dispatch('find', {source:this, type:'', query, caseSensitive:options.matchCase, entireWord:options.wholeWord, highlightAll:true, findPrevious:false, matchDiacritics:false});
   }
-  stepSearch(direction: 1 | -1) { const s=this.snapshot.data.search; if(s.query) this.eventBus.dispatch('find',{source:this,type:'again',query:s.query,caseSensitive:s.matchCase,entireWord:s.wholeWord,highlightAll:true,findPrevious:direction===-1,matchDiacritics:false}); }
+  stepSearch(direction: 1 | -1) { this.locateFlash.clear();this.findScrollLeft=this.container.scrollLeft;++this.locateRequest; const s=this.snapshot.data.search; if(s.query) this.eventBus.dispatch('find',{source:this,type:'again',query:s.query,caseSensitive:s.matchCase,entireWord:s.wholeWord,highlightAll:true,findPrevious:direction===-1,matchDiacritics:false}); }
   closeSearch() { this.search('',{matchCase:false,wholeWord:false}); }
   async cancelOpen(): Promise<void> {
+    this.locateFlash.clear();
     if (this.disposed) return;
     this.sessionLifecycle.abort(); this.sessionLifecycle = new AbortController();
     const task = this.task; this.task = undefined;
@@ -279,5 +331,5 @@ export class PdfjsReader implements ReaderService, AnchorService {
     if (this.password?.id !== id) return failure('STALE_CONFIRMATION','密码请求已结束');
     await this.cancelOpen(); return success(undefined);
   }
-  async dispose() { if (this.disposed) return; this.disposed = true; this.sessionLifecycle.abort(); this.lifecycle.abort(); this.observer.disconnect(); this.listeners.clear(); Object.values(this.projections).forEach(s=>s.clear()); this.password = undefined; this.highlights?.dispose(); this.highlights = undefined; this.links.setDocument(null); this.viewer.setDocument(null); await this.task?.destroy().catch(()=>{}); }
+  async dispose() { if (this.disposed) return; this.locateFlash.clear(); this.disposed = true; this.sessionLifecycle.abort(); this.lifecycle.abort(); this.observer.disconnect(); this.listeners.clear(); Object.values(this.projections).forEach(s=>s.clear()); this.password = undefined; this.highlights?.dispose(); this.highlights = undefined; this.links.setDocument(null); this.viewer.setDocument(null); await this.task?.destroy().catch(()=>{}); }
 }

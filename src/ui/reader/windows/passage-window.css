@@ -1,0 +1,6 @@
+/* Same scroll layer and shell as comment notes; clipping belongs to the PDF viewport. */
+.pp-passage-window { z-index: 1; min-height: 140px; color: var(--pp-text); }
+.pp-passage-window[data-collapsed='true'] { min-height: 34px; height: 34px; }
+.pp-passage-window .pp-note__pill-title { flex: 1; }
+
+.pp-passage-window__connector { position: absolute; inset: 0; z-index: 0; pointer-events: none; }

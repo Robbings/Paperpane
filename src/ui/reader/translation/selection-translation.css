@@ -1,0 +1,13 @@
+.pp-selection-translation__body { min-height: 60px; overflow: auto; overflow-wrap: anywhere; user-select: text; }
+.pp-selection-translation__source { color: var(--pp-text-2); margin: 0 0 12px; padding-bottom: 10px; border-bottom: 0.5px solid var(--pp-hairline); }
+.pp-selection-translation__footer { display: flex; gap: 8px; align-items: center; justify-content: space-between; padding: 4px 8px 6px 12px; }
+.pp-selection-translation__hint { display: inline-flex; gap: 5px; align-items: center; color: var(--pp-text-3); font-size: var(--pp-text-xs); }
+.pp-selection-translation__error { max-height: 100px; overflow: auto; overflow-wrap: anywhere; margin: 0; padding: 0 12px 10px; font-size: var(--pp-text-xs); color: var(--pp-danger); }
+.pp-selection-translation__options { display: flex; flex-direction: column; gap: 12px; }
+.pp-selection-translation__options label { display: flex; flex-direction: column; gap: 6px; font-size: var(--pp-text-sm); color: var(--pp-text-2); }
+.pp-selection-translation__options-actions { display: flex; justify-content: flex-end; gap: 8px; }
+
+.pp-selection-translation__body > p { margin: 0 0 10px; }
+.pp-selection-translation__body > p:last-child { margin-bottom: 0; }
+
+.pp-selection-translation__footer { flex-shrink: 0; padding-right: 18px; }

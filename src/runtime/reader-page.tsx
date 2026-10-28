@@ -4,6 +4,10 @@ import { Button, Dialog, EmptyState, ProgressBar, TextField, Toaster } from '@/u
 import type { ReaderInteraction } from '@/ui/reader/types';
 import { ReaderController } from './reader-controller';
 import '@/document/reader/surface.css';
+import { useTranslation } from './use-translation';
+import { useModelSettings } from './use-model-settings';
+import { toast } from '@/ui/components';
+import { toDraft } from '@/ui/settings/types';
 import { useLocalPreferences } from './use-local-preferences';
 import { downloadFile } from './library-page';
 
@@ -24,6 +28,8 @@ export function LiveReaderPage() {
     setOwner(controller); void controller.start();
     return ()=>{live=false;void controller.dispose();};
   },[container,surface]);
+  const translation=useTranslation(owner,preferences.state.preferences);
+  const modelSettings=useModelSettings();
   const state=owner?.reader.getSnapshot().data;
   const saved=owner?.annotations?.getSnapshot().data;
   const documents=owner?.imports.service.getSnapshot().data.documents??[];
@@ -47,7 +53,7 @@ export function LiveReaderPage() {
     tool:state?.tool??'select',onToolChange:tool=>owner?.reader.setTool(tool),
     onCreateHighlight:(id,color)=>owner?.createHighlight(id,color)??Promise.resolve(null),
     onSelectionAction:(id,action)=>owner?.selectionAction(id,action),
-    onAnnotationAction:(id,action)=>{const row=owner?.item(id);if(row)owner?.textAction(row.quote,action);},
+    onAnnotationAction:(id,action)=>{const row=owner?.item(id);if(row){if(action==='translate'&&owner?.translateSelection)owner.translateSelection(row.anchor,row.quote);else owner?.textAction(row.quote,action);}},
     onAnnotationColor:(id,color)=>owner?.colorAnnotation(id,color),
     onAnnotationComment:(id,comment)=>owner?.annotations?.edit(id,{comment}),
     onAnnotationDelete:async id=>{const ok=await owner?.annotations?.deleteCurrent(id)??false;if(ok)owner?.reader.dismissMenu();return ok;},
@@ -60,6 +66,7 @@ export function LiveReaderPage() {
     noteLayouts:saved?.layouts??[],onNoteLayouts:layouts=>owner?.annotations?.setLayouts(layouts),
   };
   const notice = saved?.error?.message || owner?.message || state?.error?.message || failedJob?.error?.message || (job ? '正在导入…' : '');
+  useEffect(()=>{if(notice&&!saved?.error)toast.show({message:notice});},[notice,saved?.error]);
   const local=!saved?'unmodified':saved.error?'failed':saved.pending?'saving':'saved';
   const unavailable=<EmptyState icon="file" title="尚未接入" description="本轮完成 PDF 阅读、高亮和评论保存，其余研究功能将在后续接入。"/>;
   return <>
@@ -76,20 +83,19 @@ export function LiveReaderPage() {
         <div ref={setSurface} className="pdfViewer pp-pdf-surface"/>
       </>}
       interaction={interaction}
+      translation={translation.shell}
       onBack={()=>{location.href='library.html';}}
       exports={[{id:'original',label:'导出原 PDF',disabled:!owner?.document}]}
       onExport={()=>{if(owner?.document)void owner.db.readFile(owner.document).then(blob=>downloadFile(blob,`${owner.document!.title}.pdf`)).catch(()=>report('原文件导出失败，请重试。'));}}
-      settings={{preferences:preferences.state.preferences,onPreference:preferences.setPreference,models:[],defaultModelId:null,onDefaultModel:()=>report('模型配置将在后续接入。'),status:{local:preferences.state.local,sync:'unconfigured',lastSyncedAt:null,modelAvailability:'unconfigured'},onOpenSettings:section=>window.open(`options.html${section?'#'+section:''}`,'_blank','noopener')}}
+      settings={{preferences:preferences.state.preferences,onPreference:preferences.setPreference,models:modelSettings.settings.models.map(m=>({value:m.id,label:m.label||m.modelId})),defaultModelId:modelSettings.settings.defaultModelId,onDefaultModel:id=>void modelSettings.save({...toDraft(modelSettings.settings),defaultModelId:id},modelSettings.settings.revision).then(r=>{if(!r.ok)report('默认模型没有保存，请到设置页重试。');}),status:{local:preferences.state.local,sync:'unconfigured',lastSyncedAt:null,modelAvailability:modelSettings.status.modelAvailability},onOpenSettings:section=>window.open(`options.html${section?'#'+section:''}`,'_blank','noopener')}}
       onNavigate={index=>{void owner?.reader.navigate(index).then(r=>{if(!r.ok)report(r.error.message);});}}
       onZoom={direction=>{const r=owner?.reader.setZoom((state?.position.zoom??1)+(direction==='in'?.1:-.1));if(r&&!r.ok)report(r.error.message);}}
       onZoomTo={percent=>{const r=owner?.reader.setZoom(percent/100);if(r&&!r.ok)report(r.error.message);}}
       onLocateAnnotation={id=>{const row=owner?.item(id);if(row)void owner?.reader.locate(row.anchor).then(()=>owner.reader.showAnnotation(id));}}
       onTool={tool=>{if(tool==='copy-annotations'||tool==='export-annotations')void owner?.exportAnnotations(tool==='copy-annotations');else if(tool==='open'||tool==='library')setOpenFiles(true);else report('该工具将在后续阅读能力接入时提供。');}}
     />
-    {notice && <div style={{position:'fixed',left:16,bottom:12,zIndex:1000,display:'flex',alignItems:'center',gap:8,maxWidth:'calc(100vw - 32px)',padding:8,background:'var(--pp-surface)',borderRadius:12}}>
-      <span role="status" style={{fontSize:12}}>{notice}</span>
-      {saved?.error&&<><Button onClick={()=>void owner?.annotations?.retry()}>重试保存</Button><Button onClick={()=>void owner?.annotations?.discardDrafts()}>放弃草稿，载入最新</Button></>}
-    </div>}
+    {translation.overlay}{translation.confirmation}
+    <Dialog open={!!saved?.error} onClose={()=>{}} title="批注未能保存" description={saved?.error?.message} footer={<><Button onClick={()=>void owner?.annotations?.retry()}>重试保存</Button><Button onClick={()=>void owner?.annotations?.discardDrafts()}>放弃草稿，载入最新</Button></>}/>
     <Dialog open={openFiles} onClose={()=>setOpenFiles(false)} title="打开论文" description="复用文献库的 PDF 文件；导入的文件与批注保存在本机数据库。" footer={<><Button onClick={()=>{setOpenFiles(false);input.current?.click();}}>导入本地 PDF</Button><Button onClick={()=>{location.href='library.html';}}>文献库</Button></>}>
       {documents.length?documents.map(doc=><div key={doc.id}><Button onClick={()=>{setOpenFiles(false);void owner?.open(doc.id);}}>{doc.title}</Button></div>):<p>还没有导入论文。</p>}
     </Dialog>

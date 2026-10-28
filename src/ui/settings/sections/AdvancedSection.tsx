@@ -1,6 +1,7 @@
 import { useId } from 'react';
 import { Segmented, Stepper } from '@/ui/components';
 import { SettingGroup, SettingRow } from '../SettingRow';
+import { LLM_TRANSLATION_LIMITS } from '@/translation/settings';
 import type { RuntimeConfig } from '../types';
 
 interface AdvancedSectionProps {
@@ -24,7 +25,7 @@ export function AdvancedSection({ runtime, onChange, problems }: AdvancedSection
       <SettingRow
         label="超时"
         htmlFor={timeoutId}
-        description={`一次请求最长等多久，${RUNTIME_LIMITS.timeout.min}–${RUNTIME_LIMITS.timeout.max} 秒。排队的时间也算在内。`}
+        description={`一次请求最长等多久，${RUNTIME_LIMITS.timeout.min}–${RUNTIME_LIMITS.timeout.max} 秒。从模型请求发出时开始计算。`}
         error={problems.get('runtime.timeoutSec')}
       >
         <span className="pp-set-number">
@@ -37,7 +38,7 @@ export function AdvancedSection({ runtime, onChange, problems }: AdvancedSection
           <span>秒</span>
         </span>
       </SettingRow>
-      <SettingRow label="同时进行的请求" description="调低不会中断已经开始的请求。" error={problems.get('runtime.concurrency')}>
+      <SettingRow label="同时进行的请求" description="翻译按此上限并发，修改在下次启动任务时生效。" error={problems.get('runtime.concurrency')}>
         <Stepper
           label="同时进行的请求"
           value={runtime.concurrency}
@@ -87,9 +88,13 @@ export function runtimeProblems(runtime: RuntimeConfig): { path: string; message
   const { timeout, concurrency } = RUNTIME_LIMITS;
   if (!Number.isInteger(runtime.timeoutSec) || runtime.timeoutSec < timeout.min || runtime.timeoutSec > timeout.max)
     problems.push({ path: 'runtime.timeoutSec', message: `请填 ${timeout.min} 到 ${timeout.max} 之间的整数。` });
-  if (runtime.concurrency < concurrency.min || runtime.concurrency > concurrency.max)
+  if (!Number.isInteger(runtime.concurrency) || runtime.concurrency < concurrency.min || runtime.concurrency > concurrency.max)
     problems.push({ path: 'runtime.concurrency', message: `请在 ${concurrency.min} 到 ${concurrency.max} 之间。` });
   if (runtime.maxOutputTokens !== null && (!Number.isInteger(runtime.maxOutputTokens) || runtime.maxOutputTokens <= 0))
     problems.push({ path: 'runtime.maxOutputTokens', message: '请填一个正整数，或改回模型默认。' });
+  if (runtime.translation) for (const key of Object.keys(LLM_TRANSLATION_LIMITS) as (keyof typeof LLM_TRANSLATION_LIMITS)[]) {
+    const value = runtime.translation[key], [min, max] = LLM_TRANSLATION_LIMITS[key];
+    if (!Number.isInteger(value) || value < min || value > max) problems.push({ path: `runtime.translation.${key}`, message: `请填 ${min} 到 ${max} 之间的整数。` });
+  }
   return problems;
 }

@@ -1,0 +1,19 @@
+import { Button, Select, TextField } from '@/ui/components';
+import { SettingGroup, SettingRow } from '../SettingRow';
+import type { SettingsDraft } from '../types';
+/** Existing design components only; saved secrets are represented by a presence bit. */
+export function ModelsSection({draft,onChange}:{draft:SettingsDraft;onChange:(draft:SettingsDraft)=>void}){
+  return <>
+    {draft.endpoints.map((e,index)=><SettingGroup key={e.id} title={e.name||`接口 ${index+1}`} description="支持 Responses 和 Chat Completions。保存时只授权这个服务的地址。">
+      <SettingRow label="接口名称"><TextField label="接口名称" hideLabel value={e.name} onChange={name=>onChange({...draft,endpoints:draft.endpoints.map(x=>x.id===e.id?{...x,name}:x)})}/></SettingRow>
+      <SettingRow label="接口协议"><Select label="接口协议" options={[{value:'openai-responses',label:'Responses API'},{value:'openai-chat',label:'Chat Completions API'}]} value={e.protocol} onChange={protocol=>onChange({...draft,endpoints:draft.endpoints.map(x=>x.id===e.id?{...x,protocol}:x)})}/></SettingRow>
+      <SettingRow label="接口地址" stacked><TextField label="接口地址" hideLabel value={e.baseUrl} placeholder="https://api.example.com/v1" onChange={baseUrl=>onChange({...draft,endpoints:draft.endpoints.map(x=>x.id===e.id?{...x,baseUrl}:x)})}/></SettingRow>
+      <SettingRow label="API 密钥" description={e.hadKey&&e.key.kind==='keep'?'已设置，留空保持原密钥。':'仅保存在本机，不会回填显示。'}><TextField label="API 密钥" hideLabel type="password" autoComplete="new-password" value={e.key.kind==='replace'?e.key.value:''} onChange={value=>onChange({...draft,endpoints:draft.endpoints.map(x=>x.id===e.id?{...x,key:value?{kind:'replace',value}:{kind:'keep'}}:x)})}/><Button size="sm" variant="quiet" onClick={()=>onChange({...draft,endpoints:draft.endpoints.map(x=>x.id===e.id?{...x,key:{kind:'clear'}}:x)})}>清除密钥</Button></SettingRow>
+      {draft.models.filter(m=>m.endpointId===e.id).map(m=><SettingRow key={m.id} label="模型 ID" description="填写服务商提供的实际模型名称。"><TextField label="模型 ID" hideLabel value={m.modelId} onChange={modelId=>onChange({...draft,models:draft.models.map(x=>x.id===m.id?{...x,modelId,label:modelId}:x)})}/><Button variant="quiet" size="sm" onClick={()=>onChange({...draft,models:draft.models.filter(x=>x.id!==m.id),defaultModelId:draft.defaultModelId===m.id?null:draft.defaultModelId,features:draft.features.map(f=>f.modelId===m.id?{...f,modelId:null}:f)})}>移除</Button></SettingRow>)}
+      <SettingRow label="移除此接口" description="保留已经生成的译文，只移除接口和它的模型。"><Button size="sm" variant="quiet" onClick={()=>{const ids=draft.models.filter(m=>m.endpointId===e.id).map(m=>m.id);onChange({...draft,endpoints:draft.endpoints.filter(x=>x.id!==e.id),models:draft.models.filter(m=>m.endpointId!==e.id),defaultModelId:ids.includes(draft.defaultModelId??'')?null:draft.defaultModelId,features:draft.features.map(f=>f.modelId&&ids.includes(f.modelId)?{...f,modelId:null}:f)});}}>移除接口</Button></SettingRow>
+      <SettingRow label="可用模型"><Button size="sm" onClick={()=>{const id=crypto.randomUUID();onChange({...draft,models:[...draft.models,{id,endpointId:e.id,modelId:'',label:'',vision:false,reasoning:{kind:'none'},showInDiscussion:true}],defaultModelId:draft.defaultModelId??id});}}>添加模型</Button></SettingRow>
+    </SettingGroup>)}
+    <SettingGroup><SettingRow label="模型服务"><Button onClick={()=>onChange({...draft,endpoints:[...draft.endpoints,{id:crypto.randomUUID(),name:'模型接口',protocol:'openai-responses',baseUrl:'',hadKey:false,key:{kind:'keep'}}]})}>添加接口</Button></SettingRow>
+      <SettingRow label="默认模型"><Select label="默认模型" options={draft.models.map(m=>({value:m.id,label:m.label||m.modelId||'未命名模型'}))} value={draft.defaultModelId} onChange={defaultModelId=>onChange({...draft,defaultModelId})}/></SettingRow></SettingGroup>
+  </>;
+}
