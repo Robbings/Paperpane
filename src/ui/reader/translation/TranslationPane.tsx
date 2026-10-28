@@ -139,8 +139,8 @@ export function TranslationPane(props: TranslationPaneProps) {
         </Tooltip>
       );
     }
-    // Untranslated or failed: the original, greyed, still lit and located like the rest.
-    const missing = s.state === 'pending' || s.state === 'failed' || (s.state === 'partial' && !s.text);
+    // Received text remains visible while failed or queued for retry.
+    const missing = !s.text.trim();
     const crossPage = s.endsOnPage !== undefined && s.endsOnPage !== s.pageIndex && (
       <span className="pp-tr__cont" title="原句跨页">
         至第 {s.endsOnPage + 1} 页
@@ -228,17 +228,17 @@ export function TranslationPane(props: TranslationPaneProps) {
               <div className="pp-tr__page" aria-label={`第 ${page.pageIndex + 1} 页`}>
                 <span>第 {page.pageIndex + 1} 页</span>
               </div>
-              {page.state === 'untranslated' ? (
+              {page.state === 'untranslated' && !page.sentences.some(s => s.text.trim()) ? (
                 <div className="pp-tr__pending">
                   <span>这一页还没翻译</span>
                   <Button size="sm" variant="quiet" onClick={() => props.onTranslatePage(page.pageIndex)}>
                     翻译这一页
                   </Button>
                 </div>
-              ) : page.state === 'failed' ? (
+              ) : page.state === 'failed' && !page.sentences.some(s => s.text.trim()) ? (
                 <div className="pp-tr__pending" data-tone="danger">
                   <span>{page.error ?? '这一页没能翻译'}</span>
-                  <Button size="sm" variant="quiet" onClick={() => props.onTranslatePage(page.pageIndex)}>
+                  <Button size="sm" variant="quiet" onClick={() => props.onRetryPage(page.pageIndex)}>
                     重试
                   </Button>
                 </div>
@@ -267,6 +267,9 @@ export function TranslationPane(props: TranslationPaneProps) {
                     <p className="pp-tr__waiting">
                       <Spinner size={13} /> 正在翻译这一页…
                     </p>
+                  )}
+                  {page.state === 'failed' && (
+                    <div className="pp-tr__pending" data-tone="danger"><span>{page.error ?? '这一页没能翻译完，已收到的译文保留'}</span><Button size="sm" variant="quiet" onClick={() => props.onRetryPage(page.pageIndex)}>重试</Button></div>
                   )}
                   {page.state === 'partial' && (
                     <PageGaps page={page} task={props.task} onRetry={() => props.onRetryPage(page.pageIndex)} />
