@@ -310,6 +310,11 @@ export class PdfjsReader implements ReaderService, AnchorService {
       const view = this.viewer.getPageView(item.pageIndex); const layer = view?.div;
       if (!view?.pdfPage || !layer) { pending.push(item.pageIndex); continue; }
       const bounds = layer.getBoundingClientRect(); const crop = view.pdfPage.view as number[];
+      // PAGE mode retains page views but detaches every other spread. Their
+      // local PDF geometry is valid; zero screen bounds are not a projection.
+      if (space === 'viewport' && (!layer.isConnected || !this.surface.contains(layer) || bounds.width <= 0 || bounds.height <= 0)) {
+        pending.push(item.pageIndex); continue;
+      }
       for (const r of item.rects) { const a = view.viewport.convertToViewportPoint(r.x+crop[0]!,r.y+crop[1]!) as number[], b = view.viewport.convertToViewportPoint(r.x+r.width+crop[0]!,r.y+r.height+crop[1]!) as number[]; const v = [...a,...b];
         rects.push({ pageIndex: item.pageIndex, rect: { left: Math.min(v[0]!,v[2]!)+(space==='viewport'?bounds.left:0), top: Math.min(v[1]!,v[3]!)+(space==='viewport'?bounds.top:0), width: Math.abs(v[2]!-v[0]!), height: Math.abs(v[3]!-v[1]!) } }); }
     }
@@ -335,9 +340,17 @@ export class PdfjsReader implements ReaderService, AnchorService {
       if(!view)throw new Error('Missing page');
       // Load the page's true crop/rotation geometry without first jumping to its upper-left corner.
       if(!view.pdfPage)view.setPdfPage(pdfPage);
+      const preferredLeft=this.container.scrollLeft;
+      if(this.viewer.scrollMode===ScrollMode.PAGE&&!this.surface.contains(view.div)){
+        // Let PDF.js attach the requested page/spread before measuring it.
+        // Do not call navigate(): that would cancel this location request.
+        this.viewer.scrollPageIntoView({pageNumber:page.pageIndex+1});
+        await new Promise<void>(resolve=>requestAnimationFrame(()=>resolve()));
+        if(this.disposed||this.snapshot.data.sessionId!==session||ticket!==this.locateRequest)throw new Error('Stale location');
+      }
       const projection=this.project({...anchor,pages:[page]},'viewport');
       if(projection.state!=='ready')throw new Error('Missing geometry');
-      this.revealPassage(projection.rects.length?projection.rects.map(r=>r.rect):[view.div.getBoundingClientRect()]);
+      this.revealPassage(projection.rects.length?projection.rects.map(r=>r.rect):[view.div.getBoundingClientRect()],preferredLeft);
       this.locateFlash.show(()=>anchor.pages.flatMap(part=>{
         const current=this.project({...anchor,pages:[part]},'viewport');
         return current.state==='ready'?current.rects.map(r=>r.rect):[];
