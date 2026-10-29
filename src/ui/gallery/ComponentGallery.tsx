@@ -34,7 +34,7 @@ import {
 import { applyTheme, type ThemeMode } from '@/ui/theme';
 import './ComponentGallery.css';
 
-// Component test page: reader.html?view=gallery. Every demo here runs on
+// Component test page: component-gallery.html. Every demo here runs on
 // local sample state; nothing is stored.
 
 const sections = [
@@ -130,7 +130,7 @@ function Demo({ label, children }: { label: string; children: ReactNode }) {
 }
 
 export function ComponentGallery() {
-  const [theme, setTheme] = useState<ThemeMode>('system');
+  const [theme, setTheme] = useState<ThemeMode>(() => { const theme = new URLSearchParams(location.search).get('theme'); return theme === 'light' || theme === 'dark' ? theme : 'system'; });
   useEffect(() => applyTheme(theme), [theme]);
 
   return (

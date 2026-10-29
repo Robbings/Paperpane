@@ -100,7 +100,7 @@ const steps = (content: OverviewContent) =>
       ? content.items.length
       : content.fields.length;
 
-export function SampleOverview({ onLocateQuote }: { onLocateQuote: (quote: string) => void }) {
+export function SampleOverview({ onLocateQuote, preview = false }: { onLocateQuote: (quote: string) => void; preview?: boolean }) {
   const [defs, setDefs] = useState(cards);
   const [results, setResults] = useState<Record<string, OverviewResultView>>({});
   const timer = useRef<number | undefined>(undefined);
@@ -144,8 +144,11 @@ export function SampleOverview({ onLocateQuote }: { onLocateQuote: (quote: strin
   return (
     <OverviewPanel
       demo
+      preview={preview}
       cards={defs}
-      results={results}
+      results={preview ? Object.fromEntries(Object.entries(results).map(([id, result]) => [id, {
+        ...result, sources: result.sources?.map(source => ({ ...source, verified: false, pageLabel: undefined })),
+      }])) : results}
       modelReady
       onRegenerate={generate}
       onStop={(ids) => {
@@ -171,7 +174,7 @@ export function SampleOverview({ onLocateQuote }: { onLocateQuote: (quote: strin
         });
         setDefs(next.map((card) => (card.id.startsWith('new:') ? { ...card, id: `card-${card.id.slice(4)}` } : card)));
         setResults((all) => ({ ...all, ...Object.fromEntries(changed.filter((c) => all[c.id]?.content).map((c) => [c.id, { ...all[c.id]!, stale: true }])) }));
-        toast.show({ message: '已保存概览内容设置', tone: 'success' });
+        toast.show({ message: preview ? '已应用到预览，刷新后重置' : '已保存概览内容设置', tone: 'success' });
       }}
       onLocate={(s) => onLocateQuote(s.quote)}
       onConfigureModels={() => toast.show({ message: '示例：打开模型设置' })}

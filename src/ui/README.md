@@ -6,7 +6,7 @@
 
 ## 测试页
 
-构建后打开扩展的 `reader.html?view=gallery`，左侧是组件目录，每个组件都有可以直接操作的示例，可切换浅色 / 深色。`?theme=light|dark` 可在任意页面强制主题，供审阅使用；正式的主题偏好由逻辑层保存，并在页面加载时调用 `applyTheme()`（`src/ui/theme.ts`）。
+构建后打开扩展的 `component-gallery.html`，左侧是组件目录，每个组件都有可以直接操作的示例，可切换浅色 / 深色。`?theme=light|dark` 可在任意页面强制主题，供审阅使用；正式的主题偏好由逻辑层保存，并在页面加载时调用 `applyTheme()`（`src/ui/theme.ts`）。
 
 ## 约定
 
@@ -93,13 +93,15 @@ toast.show({ message: '翻译失败：请求超时', tone: 'error', action: { la
 
 ## 阅读器外壳 `ReaderShell`
 
-位于 `src/ui/reader/ReaderShell.tsx`，当前由 `src/ui/pages/ReaderPage.tsx` 用示例数据驱动。视图模型在 `src/ui/reader/types.ts`，契约确定后由逻辑层映射过来。
+位于 `src/ui/reader/ReaderShell.tsx`，由 `src/runtime/reader-page.tsx` 的真实阅读器接合 PDF.js、数据和服务。视图模型在 `src/ui/reader/types.ts`。功能开发与验收都从真实 PDF 开始，步骤见根目录 README 的“阅读器开发入口”。
+
+虚拟论文已移入 `src/ui/reader/sample/ArchivedReaderPage.tsx`，仅通过组件预览页的存档参数回看。不要继续在这里实现正式功能或把样例中的效果当作真实接合结果。讨论/概览等服务未接通时，允许通过真实阅读器的 `panels` 插槽提供明确标识的示例数据；保持正式阅读器、PDF 选区和锚点不变。
 
 | prop | 说明 |
 |---|---|
 | `header` | 标题、来源、页数 |
 | `outline`、`pageIndex`、`zoomPercent` | 目录、当前页（从 0 开始）、缩放 |
-| `document` | 论文区内容；接入 PDF 渲染时替换示例页 |
+| `document` | 论文区内容；正式运行时挂载 PDF.js surface |
 | `annotations`、`annotationStatus` | 批注列表与保存 / 同步状态 |
 | `notes` | 笔记内容、`onChange`、保存 / 同步状态 |
 | `initialLayout`、`onLayoutChange` | 停靠位置、宽高、是否显示标题；由逻辑层保存为偏好 |
@@ -113,7 +115,7 @@ toast.show({ message: '翻译失败：请求超时', tone: 'error', action: { la
 
 ## 阅读与批注的接口 `ReaderInteraction`
 
-`ReaderShell` 的 `interaction` 由运行时提供（类型在 `src/ui/reader/types.ts`）。界面负责浮动菜单、评论便签和批注列表的外观与交互；选区捕获、点中已有高亮的判断、坐标和保存都在运行时。演示页的 `reader/sample/useSampleReader.tsx` 是按同一接口写的示例运行时。
+`ReaderShell` 的 `interaction` 由运行时提供（类型在 `src/ui/reader/types.ts`）。界面负责浮动菜单、评论便签和批注列表的外观与交互；选区捕获、点中已有高亮的判断、坐标和保存都在运行时。存档中的 `reader/sample/useSampleReader.tsx` 仅是同接口的历史示例；正式功能使用 `src/document/reader/pdfjs-reader.ts` 和 `src/runtime/reader-page.tsx`。
 
 - `onScrollContainer(el)`：论文滚动容器挂载后交给运行时，viewer 挂在里面，选区也在这里监听。不要修改它的样式和内边距。
 - `menuTarget`：浮动菜单对谁显示。`{ kind: 'selection', id, text, rects }` 是新选区；`{ kind: 'annotation', annotationId, rects }` 是点中的已有高亮。`rects` 是窗口坐标，每行一个。关闭（Esc、点别处、滚动）时外壳调用 `onDismissMenu`。

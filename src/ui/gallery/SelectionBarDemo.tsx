@@ -1,7 +1,7 @@
 import { SelectionMenu, type SelectionMenuAction, type SelectionMenuLook } from '@/ui/components';
 import './SelectionBarDemo.css';
 
-// 审阅用：选区浮动条的几种样式并排放在论文页上比较。reader.html?view=selbar 打开。
+// 审阅用：选区浮动条的几种样式并排放在论文页上比较。component-gallery.html?view=selbar 打开。
 
 const actions: SelectionMenuAction[] = [
   { id: 'comment', label: '评论', icon: 'comment' },
