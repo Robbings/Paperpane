@@ -57,7 +57,7 @@ export function SamplePopup() {
         recent={recent}
         onOpenRecent={() => open('./reader.html')}
         onOpenLibrary={() => open('./library.html')}
-        onOpenFile={() => toast.show({ message: '示例：会打开阅读器并弹出选择文件' })}
+        onOpenFile={() => open('./reader.html?open=import')}
         onOpenSettings={(section) => open(`./options.html${section ? `#${section}` : ''}`)}
         status={status}
       />

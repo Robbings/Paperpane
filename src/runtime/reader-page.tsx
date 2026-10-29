@@ -1,4 +1,6 @@
 import { useEffect, useRef, useState } from 'react';
+import { SampleChat } from '@/ui/reader/sample/SampleChat';
+import { SampleOverview } from '@/ui/reader/sample/SampleOverview';
 import { ReaderShell } from '@/ui/reader/ReaderShell';
 import { Button, Dialog, EmptyState, ProgressBar, TextField, Toaster, toast } from '@/ui/components';
 import type { ReaderInteraction } from '@/ui/reader/types';
@@ -18,7 +20,11 @@ export function LiveReaderPage() {
   const [owner,setOwner] = useState<ReaderController>();
   const [,redraw] = useState(0);
   const [password,setPassword] = useState('');
-  const [openFiles,setOpenFiles] = useState(false);
+  const [openFiles,setOpenFiles] = useState(() => new URLSearchParams(location.search).get('open') === 'import');
+  useEffect(() => {
+    const url = new URL(location.href);
+    if (url.searchParams.get('open') === 'import') { url.searchParams.delete('open'); history.replaceState(null, '', url); }
+  }, []);
   const input = useRef<HTMLInputElement>(null);
   useEffect(() => {
     if (!container || !surface) return;
@@ -79,6 +85,8 @@ export function LiveReaderPage() {
   const notice = saved?.error?.message || owner?.message || state?.error?.message || failedJob?.error?.message || (job ? '正在导入…' : '');
   useEffect(()=>{if(notice&&!saved?.error)toast.show({message:notice});},[notice,saved?.error]);
   const local=!saved?'unmodified':saved.error?'failed':saved.pending?'saving':'saved';
+  const previewKey=state?.document ? `${state.document.documentId}:${state.document.fileVersion}` : 'empty';
+  const previewCitation=()=>toast.show({message:'示例出处不对应当前论文。'});
   const unavailable=<EmptyState icon="file" title="尚未接入" description="本轮完成 PDF 阅读、高亮和评论保存，其余研究功能将在后续接入。"/>;
   return <>
     <ReaderShell header={{title:owner?.document?.title??'打开论文',sourceLabel:owner?.document?.sourceUrl?new URL(owner.document.sourceUrl).hostname:'本地文件',pageCount:state?.pageCount??0}}
@@ -86,7 +94,12 @@ export function LiveReaderPage() {
       annotations={(saved?.items??[]).filter(row=>!row.deletedAt).map(row=>({id:row.id,kind:row.kind==='page-comment'?'comment':'highlight',color:row.color,pageIndex:row.anchor.pages[0]!.pageIndex,quote:row.quote,note:row.comment}))}
       annotationStatus={{local,sync:'unconfigured'}}
       notes={{value:'',onChange:()=>report('整篇笔记将在后续接入。'),local:'unmodified',sync:'unconfigured'}}
-      panels={{overview:unavailable,discuss:unavailable,explain:unavailable,notes:unavailable,cite:unavailable}}
+      panels={{
+        overview:<SampleOverview key={`overview:${previewKey}`} preview onLocateQuote={previewCitation}/>,
+        discuss:<SampleChat key={`discuss:${previewKey}`} preview onLocateQuote={previewCitation}/>,
+        explain:<SampleChat key={`explain:${previewKey}`} title="解释" preview onLocateQuote={previewCitation}/>,
+        notes:unavailable,cite:unavailable,
+      }}
       document={<>
         {(!state||state.phase==='empty'||state.phase==='failed')&&<EmptyState icon="file" title={state?.phase==='failed'?'无法打开 PDF':'打开一份论文'} description={state?.error?.message} actions={<Button onClick={()=>setOpenFiles(true)}>选择论文</Button>}/>}
         {state?.phase==='loading'&&<ProgressBar label="载入 PDF" value={state.loadProgress}/>}

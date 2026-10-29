@@ -10,6 +10,8 @@ import './overview.css';
 
 export interface OverviewPanelProps {
   demo?: boolean;
+  /** Label an isolated UI preview displayed next to a real PDF. */
+  preview?: boolean;
   /** All cards in display order; hidden ones are skipped. */
   cards: readonly OverviewCardDef[];
   /**
@@ -116,7 +118,7 @@ export function OverviewPanel(props: OverviewPanelProps) {
 
   const header = (
     <PanelHeader
-      title="概览"
+      title={props.preview ? '概览 · 示例内容' : '概览'}
       meta={
         running ? (
           <span className="pp-ov__status">
@@ -194,6 +196,7 @@ export function OverviewPanel(props: OverviewPanelProps) {
       {header}
       <PanelBody>
       <ScrollArea className="pp-ov__scroll" viewportClassName="pp-ov__viewport" {...cleanCopyHandlers}>
+        {props.preview && <p className="pp-ov__notice">界面预览，与当前论文无关；不调用模型，刷新后重置。</p>}
         {!props.modelReady && (
           <p className="pp-ov__notice">
             模型暂不可用，下面是上次整理的结果。

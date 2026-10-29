@@ -1,8 +1,6 @@
 import { useEffect, useState } from 'react';
 import { createPortal } from 'react-dom';
 import { Toaster, toast } from '@/ui/components';
-import { ComponentGallery } from '@/ui/gallery/ComponentGallery';
-import { SelectionBarDemo } from '@/ui/gallery/SelectionBarDemo';
 import { sampleFolders, samplePapers, sampleTags } from '@/ui/library/sample/libraryData';
 import type { FolderView, PaperView, TagView } from '@/ui/library/types';
 import type { LibraryEntryDraft } from '@/ui/reader/library/SaveToLibraryPopover';
@@ -19,21 +17,19 @@ import { sampleAnnotations, sampleHeader, sampleOutline } from '@/ui/reader/samp
 import { modelOptions, useSamplePreferences, useSampleSettings } from '@/ui/settings/sample/useSampleSettings';
 import { applyTheme } from '@/ui/theme';
 
-// Review switches: reader.html?view=gallery shows the component gallery,
-// ?theme=light|dark forces a theme. The saved theme preference comes from the logic layer.
+// Historical UI fixture only: component-gallery.html?view=reader-archive.
+// Reader features must be integrated in runtime/reader-page.tsx with a real PDF.
 const params = new URLSearchParams(window.location.search);
 const forcedTheme = params.get('theme');
 if (forcedTheme === 'light' || forcedTheme === 'dark') applyTheme(forcedTheme);
 
 const ZOOM_STEPS = [50, 67, 80, 90, 100, 110, 125, 150, 175, 200];
 
-export function ReaderPage() {
-  if (params.get('view') === 'gallery') return <ComponentGallery />;
-  if (params.get('view') === 'selbar') return <SelectionBarDemo />;
+export function ArchivedReaderPage() {
   return <SampleReader />;
 }
 
-/** 示例接线：用示例数据驱动阅读器外壳，直到文档、标注与笔记逻辑接入。 */
+/** Archived, in-memory UI fixture. Not a feature-development or acceptance entry. */
 function SampleReader() {
   const [pageIndex, setPageIndex] = useState(0);
   const [zoom, setZoom] = useState(100);

@@ -100,8 +100,21 @@ function latestLeaf(session: Session, id: string): string {
   return latestLeaf(session, newest.id);
 }
 
-export function SampleChat({ onLocateQuote }: { onLocateQuote: (quote: string) => void }) {
-  const [sessions, setSessions] = useState<Session[]>(seed);
+export function SampleChat({ onLocateQuote, preview = false, title = '讨论' }: {
+  onLocateQuote: (quote: string) => void;
+  /** Preview alongside a real PDF: never treat canned citations as its sources. */
+  preview?: boolean;
+  title?: '讨论' | '解释';
+}) {
+  const [sessions, setSessions] = useState<Session[]>(() => {
+    const initial = seed();
+    if (title === '解释') {
+      initial[0]!.title = '选区解释示例';
+      initial[0]!.messages = initial[0]!.messages.map(message => message.id === 'q1'
+        ? { ...message, markdown: '请解释这段示例文字中的方法。' } : message);
+    }
+    return initial;
+  });
   const [currentId, setCurrentId] = useState<string | null>('s1');
   const [newDraft, setNewDraft] = useState('');
   const [defaultModel, setDefaultModel] = useState('m-a');
@@ -173,7 +186,7 @@ export function SampleChat({ onLocateQuote }: { onLocateQuote: (quote: string) =
     suggestions: current.suggestions,
     messages: visible(current).map((m) => {
       const versions = siblings(current, m);
-      return { ...m, version: versions.length > 1 ? { index: versions.indexOf(m) + 1, count: versions.length } : undefined };
+      return { ...m, citations: preview ? m.citations.map(citation => ({ ...citation, verified: false, pageLabel: undefined })) : m.citations, version: versions.length > 1 ? { index: versions.indexOf(m) + 1, count: versions.length } : undefined };
     }),
   };
 
@@ -190,7 +203,11 @@ export function SampleChat({ onLocateQuote }: { onLocateQuote: (quote: string) =
 
   return (
     <ChatPanel
-      title="讨论"
+      title={preview ? `${title} · 示例内容` : title}
+      source={preview ? <div className="pp-chat-start">
+        <p className="pp-chat-start__lead">界面预览，与当前论文无关；不调用模型，刷新后重置。</p>
+        {title === '解释' && <blockquote>示例原文：The procedure needs no training data and keeps every block linked to its position on the page.</blockquote>}
+      </div> : undefined}
       demo
       models={models}
       session={view}
