@@ -3,7 +3,7 @@ import { useUiScale } from '@/ui/use-ui-scale';
 import { createPortal } from 'react-dom';
 import { IconButton } from '@/ui/components';
 import type { NoteLayout } from '../types';
-import { useFloatingCanvas } from './floating-canvas';
+import { floatingLeft, floatingMargin, useFloatingCanvas } from './floating-canvas';
 import '../notes/notes.css';
 import './passage-window.css';
 
@@ -69,7 +69,7 @@ export function PassageWindow(props:Props){
     latest.current.props.onLayoutChange?.({dx:nextOffset.x,dy:nextOffset.y,width:nextSize.width,height:nextSize.height??props.initialHeight??180,zoom:latest.current.props.zoomPercent??100});
   };
   const width=collapsed?undefined:Math.min(size.width*uiScale,Math.max(140,container.clientWidth-24));
-  const logicalLeft=anchor.x+offset.x,top=anchor.y+offset.y;
+  const logicalLeft=floatingLeft(container,anchor.x+offset.x),top=anchor.y+offset.y;
   const canvas=useFloatingCanvas(container,initialized.current?logicalLeft:null);
   const left=logicalLeft+canvas.inset,actualWidth=panel.current?.offsetWidth??width??130*uiScale;
   const active=hovered||focused;
@@ -96,11 +96,11 @@ export function PassageWindow(props:Props){
       // A restored card may already be under a stationary pointer: there is no
       // fresh pointerenter event after reload. Recover hover along with geometry.
       setHovered(panel.current?.matches(':hover')??false);
-      // Match comment notes: reserve a bounded margin beside the pages, never derive it from scrollWidth.
+      // Match comment notes: bound the outer margin so the paper cannot leave the viewport.
       const pages=[...container.querySelectorAll<HTMLElement>('.page, [data-page-index]')];
       const right=Math.max(container.clientWidth,...pages.map(p=>p.getBoundingClientRect().right-box.left+container.scrollLeft-canvas.readInset()));
       const bottom=Math.max(container.clientHeight,...pages.map(p=>p.getBoundingClientRect().bottom-box.top+container.scrollTop));
-      const next={width:right+Math.max(520,container.clientWidth),height:bottom+300};
+      const next={width:right+floatingMargin(container),height:bottom+300};
       setBounds(old=>old.width===next.width&&old.height===next.height?old:next);tick(n=>n+1);
     };
     measure();const stop=props.subscribeGeometry(measure),observer=new ResizeObserver(measure);
@@ -126,7 +126,7 @@ export function PassageWindow(props:Props){
     if(g?.moved)latest.current.props.onLayoutCommit?.();
     if(reveal&&g?.moved&&g.kind==='move'){
       const s=latest.current,p=panel.current;
-      const l=s.anchor.x+s.offset.x+canvas.readInset(),r=l+(p?.offsetWidth??360);
+      const l=floatingLeft(container,s.anchor.x+s.offset.x)+canvas.readInset(),r=l+(p?.offsetWidth??360);
       if(r>container.scrollLeft+container.clientWidth-16)container.scrollLeft=r-container.clientWidth+16;
       else if(l<container.scrollLeft+16)container.scrollLeft=Math.max(0,l-16);
     }
@@ -147,7 +147,7 @@ export function PassageWindow(props:Props){
       changeLayout(s.offset,{width:clamp((g.size.width+dx)/uiScale,220,Math.min(520,(container.clientWidth-24)/uiScale)),height:clamp((g.size.height+dy)/uiScale,140,Math.min(520,(container.clientHeight-48)/uiScale))});
       return;
     }
-    changeLayout({x:clamp(g.start.x+dx,-Math.max(520,container.clientWidth),s.bounds.width-(panel.current?.offsetWidth??360))-s.anchor.x,y:clamp(g.start.y+dy,0,s.bounds.height-(panel.current?.offsetHeight??140))-s.anchor.y});
+    changeLayout({x:clamp(g.start.x+dx,12-floatingMargin(container),s.bounds.width-(panel.current?.offsetWidth??360))-s.anchor.x,y:clamp(g.start.y+dy,0,s.bounds.height-(panel.current?.offsetHeight??140))-s.anchor.y});
   };
   const pan=()=>{
     const g=gesture.current;if(!g)return;

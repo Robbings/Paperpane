@@ -1,5 +1,9 @@
 import { useLayoutEffect, useMemo, useRef, useSyncExternalStore } from 'react';
 
+/** Keep a substantial part of the paper visible even at a floating card's outer limit. */
+export const floatingMargin = (container: Pick<HTMLElement, 'clientWidth'>) => Math.max(0, Math.min(320, Math.floor(container.clientWidth / 3)));
+export const floatingLeft = (container: Pick<HTMLElement, 'clientWidth'>, left: number) => Math.max(12 - floatingMargin(container), Number.isFinite(left) ? left : 12);
+
 /** A positive scroll origin for cards placed left of the PDF. Offsets stay relative to the source. */
 export class FloatingCanvas {
   private inset = 0;
@@ -18,7 +22,7 @@ export class FloatingCanvas {
   remove(id: symbol) { this.extents.delete(id); this.apply(); }
   private apply() {
     const min = Math.min(12, ...this.extents.values());
-    const next = Math.ceil(Math.max(0, 12 - min));
+    const next = Math.min(floatingMargin(this.container), Math.ceil(Math.max(0, 12 - min)));
     if (next === this.inset) return;
     const surface = this.surface ?? this.container.querySelector<HTMLElement>('.pdfViewer');
     if (!surface) return;
