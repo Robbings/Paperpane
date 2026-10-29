@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState, type KeyboardEvent, type MouseEvent, type PointerEvent, type ReactNode } from 'react';
+import { useUiScale } from '@/ui/use-ui-scale';
 import { Badge, Icon, ScrollArea, StarToggle } from '@/ui/components';
 import { authorLine, columnDefaults, columnLabels, formatDate } from './columns';
 import { PAPER_DRAG_TYPE } from './dragTypes';
@@ -36,6 +37,7 @@ const ABSTRACT_MAX = 600;
 const clip = (text: string) => (text.length > ABSTRACT_MAX ? `${text.slice(0, ABSTRACT_MAX).trimEnd()}…` : text);
 
 export function LibraryTable(props: LibraryTableProps) {
+  const uiScale = useUiScale();
   const { papers, tagsById, widths, sort, mode, selectedIds, activeId, hasMore, onLoadMore } = props;
   const anchor = useRef<string | null>(activeId);
   const bodyRef = useRef<HTMLTableSectionElement>(null);
@@ -60,10 +62,10 @@ export function LibraryTable(props: LibraryTableProps) {
   useEffect(() => {
     const el = viewport.current;
     if (!el) return;
-    const observer = new ResizeObserver(() => setAvailable(el.clientWidth - GUTTER));
+    const observer = new ResizeObserver(() => setAvailable(el.clientWidth / uiScale - GUTTER));
     observer.observe(el);
     return () => observer.disconnect();
-  }, []);
+  }, [uiScale]);
 
   // Load more when the end is near, and keep loading while the rows do not fill the view.
   const maybeLoadMore = () => {
@@ -133,7 +135,7 @@ export function LibraryTable(props: LibraryTableProps) {
     const startX = event.clientX;
     const startLeft = widthOf(column);
     const startNext = widthOf(next);
-    const titleRoom = (bodyRef.current?.closest('table')?.querySelector<HTMLElement>('th[data-column="title"]')?.offsetWidth ?? 0) - columnDefaults.title.min;
+    const titleRoom = (bodyRef.current?.closest('table')?.querySelector<HTMLElement>('th[data-column="title"]')?.offsetWidth ?? 0) / uiScale - columnDefaults.title.min;
     const growsLeft = column !== 'starred';
     // How far the edge may travel: the next column keeps its minimum on the right;
     // on the left, the column (or the title) keeps its own.
@@ -145,7 +147,7 @@ export function LibraryTable(props: LibraryTableProps) {
     document.body.style.userSelect = 'none';
     setResizing(column);
     const move = (e: globalThis.PointerEvent) => {
-      const delta = Math.round(Math.min(maxRight, Math.max(-maxLeft, e.clientX - startX)));
+      const delta = Math.round(Math.min(maxRight, Math.max(-maxLeft, (e.clientX - startX) / uiScale)));
       props.onWidths(growsLeft ? { [column]: startLeft + delta, [next]: startNext - delta } : { [next]: startNext - delta });
     };
     const end = () => {
@@ -207,9 +209,9 @@ export function LibraryTable(props: LibraryTableProps) {
         style={{ minWidth: needed(shown) }}
       >
         <colgroup>
-          <col style={{ width: CHECK }} />
+          <col style={{ width: `${CHECK / 16}rem` }} />
           {all.map((column) => (
-            <col key={column} style={{ width: column === 'title' ? undefined : widthOf(column) }} />
+            <col key={column} style={{ width: column === 'title' ? undefined : `${widthOf(column) / 16}rem` }} />
           ))}
         </colgroup>
         <thead>

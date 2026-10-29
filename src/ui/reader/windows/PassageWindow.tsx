@@ -1,4 +1,5 @@
 import { useEffect, useLayoutEffect, useRef, useState, type PointerEvent as ReactPointerEvent, type ReactNode } from 'react';
+import { useUiScale } from '@/ui/use-ui-scale';
 import { createPortal } from 'react-dom';
 import { IconButton } from '@/ui/components';
 import '../notes/notes.css';
@@ -29,6 +30,8 @@ const same=(a:Point,b:Point)=>a.x===b.x&&a.y===b.y;
 /** Shared passage window for translation/explanation. Uses comment-note visuals and drag/pan behavior. */
 export function PassageWindow(props:Props){
   const {container}=props;
+  const uiScale=useUiScale();
+  const [dragging,setDragging]=useState(false);
   const [collapsed,setCollapsed]=useState(false),[hovered,setHovered]=useState(false),[focused,setFocused]=useState(false);
   const [anchor,setAnchor]=useState<Point>({x:container.scrollLeft+24,y:container.scrollTop+80});
   const [offset,setOffset]=useState<Point>({x:0,y:0});
@@ -38,7 +41,7 @@ export function PassageWindow(props:Props){
   const panel=useRef<HTMLElement>(null),initialized=useRef(false),frame=useRef(0);
   const gesture=useRef<{kind:'move'|'resize';size:{width:number;height:number};id:number;target:HTMLElement;x:number;y:number;px:number;py:number;scrollX:number;scrollY:number;start:Point;moved:boolean}|null>(null);
   const latest=useRef({props,anchor,offset,bounds,collapsed});latest.current={props,anchor,offset,bounds,collapsed};
-  const width=Math.min(collapsed?260:size.width,Math.max(140,container.clientWidth-24));
+  const width=Math.min((collapsed?260:size.width)*uiScale,Math.max(140,container.clientWidth-24));
   const left=anchor.x+offset.x,top=anchor.y+offset.y;
   const active=hovered||focused;
 
@@ -50,7 +53,7 @@ export function PassageWindow(props:Props){
         setAnchor(old=>same(old,next)?old:next);
         if(!initialized.current){
           initialized.current=true;
-          const w=Math.min(360,container.clientWidth-24);
+          const w=Math.min(360*uiScale,container.clientWidth-24);
           setOffset({x:clamp(next.x,container.scrollLeft+12,container.scrollLeft+container.clientWidth-w-12)-next.x,y:clamp(next.y,container.scrollTop+64,container.scrollTop+container.clientHeight-180)-next.y});
         }
       }
@@ -66,7 +69,7 @@ export function PassageWindow(props:Props){
     const redraw=()=>tick(n=>n+1);
     container.addEventListener('scroll',redraw,{passive:true});window.addEventListener('resize',measure);
     return()=>{stop();observer.disconnect();container.removeEventListener('scroll',redraw);window.removeEventListener('resize',measure);};
-  },[container,props.subscribeGeometry]);
+  },[container,props.subscribeGeometry,uiScale]);
 
   // Read the card after React has applied movement/collapse and streamed content has resized it.
   useLayoutEffect(()=>{if(active)tick(n=>n+1);},[active,anchor,offset,collapsed]);
@@ -76,7 +79,7 @@ export function PassageWindow(props:Props){
   },[]);
 
   const finish=(reveal=false)=>{
-    const g=gesture.current;gesture.current=null;cancelAnimationFrame(frame.current);
+    const g=gesture.current;gesture.current=null;if(g)setDragging(false);cancelAnimationFrame(frame.current);
     if(g?.target.hasPointerCapture(g.id))g.target.releasePointerCapture(g.id);
     if(reveal&&g?.moved&&g.kind==='move'){
       const s=latest.current,p=panel.current;
@@ -98,7 +101,7 @@ export function PassageWindow(props:Props){
     if(Math.abs(dx)+Math.abs(dy)>3)g.moved=true;
     if(!g.moved)return;
     if(g.kind==='resize'){
-      setSize({width:clamp(g.size.width+dx,220,Math.min(520,container.clientWidth-24)),height:clamp(g.size.height+dy,140,Math.min(520,container.clientHeight-48))});
+      setSize({width:clamp((g.size.width+dx)/uiScale,220,Math.min(520,(container.clientWidth-24)/uiScale)),height:clamp((g.size.height+dy)/uiScale,140,Math.min(520,(container.clientHeight-48)/uiScale))});
       return;
     }
     setOffset({x:clamp(g.start.x+dx,0,s.bounds.width-(panel.current?.offsetWidth??360))-s.anchor.x,y:clamp(g.start.y+dy,0,s.bounds.height-(panel.current?.offsetHeight??140))-s.anchor.y});
@@ -116,7 +119,7 @@ export function PassageWindow(props:Props){
       if(event.button!==0||!event.isPrimary||(event.target as Element).closest('button'))return;
       event.preventDefault();event.stopPropagation();finish();event.currentTarget.setPointerCapture(event.pointerId);
       gesture.current={kind,size:{width:panel.current?.offsetWidth??360,height:panel.current?.offsetHeight??140},id:event.pointerId,target:event.currentTarget,x:event.clientX,y:event.clientY,px:event.clientX,py:event.clientY,scrollX:container.scrollLeft,scrollY:container.scrollTop,start:{x:left,y:top},moved:false};
-      if(kind==='move')frame.current=requestAnimationFrame(pan);
+      setDragging(true);if(kind==='move')frame.current=requestAnimationFrame(pan);
   };
   const drag={
     onPointerDown:begin('move'),
@@ -136,15 +139,15 @@ export function PassageWindow(props:Props){
   }
   return <>
     {createPortal(<div className="pp-notes-layer pp-passage-window-layer" data-pp-overlay="">
-      <div aria-hidden="true" style={{position:'absolute',width:bounds.width,height:bounds.height,pointerEvents:'none'}}/>
-      {line&&<svg className="pp-passage-window__connector" aria-hidden="true" width={bounds.width} height={bounds.height}>
+      {dragging&&<div aria-hidden="true" style={{position:'absolute',width:bounds.width,height:bounds.height,pointerEvents:'none'}}/>}
+      {line&&<svg className="pp-passage-window__connector" aria-hidden="true" width={Math.max(container.clientWidth,left+width)} height={Math.max(container.clientHeight,top+(panel.current?.offsetHeight??140))}>
         <g transform={`translate(${container.scrollLeft-box.left-container.clientLeft} ${container.scrollTop-box.top-container.clientTop})`}>
           {rects.map((r,i)=><rect key={i} x={r.left-2} y={r.top-1} width={r.width+4} height={r.height+2} rx={3} className="pp-note-connector__mark"/>)}
           <line {...line} className="pp-note-connector__line"/><circle cx={line.x2} cy={line.y2} r={2.5} className="pp-note-connector__end"/>
         </g>
       </svg>}
       <section ref={panel} className={`pp-glass pp-note pp-passage-window${collapsed?' pp-note--pill':''}`} data-tone="float" data-collapsed={collapsed} aria-label={props.label}
-        style={{left,top,width,height:collapsed?34:size.height,maxHeight:Math.max(140,container.clientHeight-48)}}
+        style={{left,top,width,height:collapsed?34*uiScale:size.height===undefined?undefined:size.height*uiScale,maxHeight:Math.max(140,container.clientHeight-48)}}
         onPointerEnter={()=>setHovered(true)} onPointerLeave={()=>setHovered(false)}
         onFocusCapture={event=>setFocused(event.target.matches(':focus-visible'))}
         onBlurCapture={event=>{if(!event.currentTarget.contains(event.relatedTarget))setFocused(false);}}>

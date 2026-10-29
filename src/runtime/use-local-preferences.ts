@@ -2,10 +2,13 @@ import { useCallback, useEffect, useRef, useState } from 'react';
 import { isTranslationLanguage } from '@/translation/languages';
 import { PreferenceStore } from '@/data/preference-store';
 import { applyAppearance } from '@/ui/theme';
-import { DEFAULT_PREFERENCES, DEFAULT_SELECTION_BAR, FONT_SIZE, type Preferences, type PreferencesState } from '@/ui/settings/types';
+import { DEFAULT_PREFERENCES, DEFAULT_SELECTION_BAR, FONT_SIZE, UI_SCALE, type Preferences, type PreferencesState } from '@/ui/settings/types';
 
 function valid<K extends keyof Preferences>(key: K, value: unknown): value is Preferences[K] {
   switch (key) {
+    case 'pdfTheme': return ['auto','original','dark','black','sepia'].includes(String(value));
+    case 'pdfScroll': return ['vertical','horizontal','page'].includes(String(value));
+    case 'pdfSpread': return ['none','odd','even'].includes(String(value));
     case 'theme':
       return value === 'system' || value === 'light' || value === 'dark';
     case 'locale':
@@ -18,10 +21,10 @@ function valid<K extends keyof Preferences>(key: K, value: unknown): value is Pr
         value === null ||
         (typeof value === 'number' && Number.isInteger(value) && value >= FONT_SIZE.min && value <= FONT_SIZE.max)
       );
+    case 'uiScale':
+      return typeof value === 'number' && Number.isInteger(value) && value >= UI_SCALE.min && value <= UI_SCALE.max;
     case 'uiFontSize':
       return typeof value === 'number' && Number.isInteger(value) && value >= FONT_SIZE.min && value <= FONT_SIZE.max;
-    case 'dimPagesInDark':
-      return typeof value === 'boolean';
     case 'mathDelimiter':
       return value === 'brackets' || value === 'dollars' || value === 'none';
     case 'selectionBar': {

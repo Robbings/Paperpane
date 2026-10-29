@@ -1,3 +1,1057 @@
+diff --git a/build/paperpane-blender/LICENSE-APACHE-2.0.txt b/build/paperpane-blender/LICENSE-APACHE-2.0.txt
+new file mode 100644
+index 0000000000000000000000000000000000000000..f433b1a53f5b830a205fd2df78e2b34974656c7b
+--- /dev/null
++++ b/build/paperpane-blender/LICENSE-APACHE-2.0.txt
+@@ -0,0 +1,177 @@
++
++                                 Apache License
++                           Version 2.0, January 2004
++                        http://www.apache.org/licenses/
++
++   TERMS AND CONDITIONS FOR USE, REPRODUCTION, AND DISTRIBUTION
++
++   1. Definitions.
++
++      "License" shall mean the terms and conditions for use, reproduction,
++      and distribution as defined by Sections 1 through 9 of this document.
++
++      "Licensor" shall mean the copyright owner or entity authorized by
++      the copyright owner that is granting the License.
++
++      "Legal Entity" shall mean the union of the acting entity and all
++      other entities that control, are controlled by, or are under common
++      control with that entity. For the purposes of this definition,
++      "control" means (i) the power, direct or indirect, to cause the
++      direction or management of such entity, whether by contract or
++      otherwise, or (ii) ownership of fifty percent (50%) or more of the
++      outstanding shares, or (iii) beneficial ownership of such entity.
++
++      "You" (or "Your") shall mean an individual or Legal Entity
++      exercising permissions granted by this License.
++
++      "Source" form shall mean the preferred form for making modifications,
++      including but not limited to software source code, documentation
++      source, and configuration files.
++
++      "Object" form shall mean any form resulting from mechanical
++      transformation or translation of a Source form, including but
++      not limited to compiled object code, generated documentation,
++      and conversions to other media types.
++
++      "Work" shall mean the work of authorship, whether in Source or
++      Object form, made available under the License, as indicated by a
++      copyright notice that is included in or attached to the work
++      (an example is provided in the Appendix below).
++
++      "Derivative Works" shall mean any work, whether in Source or Object
++      form, that is based on (or derived from) the Work and for which the
++      editorial revisions, annotations, elaborations, or other modifications
++      represent, as a whole, an original work of authorship. For the purposes
++      of this License, Derivative Works shall not include works that remain
++      separable from, or merely link (or bind by name) to the interfaces of,
++      the Work and Derivative Works thereof.
++
++      "Contribution" shall mean any work of authorship, including
++      the original version of the Work and any modifications or additions
++      to that Work or Derivative Works thereof, that is intentionally
++      submitted to Licensor for inclusion in the Work by the copyright owner
++      or by an individual or Legal Entity authorized to submit on behalf of
++      the copyright owner. For the purposes of this definition, "submitted"
++      means any form of electronic, verbal, or written communication sent
++      to the Licensor or its representatives, including but not limited to
++      communication on electronic mailing lists, source code control systems,
++      and issue tracking systems that are managed by, or on behalf of, the
++      Licensor for the purpose of discussing and improving the Work, but
++      excluding communication that is conspicuously marked or otherwise
++      designated in writing by the copyright owner as "Not a Contribution."
++
++      "Contributor" shall mean Licensor and any individual or Legal Entity
++      on behalf of whom a Contribution has been received by Licensor and
++      subsequently incorporated within the Work.
++
++   2. Grant of Copyright License. Subject to the terms and conditions of
++      this License, each Contributor hereby grants to You a perpetual,
++      worldwide, non-exclusive, no-charge, royalty-free, irrevocable
++      copyright license to reproduce, prepare Derivative Works of,
++      publicly display, publicly perform, sublicense, and distribute the
++      Work and such Derivative Works in Source or Object form.
++
++   3. Grant of Patent License. Subject to the terms and conditions of
++      this License, each Contributor hereby grants to You a perpetual,
++      worldwide, non-exclusive, no-charge, royalty-free, irrevocable
++      (except as stated in this section) patent license to make, have made,
++      use, offer to sell, sell, import, and otherwise transfer the Work,
++      where such license applies only to those patent claims licensable
++      by such Contributor that are necessarily infringed by their
++      Contribution(s) alone or by combination of their Contribution(s)
++      with the Work to which such Contribution(s) was submitted. If You
++      institute patent litigation against any entity (including a
++      cross-claim or counterclaim in a lawsuit) alleging that the Work
++      or a Contribution incorporated within the Work constitutes direct
++      or contributory patent infringement, then any patent licenses
++      granted to You under this License for that Work shall terminate
++      as of the date such litigation is filed.
++
++   4. Redistribution. You may reproduce and distribute copies of the
++      Work or Derivative Works thereof in any medium, with or without
++      modifications, and in Source or Object form, provided that You
++      meet the following conditions:
++
++      (a) You must give any other recipients of the Work or
++          Derivative Works a copy of this License; and
++
++      (b) You must cause any modified files to carry prominent notices
++          stating that You changed the files; and
++
++      (c) You must retain, in the Source form of any Derivative Works
++          that You distribute, all copyright, patent, trademark, and
++          attribution notices from the Source form of the Work,
++          excluding those notices that do not pertain to any part of
++          the Derivative Works; and
++
++      (d) If the Work includes a "NOTICE" text file as part of its
++          distribution, then any Derivative Works that You distribute must
++          include a readable copy of the attribution notices contained
++          within such NOTICE file, excluding those notices that do not
++          pertain to any part of the Derivative Works, in at least one
++          of the following places: within a NOTICE text file distributed
++          as part of the Derivative Works; within the Source form or
++          documentation, if provided along with the Derivative Works; or,
++          within a display generated by the Derivative Works, if and
++          wherever such third-party notices normally appear. The contents
++          of the NOTICE file are for informational purposes only and
++          do not modify the License. You may add Your own attribution
++          notices within Derivative Works that You distribute, alongside
++          or as an addendum to the NOTICE text from the Work, provided
++          that such additional attribution notices cannot be construed
++          as modifying the License.
++
++      You may add Your own copyright statement to Your modifications and
++      may provide additional or different license terms and conditions
++      for use, reproduction, or distribution of Your modifications, or
++      for any such Derivative Works as a whole, provided Your use,
++      reproduction, and distribution of the Work otherwise complies with
++      the conditions stated in this License.
++
++   5. Submission of Contributions. Unless You explicitly state otherwise,
++      any Contribution intentionally submitted for inclusion in the Work
++      by You to the Licensor shall be under the terms and conditions of
++      this License, without any additional terms or conditions.
++      Notwithstanding the above, nothing herein shall supersede or modify
++      the terms of any separate license agreement you may have executed
++      with Licensor regarding such Contributions.
++
++   6. Trademarks. This License does not grant permission to use the trade
++      names, trademarks, service marks, or product names of the Licensor,
++      except as required for reasonable and customary use in describing the
++      origin of the Work and reproducing the content of the NOTICE file.
++
++   7. Disclaimer of Warranty. Unless required by applicable law or
++      agreed to in writing, Licensor provides the Work (and each
++      Contributor provides its Contributions) on an "AS IS" BASIS,
++      WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or
++      implied, including, without limitation, any warranties or conditions
++      of TITLE, NON-INFRINGEMENT, MERCHANTABILITY, or FITNESS FOR A
++      PARTICULAR PURPOSE. You are solely responsible for determining the
++      appropriateness of using or redistributing the Work and assume any
++      risks associated with Your exercise of permissions under this License.
++
++   8. Limitation of Liability. In no event and under no legal theory,
++      whether in tort (including negligence), contract, or otherwise,
++      unless required by applicable law (such as deliberate and grossly
++      negligent acts) or agreed to in writing, shall any Contributor be
++      liable to You for damages, including any direct, indirect, special,
++      incidental, or consequential damages of any character arising as a
++      result of this License or out of the use or inability to use the
++      Work (including but not limited to damages for loss of goodwill,
++      work stoppage, computer failure or malfunction, or any and all
++      other commercial damages or losses), even if such Contributor
++      has been advised of the possibility of such damages.
++
++   9. Accepting Warranty or Additional Liability. While redistributing
++      the Work or Derivative Works thereof, You may choose to offer,
++      and charge a fee for, acceptance of support, warranty, indemnity,
++      or other liability obligations and/or rights consistent with this
++      License. However, in accepting such obligations, You may act only
++      on Your own behalf and on Your sole responsibility, not on behalf
++      of any other Contributor, and only if You agree to indemnify,
++      defend, and hold each Contributor harmless for any liability
++      incurred by, or claims asserted against, such Contributor by reason
++      of your accepting any such warranty or additional liability.
++
++   END OF TERMS AND CONDITIONS
+diff --git a/build/paperpane-blender/LICENSE-DOQ-MIT.txt b/build/paperpane-blender/LICENSE-DOQ-MIT.txt
+new file mode 100644
+index 0000000000000000000000000000000000000000..8c4b5d9d9c39ba6cb48c9d5860be7659497c21aa
+--- /dev/null
++++ b/build/paperpane-blender/LICENSE-DOQ-MIT.txt
+@@ -0,0 +1,21 @@
++MIT License
++
++Copyright (c) 2020-2026 Shiva Prasad
++
++Permission is hereby granted, free of charge, to any person obtaining a copy
++of this software and associated documentation files (the "Software"), to deal
++in the Software without restriction, including without limitation the rights
++to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
++copies of the Software, and to permit persons to whom the Software is
++furnished to do so, subject to the following conditions:
++
++The above copyright notice and this permission notice shall be included in all
++copies or substantial portions of the Software.
++
++THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
++IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
++FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
++AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
++LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
++OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
++SOFTWARE.
+diff --git a/build/paperpane-blender/NOTICE.md b/build/paperpane-blender/NOTICE.md
+new file mode 100644
+index 0000000000000000000000000000000000000000..96cc8bbdb19fd49aad18ca1f83c2a1d79420fdbf
+--- /dev/null
++++ b/build/paperpane-blender/NOTICE.md
+@@ -0,0 +1,7 @@
++# PDF page themes
++
++Blender and Color are vendored from https://github.com/zotero/pdf.js/tree/5f95f712bc629ac11159cb4859ed8091fdffa87b/src/display/blender (fixed revision 5f95f712bc629ac11159cb4859ed8091fdffa87b). The source repository is licensed under Apache-2.0. Color identifies its Doq/Color.js MIT provenance; both license texts are included. MathClamp is from the same revision's src/shared/math_clamp.js, with its Mozilla copyright header preserved.
++
++Paperpane changes: local module import paths only in the vendored files. The adapter registers themes per viewer/page canvas using WeakMaps instead of Zotero's window.theme. PDF.js lifecycle, transparency-group and pattern hooks are adapted from that revision's src/display/canvas.js to pdfjs-dist 6.4.299. The original source coloring algorithms are not rewritten.
++
++Original PDF bytes, exports, annotation colors and unregistered canvases are not modified by this adapter. Theme selection affects display rendering only.
+diff --git a/build/paperpane-blender/blender.mjs b/build/paperpane-blender/blender.mjs
+new file mode 100644
+index 0000000000000000000000000000000000000000..f3c395fbb158360a8ea157b73a57b0846619f1e1
+--- /dev/null
++++ b/build/paperpane-blender/blender.mjs
+@@ -0,0 +1,501 @@
++import Color from "./color.mjs";
++
++class Blender {
++  constructor(ctx, theme) {
++    this.ctx = ctx;
++    this.styleCache = new Map();
++
++    this.background = new Color(theme.background);
++    this.foreground = new Color(theme.foreground);
++    this.gradient = this.background.range(this.foreground);
++    this.dark = this.background.lightness < this.foreground.lightness;
++    this.forceInversion = !!theme.invertImages;
++
++    this.fullPageImageDetected = false;
++
++    // Backup original methods
++    this.origFill = this.ctx.fill.bind(this.ctx);
++    this.origFillRect = this.ctx.fillRect.bind(this.ctx);
++    this.origStroke = this.ctx.stroke.bind(this.ctx);
++    this.origStrokeRect = this.ctx.strokeRect.bind(this.ctx);
++    this.origFillText = this.ctx.fillText.bind(this.ctx);
++    this.origDrawImage = this.ctx.drawImage.bind(this.ctx);
++
++    // Intercept style properties
++    this.origFillStyle = this.interceptStyleProperty("fillStyle");
++    this.origStrokeSyle = this.interceptStyleProperty("strokeStyle");
++
++    // Wrap drawing APIs
++    this.ctx.fill = (...args) => { this.origFill(...args); this.deleteCachedImage(); };
++    this.ctx.fillRect = (...args) => { this.origFillRect(...args); this.deleteCachedImage(); };
++    this.ctx.stroke = (...args) => { this.origStroke(...args); this.deleteCachedImage(); };
++    this.ctx.strokeRect = (...args) => { this.origStrokeRect(...args); this.deleteCachedImage(); };
++
++    this.ctx.fillText = (...args) => {
++      if (typeof this.ctx.fillStyle !== "string") {
++        return this.origFillText(...args);
++      }
++      this.ctx.save();
++      this.updateTextStyle(args);
++      let retVal = this.origFillText(...args);
++      this.ctx.restore();
++      return retVal;
++    };
++
++    this.ctx.drawImage = (...args) => this.customDrawImage(args);
++  }
++
++  interceptStyleProperty(prop) {
++    const proto = Object.getPrototypeOf(this.ctx);
++    const descriptor = Object.getOwnPropertyDescriptor(proto, prop);
++
++    const { get: originalGet, set: originalSet } = descriptor;
++    Object.defineProperty(this.ctx, prop, {
++      get: () => originalGet.call(this.ctx),
++      set: v => {
++        originalSet.call(this.ctx, v);
++        const currentVal = originalGet.call(this.ctx);
++        originalSet.call(this.ctx, this.getCanvasStyle(currentVal));
++      },
++      configurable: true,
++      enumerable: true,
++    });
++
++    return (val) => {
++      originalSet.call(this.ctx, val);
++    };
++  }
++
++  /**
++   * Sets up fillStyle/strokeStyle interceptors on an external (group) context
++   * so that calcStyle transforms text/shape colors within transparency groups.
++   */
++  interceptGroupStyles(ctx) {
++    const proto = Object.getPrototypeOf(ctx);
++    for (const prop of ["fillStyle", "strokeStyle"]) {
++      const descriptor = Object.getOwnPropertyDescriptor(proto, prop);
++      const { get: originalGet, set: originalSet } = descriptor;
++      Object.defineProperty(ctx, prop, {
++        get: () => originalGet.call(ctx),
++        set: v => {
++          originalSet.call(ctx, v);
++          const currentVal = originalGet.call(ctx);
++          const newVal = this.getCanvasStyle(currentVal);
++          if (newVal !== undefined) {
++            originalSet.call(ctx, newVal);
++          }
++        },
++        configurable: true,
++        enumerable: true,
++      });
++    }
++  }
++
++  /**
++   * Restores original fillStyle/strokeStyle on a group context.
++   */
++  cleanupGroupStyles(ctx) {
++    const proto = Object.getPrototypeOf(ctx);
++    for (const prop of ["fillStyle", "strokeStyle"]) {
++      const descriptor = Object.getOwnPropertyDescriptor(proto, prop);
++      Object.defineProperty(ctx, prop, {
++        get: descriptor.get ? descriptor.get.bind(ctx) : undefined,
++        set: descriptor.set ? descriptor.set.bind(ctx) : undefined,
++        configurable: true,
++        enumerable: true,
++      });
++    }
++  }
++
++  /**
++   * Removes all our property definitions and method wraps on this.ctx.
++   */
++  unwrap() {
++    const proto = Object.getPrototypeOf(this.ctx);
++    // Restore fillStyle and strokeStyle
++    ["fillStyle", "strokeStyle"].forEach(prop => {
++      const descriptor = Object.getOwnPropertyDescriptor(proto, prop);
++      Object.defineProperty(this.ctx, prop, {
++        get: descriptor.get ? descriptor.get.bind(this.ctx) : undefined,
++        set: descriptor.set ? descriptor.set.bind(this.ctx) : undefined,
++        configurable: true,
++        enumerable: true,
++      });
++    });
++    // Restore original methods
++    this.ctx.fill = proto.fill;
++    this.ctx.fillRect = proto.fillRect;
++    this.ctx.stroke = proto.stroke;
++    this.ctx.strokeRect = proto.strokeRect;
++    this.ctx.fillText = proto.fillText;
++    this.ctx.drawImage = proto.drawImage;
++  }
++
++  deleteCachedImage() {
++    delete this.cachedImage;
++  }
++
++  updateTextStyle(args) {
++    const style = this.ctx.fillStyle;
++    if (!this.hasBackgrounds) {
++      return;
++    }
++    // text, x, y
++    const bg = this.getCanvasColor(args[0], args[1], args[2]);
++    const newStyle = this.getCanvasStyle(style, bg);
++    if (newStyle !== style) {
++      this.origFillStyle(newStyle);
++    }
++  }
++
++  getCanvasStyle(style, bg) {
++    if (typeof style !== "string") {
++      return;
++    }
++    style = new Color(style);
++    const key = style.hex + (bg?.hex || "");
++    let newStyle = this.styleCache.get(key);
++    if (!newStyle) {
++      newStyle = bg ? this.getTextStyle(style, bg) : this.calcStyle(style);
++      this.styleCache.set(key, newStyle);
++    }
++    return newStyle.toHex(style.alpha);
++  }
++
++  calcStyle(color) {
++    if (color.chroma > 10) {
++      if (this.dark) {
++        const [, a, b] = color.lab;
++        const scale = Math.max(1.2, 20 / color.chroma);
++        // Keep the established brightness, but respect dim foregrounds.
++        return new Color(
++          [Math.min(80, this.foreground.lightness), a * scale, b * scale],
++          "lab"
++        );
++      }
++      return color;
++    }
++    const whiteL = Color.white.lightness;
++    return this.gradient(1 - color.lightness / whiteL);
++  }
++
++  getTextStyle(color, textBg, minContrast = 30) {
++    const diffL = clr => Math.abs(clr.lightness - textBg.lightness);
++
++    if (this.background.deltaE(textBg) > 2.3 && diffL(color) < minContrast) {
++      return [color, this.background, this.foreground].reduce((best, clr) =>
++        diffL(clr) > diffL(best) ? clr : best
++      );
++    }
++    return color;
++  }
++
++  distinctColors(imageData, cutoffThreshold) {
++    const { data } = imageData;
++    const colorSet = new Set();
++    for (let i = 0; i < data.length; i += 4) {
++      const r = data[i];
++      const g = data[i + 1];
++      const b = data[i + 2];
++      const colorKey = (((r & 0xff) << 24) | ((g & 0xff) << 16) | ((b & 0xff) << 8) | 0xff) >>> 0;
++      colorSet.add(colorKey);
++      if (cutoffThreshold && colorSet.size >= cutoffThreshold) {
++        return colorSet.size;
++      }
++    }
++    return colorSet.size;
++  }
++
++  neutralRatio(imageData, deviation = 12, step = 16) {
++    const { data } = imageData;
++    let neutral = 0;
++    let total = 0;
++
++    for (let i = 0; i < data.length; i += 4 * step) {
++      const alpha = data[i + 3];
++      if (alpha < 32) {
++        continue;
++      }
++      total++;
++      if (this.isColorNeutral(data[i], data[i + 1], data[i + 2], deviation)) {
++        neutral++;
++      }
++    }
++
++    return total ? neutral / total : 0;
++  }
++
++  averageLightness(imageData) {
++    const { data } = imageData;
++    let luminanceSum = 0;
++
++    for (let i = 0; i < data.length; i += 4) {
++      let r = data[i];
++      let g = data[i + 1];
++      let b = data[i + 2];
++      const a = data[i + 3];
++
++      // We assume that the background under the transparent image is white.
++      // But that's not necessarily right
++      if (a < 64) {
++        r = 255;
++        g = 255;
++        b = 255;
++      }
++
++      // Integer-math version of 0.2126*r + 0.7152*g + 0.0722*b
++      // (scaled by 10 000 to keep precision, then shifted back down)
++      luminanceSum += (2126 * r + 7152 * g + 722 * b) >>> 0;
++    }
++
++    const pixelCount = data.length >> 2;// divide by 4
++    const avg = luminanceSum / pixelCount; // still scaled ×10 000
++    return Math.round(avg / 10_000); // scale back to 0 … 255
++  }
++
++  customDrawImage(args) {
++    this.hasBackgrounds = true;
++    delete this.cachedImage;
++
++    const img = args[0];
++    if (!img) {
++      return this.origDrawImage(...args);
++    }
++
++    const [bgR, bgG, bgB] = this.background.rgb.map(e => e * 255);
++    const [fgR, fgG, fgB] = this.foreground.rgb.map(e => e * 255);
++
++    let sx, sy, sWidth, sHeight, dx, dy, dWidth, dHeight;
++    if (args.length === 3) {
++      [dx, dy] = [args[1], args[2]];
++      sWidth = img.naturalWidth || img.width;
++      sHeight = img.naturalHeight || img.height;
++      [sx, sy, dWidth, dHeight] = [0, 0, sWidth, sHeight];
++    } else if (args.length === 5) {
++      [dx, dy, dWidth, dHeight] = [args[1], args[2], args[3], args[4]];
++      sWidth = img.naturalWidth || img.width;
++      sHeight = img.naturalHeight || img.height;
++      [sx, sy] = [0, 0];
++    } else if (args.length === 9) {
++      [sx, sy, sWidth, sHeight, dx, dy, dWidth, dHeight] = args.slice(1);
++    } else {
++      return this.origDrawImage(...args);
++    }
++
++    const pageWidth = this.pageWidth || this.ctx.canvas.width;
++    const pageHeight = this.pageHeight || this.ctx.canvas.height;
++
++    const { a, b, c, d } = this.ctx.getTransform();
++    const imageWidth = Math.abs(a * dWidth) + Math.abs(c * dHeight);
++    const imageHeight = Math.abs(b * dWidth) + Math.abs(d * dHeight);
++    const pageArea = pageWidth * pageHeight;
++    const entirePage =
++      Math.abs(pageArea - imageWidth * imageHeight) < pageArea * 0.25;
++
++    const offCanvas = document.createElement("canvas");
++    offCanvas.width = sWidth;
++    offCanvas.height = sHeight;
++    const offCtx = offCanvas.getContext("2d");
++    offCtx.drawImage(img, sx, sy, sWidth, sHeight, 0, 0, sWidth, sHeight);
++    const imageData = offCtx.getImageData(0, 0, sWidth, sHeight);
++
++    let type = "overlay";
++
++    if (this.forceInversion) {
++      type = "invert";
++    } else {
++      if (entirePage) {
++        const lightness = this.averageLightness(imageData);
++        if (!this.fullPageImageDetected) {
++          this.fullPageImageDetected = true;
++          if (this.dark && lightness >= 150) {
++            type = "invert";
++            this.forceInversion = true;
++          }
++        }
++        if (!this.dark && lightness >= 150 && this.neutralRatio(imageData) >= 0.9) {
++          type = "gradient";
++        }
++      }
++      // This is mainly necessary for IEEE TRANSACTIONS papers because they
++      // use formulas as images instead of glyphs or vector graphics
++      else {
++        const distinctColors = this.distinctColors(imageData, 3);
++        if (distinctColors <= 2) {
++          type = "replace";
++        }
++      }
++    }
++
++    const data = imageData.data;
++
++    if (type === "gradient") {
++      const colorDeviation = 12;
++      const lumaR = 0.299;
++      const lumaG = 0.587;
++      const lumaB = 0.114;
++
++      for (let i = 0; i < data.length; i += 4) {
++        const alpha = data[i + 3];
++        if (!alpha) {
++          continue;
++        }
++        const r = data[i];
++        const g = data[i + 1];
++        const b = data[i + 2];
++        if (!this.isColorNeutral(r, g, b, colorDeviation)) {
++          continue;
++        }
++
++        const brightness = (r * lumaR + g * lumaG + b * lumaB) / 255;
++        data[i] = Math.round(bgR + (fgR - bgR) * (1 - brightness));
++        data[i + 1] = Math.round(bgG + (fgG - bgG) * (1 - brightness));
++        data[i + 2] = Math.round(bgB + (fgB - bgB) * (1 - brightness));
++      }
++
++      offCtx.putImageData(imageData, 0, 0);
++      if (args.length === 3) {
++        this.origDrawImage(offCanvas, dx, dy);
++      } else if (args.length === 5) {
++        this.origDrawImage(offCanvas, dx, dy, dWidth, dHeight);
++      } else {
++        this.origDrawImage(offCanvas, 0, 0, sWidth, sHeight, dx, dy, dWidth, dHeight);
++      }
++    } else if (type === "replace") {
++      const whiteThreshold = 200;
++      const blackThreshold = 50;
++      const colorDeviation = 1;
++
++      for (let i = 0; i < data.length; i += 4) {
++        const r = data[i];
++        const g = data[i + 1];
++        const b = data[i + 2];
++        const avg = (r + g + b) / 3;
++        const isNeutral = this.isColorNeutral(r, g, b, colorDeviation);
++        if (isNeutral && avg > whiteThreshold) {
++          data[i] = bgR;
++          data[i + 1] = bgG;
++          data[i + 2] = bgB;
++        } else if (isNeutral && avg < blackThreshold) {
++          data[i] = fgR;
++          data[i + 1] = fgG;
++          data[i + 2] = fgB;
++        }
++      }
++      offCtx.putImageData(imageData, 0, 0);
++      // draw the processed offCanvas
++      if (args.length === 3) {
++        this.origDrawImage(offCanvas, dx, dy);
++      } else if (args.length === 5) {
++        this.origDrawImage(offCanvas, dx, dy, dWidth, dHeight);
++      } else {
++        this.origDrawImage(offCanvas, 0, 0, sWidth, sHeight, dx, dy, dWidth, dHeight);
++      }
++    } else if (type === "invert") {
++      // perceptual weights for relative luminance
++      const LUMA_R = 0.299;
++      const LUMA_G = 0.587;
++      const LUMA_B = 0.114;
++
++      for (let i = 0; i < data.length; i += 4) {
++        // 1. invert the source pixel
++        const invR = 255 - data[i];
++        const invG = 255 - data[i + 1];
++        const invB = 255 - data[i + 2];
++
++        // 2. calculate brightness in [0 … 1]
++        const brightness =
++          (invR * LUMA_R + invG * LUMA_G + invB * LUMA_B) / 255;
++
++        // 3. shift towards theme fg / bg depending on brightness:
++        // brightness = 0   → use background color
++        // brightness = 0.5 → keep pure inverted color
++        // brightness = 1   → use foreground color
++        const factor = (brightness - 0.5) * 2; // range [-1 … 1]
++
++        let outR = invR;
++        let outG = invG;
++        let outB = invB;
++
++        if (factor > 0) {
++          // pull towards foreground
++          outR = invR + factor * (fgR - invR);
++          outG = invG + factor * (fgG - invG);
++          outB = invB + factor * (fgB - invB);
++        } else if (factor < 0) {
++          // pull towards background
++          const t = -factor; // positive weight
++          outR = invR + t * (bgR - invR);
++          outG = invG + t * (bgG - invG);
++          outB = invB + t * (bgB - invB);
++        }
++
++        // 4. write back (rounded & clamped just in case)
++        data[i] = Math.min(255, Math.max(0, Math.round(outR)));
++        data[i + 1] = Math.min(255, Math.max(0, Math.round(outG)));
++        data[i + 2] = Math.min(255, Math.max(0, Math.round(outB)));
++      }
++
++      // push the processed pixels to the off-screen canvas …
++      offCtx.putImageData(imageData, 0, 0);
++
++      // … and draw it back using the same geometry logic as before
++      if (args.length === 3) {
++        this.origDrawImage(offCanvas, dx, dy);
++      } else if (args.length === 5) {
++        this.origDrawImage(offCanvas, dx, dy, dWidth, dHeight);
++      } else {
++        this.origDrawImage(offCanvas, 0, 0, sWidth, sHeight, dx, dy, dWidth, dHeight);
++      }
++    } else if (type === "overlay") {
++      // Full-page scans must remain opaque, otherwise OCR/underlying content
++      // can bleed through in themed modes. Keep partial opacity only for
++      // smaller overlays where the theme should still influence the page.
++      this.ctx.globalCompositeOperation = "source-over";
++      this.ctx.globalAlpha = entirePage ? 1 : 0.8;
++      this.origDrawImage(...args);
++    }
++  }
++
++  isColorNeutral(r, g, b, dev) {
++    const r_g = Math.abs(r - g);
++    const r_b = Math.abs(r - b);
++    const g_b = Math.abs(g - b);
++    return r_g < dev && r_b < dev && g_b < dev;
++  }
++
++  getCanvasColor(text, tx, ty) {
++    if (!this.cachedImage) {
++      const canvasWidth = this.ctx.canvas.width;
++      const canvasHeight = this.ctx.canvas.height;
++      this.cachedImage = this.ctx.getImageData(0, 0, canvasWidth, canvasHeight);
++    }
++
++    const mtr = this.ctx.measureText(text);
++    const dx = mtr.width / 2;
++    const dy = (mtr.actualBoundingBoxAscent - mtr.actualBoundingBoxDescent) / 2;
++
++    const tfm = this.ctx.getTransform();
++    let { x, y } = tfm.transformPoint({ x: tx + dx, y: ty - dy });
++    x = Math.round(x);
++    y = Math.round(y);
++
++    const canvasWidth = this.ctx.canvas.width;
++    const canvasHeight = this.ctx.canvas.height;
++    if (x < 0 || y < 0 || x >= canvasWidth || y >= canvasHeight) {
++      console.warn("Coordinates out of bounds for canvas size.");
++      return new Color([0, 0, 0]);
++    }
++
++    const index = (y * canvasWidth + x) * 4;
++    const data = this.cachedImage.data;
++    const rgb = [
++      data[index] / 255,
++      data[index + 1] / 255,
++      data[index + 2] / 255,
++    ];
++    return new Color(rgb);
++  }
++}
++
++export { Blender };
+diff --git a/build/paperpane-blender/color.mjs b/build/paperpane-blender/color.mjs
+new file mode 100644
+index 0000000000000000000000000000000000000000..9b2b31b5739ea8c4727329f702e5f57371e466f0
+--- /dev/null
++++ b/build/paperpane-blender/color.mjs
+@@ -0,0 +1,289 @@
++/**
++ * Taken from https://github.com/shivaprsd/doq MIT License
++ *
++ * Interface for storing and processing sRGB colors in CIELAB
++ * Adapted from => https://github.com/LeaVerou/color.js
++ */
++import { MathClamp } from "./math-clamp.mjs";
++
++export default class Color {
++  constructor(...args) {
++    if (Array.isArray(args[0])) {
++      const [coords, space] = args;
++
++      if (space === "lab") {
++        this._lab = coords;
++      } else {
++        this._rgb = coords;
++      }
++    } else if (typeof args[0] === "string") {
++      const str = args[0];
++
++      if (str[0] === "#" && str.length === 7) {
++        this._hex = str;
++        this._rgb = Color.parseHex(str);
++      } else if (str.startsWith("rgb(")) {
++        this._rgb = Color.parseRGB(str);
++      } else if (str.startsWith("rgba(")) {
++        [this._rgb, this._alpha] = Color.parseRGBA(str);
++      } else {
++        throw new Error(`Unsupported color format: "${str}"`);
++      }
++    } else {
++      this._rgb = [0, 0, 0];
++    }
++  }
++
++  get hex() {
++    this._hex = this._hex || this.toHex();
++    return this._hex;
++  }
++
++  get rgb() {
++    this._rgb = this._rgb || sRGB.fromLab(this._lab);
++    return this._rgb;
++  }
++
++  get lab() {
++    this._lab = this._lab || sRGB.toLab(this._rgb);
++    return this._lab;
++  }
++
++  get lightness() {
++    return this.lab[0];
++  }
++
++  get chroma() {
++    const [L, a, b] = this.lab;
++    return Math.sqrt(a ** 2 + b ** 2);
++  }
++
++  get alpha() {
++    return this._alpha ?? 1;
++  }
++
++  get luminance() {
++    if (this._luminance !== undefined) {
++      return this._luminance;
++    }
++    const [r, g, b] = this.rgb.map(component => {
++      const c = MathClamp(component, 0, 1);
++      return c <= 0.04045 ? c / 12.92 : ((c + 0.055) / 1.055) ** 2.4;
++    });
++    return (this._luminance = 0.2126 * r + 0.7152 * g + 0.0722 * b);
++  }
++
++  contrast(color) {
++    const a = this.luminance + 0.05;
++    const b = color.luminance + 0.05;
++    return Math.max(a, b) / Math.min(a, b);
++  }
++
++  deltaE(color) {
++    return Math.sqrt(this.lab.reduce((a, c, i) => {
++      if (isNaN(c) || isNaN(color.lab[i])) {
++        return a;
++      }
++      return a + (color.lab[i] - c) ** 2;
++    }, 0));
++  }
++
++  range(color) {
++    function interpolate(start, end, p) {
++      if (isNaN(start)) {
++        return end;
++      }
++      if (isNaN(end)) {
++        return start;
++      }
++      return start + (end - start) * p;
++    }
++    return p => {
++      const coords = this.lab.map((start, i) => {
++        const end = color.lab[i];
++        return interpolate(start, end, p);
++      });
++      return new Color(coords, "lab");
++    };
++  }
++
++  toHex(alpha = 1) {
++    let hex = this.rgb.map(Color.compToHex).join("");
++    if (alpha !== 1) {
++      hex += Color.compToHex(alpha);
++    }
++    return "#" + hex;
++  }
++
++  static parseHex(str) {
++    let rgba = [];
++    str.replace(/[a-f0-9]{2}/gi, component => {
++      rgba.push(parseInt(component, 16) / 255);
++    });
++    return rgba.slice(0, 3);
++  }
++
++  static parseRGB(str) {
++    return Color.parseRGBA(str.replace("rgb", "rgba"))[0];
++  }
++
++  static parseRGBA(str) {
++    const rgba = str.slice(5, -1).split(",");
++    return [
++      rgba.slice(0, 3).map(c => parseInt(c) / 255),   /* [r, g, b] */
++      parseFloat(rgba.pop())                          /* alpha */
++    ];
++  }
++
++  static compToHex(c) {
++    c = Math.round(Math.min(Math.max(c * 255, 0), 255));
++    return c.toString(16).padStart(2, "0");
++  }
++}
++Color.white = new Color([1, 1, 1]);
++
++/**
++ * Matrices and functions for sRGB <--> CIELAB conversion
++ * https://drafts.csswg.org/css-color-4/conversions.js
++ */
++const Matrices = {
++  lin_sRGB_to_XYZ: [
++    [ 0.41239079926595934, 0.357584339383878,   0.1804807884018343  ],
++    [ 0.21263900587151027, 0.715168678767756,   0.07219231536073371 ],
++    [ 0.01933081871559182, 0.11919477979462598, 0.9505321522496607  ]
++  ],
++  XYZ_to_lin_sRGB: [        /* inverse of above */
++    [  3.2409699419045226,  -1.537383177570094,   -0.4986107602930034  ],
++    [ -0.9692436362808796,   1.8759675015077202,   0.04155505740717559 ],
++    [  0.05563007969699366, -0.20397695888897652,  1.0569715142428786  ]
++  ],
++  /* Bradford CAT */
++  D65_to_D50: [
++    [  1.0479298208405488,    0.022946793341019088,  -0.05019222954313557 ],
++    [  0.029627815688159344,  0.990434484573249,     -0.01707382502938514 ],
++    [ -0.009243058152591178,  0.015055144896577895,   0.7518742899580008  ]
++  ],
++  D50_to_D65: [             /* inverse of above */
++    [  0.9554734527042182,   -0.023098536874261423,  0.0632593086610217   ],
++    [ -0.028369706963208136,  1.0099954580058226,    0.021041398966943008 ],
++    [  0.012314001688319899, -0.020507696433477912,  1.3303659366080753   ]
++  ],
++
++  /**
++   * Simple matrix (and vector) multiplication
++   * https://drafts.csswg.org/css-color-4/multiply-matrices.js
++   * @author Lea Verou 2020 MIT License
++   */
++  multiply(A, B) {
++    const m = A.length;
++    /* if A is vector, convert to [[a, b, c, ...]] */
++    if (!Array.isArray(A[0])) {
++      A = [A];
++    }
++    /* if B is vector, convert to [[a], [b], [c], ...]] */
++    if (!Array.isArray(B[0])) {
++      B = B.map(x => [x]);
++    }
++    const p = B[0].length;
++    const B_cols = B[0].map((_, i) => B.map(x => x[i]));  /* transpose B */
++
++    let product = A.map(row => B_cols.map(col => {
++      if (!Array.isArray(row)) {
++        return col.reduce((a, c) => a + c * row, 0);
++      }
++      return row.reduce((a, c, i) => a + c * (col[i] || 0), 0);
++    }));
++    if (m === 1) {
++      product = product[0];   /* Avoid [[a, b, c, ...]] */
++    }
++    if (p === 1) {
++      return product.map(x => x[0]);  /* Avoid [[a], [b], [c], ...]] */
++    }
++    return product;
++  }
++}
++
++/* Gamma-corrected sRGB to CIE Lab and back */
++const sRGB = {
++  toXYZ_M: Matrices.multiply(Matrices.D65_to_D50, Matrices.lin_sRGB_to_XYZ),
++  fromXYZ_M: Matrices.multiply(Matrices.XYZ_to_lin_sRGB, Matrices.D50_to_D65),
++  whites: {
++    /* ASTM E308-01: [0.96422, 1.00000, 0.82521] */
++    D50: [0.3457 / 0.3585, 1.00000, (1.0 - 0.3457 - 0.3585) / 0.3585]
++  },
++  CIE_fracs: {
++    ε: 216/24389,  /* 6^3/29^3 */
++    ε3: 24/116,    /*  6 / 29  */
++    κ: 24389/27    /* 29^3/3^3 */
++  },
++
++  toLab(RGB) {
++    return this.XYZtoLab(this.toXYZ(this.toLinear(RGB)));
++  },
++
++  toLinear(RGB) {  /* sRGB values [0 - 1] */
++    return RGB.map(function (val) {
++      const sign = val < 0? -1 : 1;
++      const abs = Math.abs(val);
++      if (abs < 0.04045) {
++        return val / 12.92;
++      }
++      return sign * (Math.pow((abs + 0.055) / 1.055, 2.4));
++    });
++  },
++
++  toXYZ(linRGB) {
++    return Matrices.multiply(this.toXYZ_M, linRGB);
++  },
++
++  XYZtoLab(XYZ) {
++    const white = this.whites.D50;
++    const {κ, ε} = this.CIE_fracs;
++    const xyz = XYZ.map((value, i) => value / white[i]);
++
++    const f = xyz.map(value => {
++      return value > ε ? Math.cbrt(value) : (κ * value + 16)/116;
++    });
++    return [
++      (116 * f[1]) - 16,   /* L */
++      500 * (f[0] - f[1]), /* a */
++      200 * (f[1] - f[2])  /* b */
++    ];
++  },
++
++  fromLab(Lab) {
++    return this.toGamma(this.fromXYZ(this.LabToXYZ(Lab)));
++  },
++
++  LabToXYZ(Lab) {
++    const white = this.whites.D50;
++    const {κ, ε3} = this.CIE_fracs;
++    let f = [];
++
++    f[1] = (Lab[0] + 16)/116;
++    f[0] = Lab[1]/500 + f[1];
++    f[2] = f[1] - Lab[2]/200;
++    /* κ * ε  = 2^3 = 8 */
++    const xyz = [
++      f[0]   > ε3  ?  Math.pow(f[0],3)            : (116*f[0]-16)/κ,
++      Lab[0] > 8   ?  Math.pow((Lab[0]+16)/116,3) : Lab[0]/κ,
++      f[2]   > ε3  ?  Math.pow(f[2],3)            : (116*f[2]-16)/κ
++    ];
++    return xyz.map((value, i) => value * white[i]);
++  },
++
++  fromXYZ(XYZ) {
++    return Matrices.multiply(this.fromXYZ_M, XYZ);
++  },
++
++  toGamma(RGB) {   /* linear-light sRGB values [0 - 1] */
++    return RGB.map(function (val) {
++      const sign = val < 0? -1 : 1;
++      const abs = Math.abs(val);
++      if (abs > 0.0031308) {
++        return sign * (1.055 * Math.pow(abs, 1/2.4) - 0.055);
++      }
++      return 12.92 * val;
++    });
++  }
++}
+diff --git a/build/paperpane-blender/math-clamp.mjs b/build/paperpane-blender/math-clamp.mjs
+new file mode 100644
+index 0000000000000000000000000000000000000000..20b8071a8a46b13c3721b6aa1d86a32c2c4801a8
+--- /dev/null
++++ b/build/paperpane-blender/math-clamp.mjs
+@@ -0,0 +1,23 @@
++/* Copyright 2026 Mozilla Foundation
++ *
++ * Licensed under the Apache License, Version 2.0 (the "License");
++ * you may not use this file except in compliance with the License.
++ * You may obtain a copy of the License at
++ *
++ *     http://www.apache.org/licenses/LICENSE-2.0
++ *
++ * Unless required by applicable law or agreed to in writing, software
++ * distributed under the License is distributed on an "AS IS" BASIS,
++ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
++ * See the License for the specific language governing permissions and
++ * limitations under the License.
++ */
++
++// TODO: Replace all occurrences of this function, and remove the file, once
++//       https://github.com/tc39/proposal-math-clamp/ is generally available.
++function MathClamp(v, min, max) {
++  // eslint-disable-next-line prefer-math-clamp/prefer-math-clamp
++  return Math.min(Math.max(v, min), max);
++}
++
++export { MathClamp };
 diff --git a/build/paperpane-highlight-geometry.mjs b/build/paperpane-highlight-geometry.mjs
 new file mode 100644
 index 0000000000000000000000000000000000000000..448f9d4065e7660c4b7251326297946e08560025
@@ -41,16 +1095,112 @@ index 0000000000000000000000000000000000000000..448f9d4065e7660c4b7251326297946e
 +  }
 +  return output;
 +}
+diff --git a/build/paperpane-theme.mjs b/build/paperpane-theme.mjs
+new file mode 100644
+index 0000000000000000000000000000000000000000..6072f75f4fa3d5700dbe43985a93cac5b276abc2
+--- /dev/null
++++ b/build/paperpane-theme.mjs
+@@ -0,0 +1,13 @@
++// Viewer-scoped bridge; avoids global Canvas prototypes and window.theme.
++const viewers = new WeakMap();
++const canvases = new WeakMap();
++export function setPaperpaneViewerTheme(viewer, theme) {
++  if (theme) viewers.set(viewer, Object.freeze({ ...theme }));
++  else viewers.delete(viewer);
++}
++export function registerPaperpaneCanvas(canvas, viewer) {
++  const theme = viewer && viewers.get(viewer);
++  if (theme) canvases.set(canvas, theme);
++  else canvases.delete(canvas);
++}
++export function getPaperpaneCanvasTheme(canvas) { return canvases.get(canvas); }
 diff --git a/build/pdf.mjs b/build/pdf.mjs
-index 3a5c6048d31f4b7246c654d7ac060ae9c4f0325d..ec826697f86653bf6df34dcfd86b5b1ca9dba967 100644
+index 3a5c6048d31f4b7246c654d7ac060ae9c4f0325d..51809ef7ea7e97539ccaba91d542285549c5fbea 100644
 --- a/build/pdf.mjs
 +++ b/build/pdf.mjs
-@@ -1,3 +1,4 @@
+@@ -1,3 +1,6 @@
++import { Blender } from "./paperpane-blender/blender.mjs";
++import { getPaperpaneCanvasTheme } from "./paperpane-theme.mjs";
 +import { mergeHighlightRects } from "./paperpane-highlight-geometry.mjs";
  /**
   * @licstart The following is the entire license notice for the
   * JavaScript code in this page
-@@ -23397,8 +23398,12 @@ class HighlightOutline extends Outline {
+@@ -10907,6 +10910,7 @@ class CanvasGraphics {
+     this.outputScaleX = 1;
+     this.outputScaleY = 1;
+     this.pageColors = pageColors;
++    this.paperpaneTheme = getPaperpaneCanvasTheme(canvasCtx.canvas);
+     this._cachedScaleForStroking = [-1, 0];
+     this._cachedBitmapsMap = new Map();
+     this.dependencyTracker = dependencyTracker ?? null;
+@@ -10925,13 +10929,18 @@ class CanvasGraphics {
+     transparency = false,
+     background = null
+   }) {
++    if (this.paperpaneTheme) {
++      this.blender = new Blender(this.ctx, this.paperpaneTheme);
++      this.blender.pageWidth = viewport.width * Math.abs(transform ? transform[0] : 1);
++      this.blender.pageHeight = viewport.height * Math.abs(transform ? transform[3] : 1);
++    }
+     const width = this.ctx.canvas.width;
+     const height = this.ctx.canvas.height;
+     const savedFillStyle = this.ctx.fillStyle;
+     this.ctx.fillStyle = background || "#ffffff";
+     this.ctx.fillRect(0, 0, width, height);
+     this.ctx.fillStyle = savedFillStyle;
+-    if (transparency) {
++    if (transparency && !this.blender) {
+       const transparentCanvas = this.transparentCanvasEntry = this.canvasFactory.create(width, height);
+       this.compositeCtx = this.ctx;
+       ({
+@@ -11061,6 +11070,10 @@ class CanvasGraphics {
+     }
+     this._cachedBitmapsMap.clear();
+     this.#drawFilter();
++    if (this.blender) {
++      this.blender.unwrap();
++      this.blender = null;
++    }
+   }
+   #drawFilter() {
+     if (this.pageColors) {
+@@ -11881,7 +11894,7 @@ class CanvasGraphics {
+     this.dependencyTracker?.recordDependencies(opIdx, Dependencies.fill);
+     if (isPatternFill) {
+       const dims = this.current.tilingPatternDims;
+-      const tileIdx = dims && fillColor.canSkipPatternCanvas(dims);
++      const tileIdx = !this.blender && dims && fillColor.canSkipPatternCanvas(dims);
+       if (tileIdx) {
+         fillColor.drawPattern(this, path, this.pendingEOFill, tileIdx, opIdx);
+         this.pendingEOFill = false;
+@@ -12541,7 +12554,7 @@ class CanvasGraphics {
+       this.current.activeSMask = null;
+     }
+     const currentCtx = this.ctx;
+-    if ((!group.needsIsolation || !group.isolated && !group.hasSoftMask) && !group.knockout && !group.isGray && this.#knockoutGroupLevel === 0 && currentCtx.globalAlpha === 1 && currentCtx.globalCompositeOperation === "source-over" && !inSMaskMode) {
++    if (!this.blender && (!group.needsIsolation || !group.isolated && !group.hasSoftMask) && !group.knockout && !group.isGray && this.#knockoutGroupLevel === 0 && currentCtx.globalAlpha === 1 && currentCtx.globalCompositeOperation === "source-over" && !inSMaskMode) {
+       if (group.bbox) {
+         let clip = new Path2D();
+         const [x0, y0, x1, y1] = group.bbox;
+@@ -12632,6 +12645,9 @@ class CanvasGraphics {
+     }
+     copyCtxState(currentCtx, groupCtx);
+     this.ctx = groupCtx;
++    if (this.blender && !this.blender.forceInversion && !group.smask) {
++      this.blender.interceptGroupStyles(this.ctx);
++    }
+     this.dependencyTracker?.inheritSimpleDataAsFutureForcedDependencies(["fillAlpha", "strokeAlpha", "globalCompositeOperation"]).pushBaseTransform(currentCtx);
+     this.setGState(opIdx, [["BM", "source-over"], ["ca", 1], ["CA", 1], ["TR", null]]);
+     this.groupStack.push(currentCtx);
+@@ -12654,6 +12670,7 @@ class CanvasGraphics {
+     }
+     this.groupLevel--;
+     const groupCtx = this.ctx;
++    if (this.blender) this.blender.cleanupGroupStyles(this.ctx);
+     const ctx = this.groupStack.pop();
+     const groupMeta = this.#groupStackMeta.pop();
+     if (groupMeta) {
+@@ -23397,8 +23414,12 @@ class HighlightOutline extends Outline {
      this.firstPoint = firstPoint;
      this.lastPoint = lastPoint;
    }
@@ -65,7 +1215,7 @@ index 3a5c6048d31f4b7246c654d7ac060ae9c4f0325d..ec826697f86653bf6df34dcfd86b5b1c
      outline.#boxes = boxes;
      outline.focusOutline = new HighlightOutliner(boxes, 0.0025, 0.001, isLTR).getOutlines();
      return outline;
-@@ -23688,7 +23693,7 @@ class HighlightEditor extends DrawingEditor {
+@@ -23688,7 +23709,7 @@ class HighlightEditor extends DrawingEditor {
      if (boxes) {
        params = {
          ...params,
@@ -74,7 +1224,7 @@ index 3a5c6048d31f4b7246c654d7ac060ae9c4f0325d..ec826697f86653bf6df34dcfd86b5b1c
        };
      }
      super._addOutlines(params);
-@@ -23918,7 +23923,7 @@ class HighlightEditor extends DrawingEditor {
+@@ -23918,7 +23939,7 @@ class HighlightEditor extends DrawingEditor {
            height: (quadPoints[i + 1] - quadPoints[i + 5]) / pageHeight
          });
        }
@@ -83,3 +1233,20 @@ index 3a5c6048d31f4b7246c654d7ac060ae9c4f0325d..ec826697f86653bf6df34dcfd86b5b1c
      }
      const thickness = data.thickness || this._defaultDrawingOptions.thickness;
      const points = (data.inkLists || data.outlines.points)[0];
+diff --git a/web/pdf_viewer.mjs b/web/pdf_viewer.mjs
+index e4a6b24652d1ed233dc3de1b746188a246e5fb9e..95f91fb3a4b5463743b59959d29dabe0195c4591 100644
+--- a/web/pdf_viewer.mjs
++++ b/web/pdf_viewer.mjs
+@@ -1,3 +1,4 @@
++import { registerPaperpaneCanvas } from "../build/paperpane-theme.mjs";
+ /**
+  * @licstart The following is the entire license notice for the
+  * JavaScript code in this page
+@@ -7110,6 +7111,7 @@ class PDFPageView extends BasePDFPageView {
+     return canvasWrapper;
+   }
+   _getRenderingContext(canvas, transform, recordOperations, recordImages) {
++    registerPaperpaneCanvas(canvas, this.div.closest('.pdfViewer'));
+     return {
+       canvas,
+       transform,

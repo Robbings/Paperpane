@@ -1,8 +1,8 @@
-import { Button, Segmented, Stepper, Switch } from '@/ui/components';
+import { Button, Segmented, Stepper } from '@/ui/components';
 import { SettingGroup, SettingRow } from '../SettingRow';
 import { SelectionBarSettings } from './SelectionBarSettings';
 import { fontSizeLabel, localeOptions, mathOptions, themeOptions } from '../options';
-import { FONT_SIZE, type Preferences, type PreferencesState } from '../types';
+import { FONT_SIZE, UI_SCALE, type Preferences, type PreferencesState } from '../types';
 
 interface GeneralSectionProps {
   state: PreferencesState;
@@ -32,9 +32,12 @@ export function GeneralSection({ state, onPreference, onRetry }: GeneralSectionP
         <SettingRow label="主题" description="跟随系统时，随系统的浅色或深色模式切换。">
           <Segmented label="主题" size="sm" options={themeOptions} value={p.theme} onChange={(theme) => onPreference('theme', theme)} />
         </SettingRow>
-        <SettingRow label="正文字号" description="批注、笔记、概览和回答的文字大小。不影响工具栏，也不改变论文页面的缩放。">
+        <SettingRow label="界面大小">
+          <Stepper label="界面大小" value={p.uiScale} min={UI_SCALE.min} max={UI_SCALE.max} step={UI_SCALE.step} resetValue={UI_SCALE.default} format={(value) => `${value}%`} onChange={(value) => onPreference('uiScale', value)} />
+        </SettingRow>
+        <SettingRow label="阅读字号" description="译文、批注、笔记、概览和回答的文字大小。不影响工具栏，也不改变论文页面的缩放。">
           <Stepper
-            label="正文字号"
+            label="阅读字号"
             value={p.uiFontSize}
             min={FONT_SIZE.min}
             max={FONT_SIZE.max}
@@ -42,12 +45,9 @@ export function GeneralSection({ state, onPreference, onRetry }: GeneralSectionP
             onChange={(size) => onPreference('uiFontSize', size)}
           />
         </SettingRow>
-        <p className="pp-set-sample" style={{ fontSize: `calc(14px * ${p.uiFontSize / 16})` }} aria-hidden="true">
+        <p className="pp-set-sample" style={{ fontSize: `calc(0.875rem * ${p.uiFontSize / 16})` }} aria-hidden="true">
           A layout-aware procedure groups glyphs into blocks. 按版面把字形分组成块，再排出阅读顺序。
         </p>
-        <SettingRow label="深色模式下页面减光" description="让白色的论文页面在深色界面里不那么刺眼；图表颜色不变。">
-          <Switch label="深色模式下页面减光" hideLabel checked={p.dimPagesInDark} onChange={(on) => onPreference('dimPagesInDark', on)} />
-        </SettingRow>
       </SettingGroup>
 
       <SelectionBarSettings value={p.selectionBar} onChange={(bar) => onPreference('selectionBar', bar)} />

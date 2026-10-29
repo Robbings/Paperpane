@@ -11,10 +11,11 @@ interface StepperProps {
   label: string;
   /** How the value reads, e.g. as a percentage. */
   format?: (value: number) => string;
+  resetValue?: number;
 }
 
 /** A number changed one step at a time: minus, the value, plus. */
-export function Stepper({ value, min, max, step = 1, onChange, label, format = String }: StepperProps) {
+export function Stepper({ value, min, max, step = 1, onChange, label, format = String, resetValue }: StepperProps) {
   const set = (next: number) => onChange(Math.min(max, Math.max(min, next)));
   return (
     <div
@@ -38,7 +39,9 @@ export function Stepper({ value, min, max, step = 1, onChange, label, format = S
       <button type="button" tabIndex={-1} aria-label="减小" disabled={value <= min} onClick={() => set(value - step)}>
         <Icon name="minus" size={13} strokeWidth={1.8} />
       </button>
-      <span className="pp-stepper__value">{format(value)}</span>
+      {resetValue === undefined ? <span className="pp-stepper__value">{format(value)}</span> : (
+        <button type="button" className="pp-stepper__value" aria-label={`恢复${label}默认值`} title="恢复默认" onClick={() => set(resetValue)}>{format(value)}</button>
+      )}
       <button type="button" tabIndex={-1} aria-label="增大" disabled={value >= max} onClick={() => set(value + step)}>
         <Icon name="plus" size={13} strokeWidth={1.8} />
       </button>

@@ -30,6 +30,17 @@ export function LiveReaderPage() {
   const translation=useTranslation(owner,preferences.state.preferences);
   const modelSettings=useModelSettings();
   const state=owner?.reader.getSnapshot().data;
+  useEffect(()=>{
+    const media=window.matchMedia('(prefers-color-scheme: dark)');
+    const apply=()=>{
+      const p=preferences.state.preferences;
+      const dark=document.documentElement.dataset.theme==='dark'||(!document.documentElement.dataset.theme&&media.matches);
+      owner?.reader.setDisplay({scroll:p.pdfScroll,spread:p.pdfSpread,theme:p.pdfTheme==='auto'?(dark?'dark':'original'):p.pdfTheme});
+    };
+    apply();media.addEventListener('change',apply);
+    const observer=new MutationObserver(apply);observer.observe(document.documentElement,{attributes:true,attributeFilter:['data-theme']});
+    return()=>{media.removeEventListener('change',apply);observer.disconnect();};
+  },[owner,state?.phase,preferences.state.preferences]);
   const saved=owner?.annotations?.getSnapshot().data;
   const documents=owner?.imports.service.getSnapshot().data.documents??[];
   const jobs=owner?.imports.service.getSnapshot().data.jobs??[];
@@ -89,10 +100,10 @@ export function LiveReaderPage() {
       onExport={()=>{if(owner?.document)void owner.db.readFile(owner.document).then(blob=>downloadFile(blob,`${owner.document!.title}.pdf`)).catch(()=>report('原文件导出失败，请重试。'));}}
       settings={{preferences:preferences.state.preferences,onPreference:preferences.setPreference,models:modelSettings.settings.models.map(m=>({value:m.id,label:m.label||m.modelId})),defaultModelId:modelSettings.settings.defaultModelId,onDefaultModel:id=>void modelSettings.save({...toDraft(modelSettings.settings),defaultModelId:id},modelSettings.settings.revision).then(r=>{if(!r.ok)report('默认模型没有保存，请到设置页重试。');}),status:{local:preferences.state.local,sync:'unconfigured',lastSyncedAt:null,modelAvailability:modelSettings.status.modelAvailability},onOpenSettings:section=>window.open(`options.html${section?'#'+section:''}`,'_blank','noopener')}}
       onNavigate={index=>{void owner?.reader.navigate(index).then(r=>{if(!r.ok)report(r.error.message);});}}
-      onZoom={direction=>{const r=owner?.reader.setZoom((state?.position.zoom??1)+(direction==='in'?.1:-.1));if(r&&!r.ok)report(r.error.message);}}
+      onZoom={direction=>{const r=owner?.reader.setZoom(Math.min(4,Math.max(.25,Math.round(((owner.reader.getSnapshot().data.position.zoom??1)+(direction==='in'?.1:-.1))*100)/100)));if(r&&!r.ok)report(r.error.message);}}
       onZoomTo={percent=>{const r=owner?.reader.setZoom(percent/100);if(r&&!r.ok)report(r.error.message);}}
       onLocateAnnotation={id=>{const row=owner?.item(id);if(row)void owner?.reader.locate(row.anchor).then(()=>owner.reader.showAnnotation(id));}}
-      onTool={tool=>{if(tool==='copy-annotations'||tool==='export-annotations')void owner?.exportAnnotations(tool==='copy-annotations');else if(tool==='open'||tool==='library')setOpenFiles(true);else report('该工具将在后续阅读能力接入时提供。');}}
+      onTool={tool=>{if(tool==='fit-width'){const r=owner?.reader.fitWidth();if(r&&!r.ok)report(r.error.message);}else if(tool==='copy-annotations'||tool==='export-annotations')void owner?.exportAnnotations(tool==='copy-annotations');else if(tool==='open'||tool==='library')setOpenFiles(true);else report('该工具将在后续阅读能力接入时提供。');}}
     />
     {translation.overlay}{translation.confirmation}
     <Dialog open={!!saved?.error} onClose={()=>{}} title="批注未能保存" description={saved?.error?.message} footer={<><Button onClick={()=>void owner?.annotations?.retry()}>重试保存</Button><Button onClick={()=>void owner?.annotations?.discardDrafts()}>放弃草稿，载入最新</Button></>}/>

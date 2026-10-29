@@ -34,7 +34,7 @@ export function Menu({ label, entries, anchor, align = 'start', triggerRef, mult
   useLayoutEffect(() => {
     const menu = ref.current;
     if (!menu) return;
-    const { width, height } = menu.getBoundingClientRect();
+    const width = menu.offsetWidth, height = menu.offsetHeight;
     const preferredLeft = align === 'end' ? anchor.x - width : anchor.x;
     const left = Math.min(Math.max(preferredLeft, EDGE), window.innerWidth - width - EDGE);
     // Open downward if it fits, else upward; either way keep the whole menu
