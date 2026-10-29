@@ -842,7 +842,7 @@ export class ResearchService implements ConversationService {
     const s = this.session(sid),
       controller = new AbortController();
     this.controllers.set(sid, controller);
-    if (choice?.cancelled || this.disposed) controller.abort();
+    if (choice?.cancelled || this.disposed || this.leaving) controller.abort();
     const modelId = choice?.modelId ?? s.modelId,
       reasoning = choice?.reasoning ?? s.reasoning;
     const model = this.models().find((m) => m.id === modelId),
@@ -908,32 +908,36 @@ export class ResearchService implements ConversationService {
         ? { state: this.disposed ? "interrupted" : "stopped" }
         : { state: "failed", error: appError(errorText(e)) };
     } finally {
-      this.controllers.delete(sid);
-      s.updatedAt = at();
-      s.revision = id();
-      this.changed();
-      const persisted = await this.flush();
-      if (!persisted) {
-        m.recoveryGeneration = m.generation;
-        m.generation = {
-          state: "save-failed",
-          error: {
-            code: "SAVE_FAILED",
-            message: this.error ?? "保存失败",
-            recovery: ["retry"],
-          },
-        };
+      try {
+        s.updatedAt = at();
+        s.revision = id();
+        this.changed();
+        const persisted = await this.flush();
+        if (!persisted) {
+          m.recoveryGeneration = m.generation;
+          m.generation = {
+            state: "save-failed",
+            error: {
+              code: "SAVE_FAILED",
+              message: this.error ?? "保存失败",
+              recovery: ["retry"],
+            },
+          };
+        }
+        this.notify();
+      } finally {
+        if (this.controllers.get(sid) === controller) this.controllers.delete(sid);
       }
-      this.notify();
-      if (!this.disposed && m.generation?.state === "completed")
+      if (!this.disposed && !this.leaving && !controller.signal.aborted && m.generation?.state === "completed")
         void this.suggest(sid);
     }
   }
   async suggest(sid: string) {
+    if (this.disposed || this.leaving) return failure("INVALID_INPUT", "阅读器正在关闭");
     const s = this.session(sid),
       key = "suggest:" + sid,
       leaf = s.activeLeafId;
-    if (this.controllers.has(sid) || this.controllers.has(key))
+    if (this.controllers.has(sid) || this.controllers.has(key) || this.accepting.has(sid))
       return failure("BUSY", "正在生成回答或追问");
     const controller = new AbortController();
     this.controllers.set(key, controller);
@@ -978,10 +982,12 @@ export class ResearchService implements ConversationService {
           ? { state: "idle", questions: [] }
           : { state: "failed", questions: [], error: appError(errorText(e)) };
     } finally {
-      if (this.controllers.get(key) === controller)
-        this.controllers.delete(key);
-      this.changed();
-      await this.flush();
+      try {
+        this.changed();
+        await this.flush();
+      } finally {
+        if (this.controllers.get(key) === controller) this.controllers.delete(key);
+      }
     }
     return success(undefined);
   }
@@ -1228,7 +1234,7 @@ export class ResearchService implements ConversationService {
       !this.paper.sentences.length ||
       !this.view?.models.length ||
       this.controllers.has("overview") ||
-      this.disposed
+      this.disposed || this.leaving
     )
       return;
     const modelId = this.defaultModel("overview"),
@@ -1414,9 +1420,12 @@ export class ResearchService implements ConversationService {
             };
       this.error = errorText(e);
     } finally {
-      this.controllers.delete("overview");
-      this.changed();
-      await this.flush();
+      try {
+        this.changed();
+        await this.flush();
+      } finally {
+        if (this.controllers.get("overview") === controller) this.controllers.delete("overview");
+      }
     }
   }
   stopOverview() {

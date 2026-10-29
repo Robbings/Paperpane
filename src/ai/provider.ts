@@ -10,6 +10,11 @@ export interface ModelInput {
   images?: string[];
 }
 export interface ModelRequest {
+  /** Cancels queued dispatch without aborting requests that have already started. */
+  queueSignal?: AbortSignal;
+  onDispatch?: () => void;
+  /** Runs inside the model slot, before failure releases it to another request. */
+  onRequestError?: (error: unknown) => void;
   imageDetail?: 'auto' | 'high' | 'low';
   outputSchema?: { name: string; schema: Record<string, unknown> };
   system: string;
@@ -24,7 +29,9 @@ export async function streamModel(
   input: ModelRequest,
   signal: AbortSignal,
 ): Promise<Usage> {
-  return modelSlot(c, signal, async () => {
+  const queuedSignal = input.queueSignal ? AbortSignal.any([signal, input.queueSignal]) : signal;
+  return modelSlot(c, queuedSignal, async () => {
+    try {
     const protocol = c.endpoint.protocol,
       base = endpointUrl(c.endpoint.baseUrl),
       started = performance.now();
@@ -180,10 +187,12 @@ export async function streamModel(
     if (!(await hasImportOrigin(url)))
       throw new Error("请在模型设置中保存并授予此接口访问权限。");
     signal.throwIfAborted();
+    queuedSignal.throwIfAborted();
     const requestSignal = AbortSignal.any([
       signal,
       AbortSignal.timeout(c.view.runtime.timeoutSec * 1000),
     ]);
+    input.onDispatch?.();
     const response = await fetch(url, {
       method: "POST",
       credentials: "omit",
@@ -428,5 +437,9 @@ export async function streamModel(
     if (!completed)
       throw new Error("模型输出未正常结束，部分内容已保留，可重新生成新版本。");
     return usage;
+    } catch (error) {
+      input.onRequestError?.(error);
+      throw error;
+    }
   });
 }

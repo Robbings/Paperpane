@@ -62,21 +62,27 @@ export async function preprocessFormulas(reader: PdfjsReader, ref: DocumentRef, 
     plan.runState = 'running';
     await store.write(key, plan);
     let cursor = 0, failure: unknown;
+    const dispatchStop = new AbortController();
+    const pendingSignal = AbortSignal.any([signal, dispatchStop.signal]);
+    const stopPending = (error: unknown) => {
+      if (failure === undefined) failure = error;
+      if (!dispatchStop.signal.aborted) dispatchStop.abort(error);
+    };
     const lane = async () => {
       while (!failure && cursor < batches.length) {
         const batch = batches[cursor++]!;
         try {
-          signal.throwIfAborted();
+          pendingSignal.throwIfAborted();
           const inputs = [];
           for (const element of batch) {
-            signal.throwIfAborted();
+            pendingSignal.throwIfAborted();
             const anchor = await reader.elementAnchor(element.page.pageIndex, expandBox(element.region.box, 'formula'));
-            const image = await reader.captureAnchor(anchor, signal);
+            const image = await reader.captureAnchor(anchor, pendingSignal);
             const hint = await reader.elementText(element.anchor).catch(() => '');
             inputs.push({ element, blob: image.blob, hint });
           }
-          await transcribeFormulaBatch(inputs, signal, plan.sessionId);
-        } catch (e) { failure = e; }
+          await transcribeFormulaBatch(inputs, signal, plan.sessionId, {pendingSignal, onFailure:stopPending});
+        } catch (e) { stopPending(e); }
       }
     };
     // This is an upper bound; the shared endpoint concurrency/cooldown still applies.
