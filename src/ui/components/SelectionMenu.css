@@ -66,6 +66,7 @@
 }
 
 .pp-selmenu__action {
+  position: relative;
   display: flex;
   flex-shrink: 0;
   align-items: center;
@@ -80,6 +81,9 @@
   line-height: 1;
   transition: background-color var(--pp-dur-fast) var(--pp-ease-out);
 }
+
+.pp-selmenu__action[data-busy='true'] > :not(.pp-selmenu__busy) { visibility: hidden; }
+.pp-selmenu__busy { position: absolute; inset: 0; display: flex; align-items: center; justify-content: center; }
 
 .pp-selmenu__action svg {
   flex-shrink: 0;

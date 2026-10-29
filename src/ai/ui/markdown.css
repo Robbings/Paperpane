@@ -1,0 +1,23 @@
+/* AI-only rich content, using the reader's existing type and separator tokens. */
+.pp-ai-markdown table {
+  display: block;
+  max-width: 100%;
+  overflow-x: auto;
+  border-collapse: collapse;
+  font: inherit;
+}
+.pp-ai-markdown th,
+.pp-ai-markdown td {
+  padding: 6px 10px;
+  text-align: left;
+  border-bottom: 0.5px solid var(--pp-hairline);
+  vertical-align: top;
+}
+.pp-ai-markdown th {
+  font-weight: var(--pp-weight-semibold);
+}
+.pp-ai-markdown .katex-display {
+  max-width: 100%;
+  overflow-x: auto;
+  overflow-y: hidden;
+}

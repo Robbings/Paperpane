@@ -91,6 +91,7 @@ export function ReaderToolbar(props: ReaderToolbarProps) {
     ...(!spacious?[{id:'settings',label:'阅读设置',icon:'settings'} as MenuEntry]:[]),
     ...(!spacious&&props.onSave?[{id:'save',label:props.saved?'编辑收藏':'收藏到文献库',icon:'bookmark'} as MenuEntry]:[]),
     ...(!spacious?[{kind:'separator',id:'sep-files'} as MenuEntry]:[]),
+    {id:'region',label:'框选图片',icon:'region'},
     {id:'open',label:'打开论文',icon:'file'},
     ...(props.onBack?[{id:'back',label:'返回文献库',icon:'chevronLeft'} as MenuEntry]:[]),
     {id:'export',label:'导出',icon:'export'},
@@ -100,6 +101,7 @@ export function ReaderToolbar(props: ReaderToolbarProps) {
   ];
   const select=(id:string)=>{
     if(id==='title')props.onToggleTitle();
+    else if(id==='region')props.onTool('region');
     else if(id==='sidebar')props.onToggleSidebar();
     else if(id==='search')props.onFind();
     else if(id==='zoom-in')onZoom('in');

@@ -1,6 +1,7 @@
 import { Fragment, useRef, type CSSProperties, type KeyboardEvent } from 'react';
 import { Icon, type IconName } from './Icon';
 import { Tooltip } from './Tooltip';
+import { Spinner } from './Feedback';
 import './SelectionMenu.css';
 
 export type HighlightColor = 'yellow' | 'green' | 'blue' | 'pink' | 'purple';
@@ -25,6 +26,8 @@ export interface SelectionMenuAction {
   id: string;
   label: string;
   icon: IconName;
+  busy?: boolean;
+  disabled?: boolean;
 }
 
 interface SelectionMenuProps {
@@ -93,12 +96,13 @@ export function SelectionMenu({
   const renderAction = (action: SelectionMenuAction) =>
     look === 'icon' ? (
       <Tooltip key={action.id} label={action.label} placement="top" labelsChild>
-        <button type="button" className="pp-selmenu__action" aria-label={action.label} onClick={() => onAction?.(action.id)}>
+        <button type="button" className="pp-selmenu__action" aria-label={action.label} aria-busy={action.busy||undefined} data-busy={action.busy||undefined} disabled={action.busy||action.disabled} onClick={() => onAction?.(action.id)}>
           <Icon name={action.icon} size={17} strokeWidth={1.5} />
+          {action.busy && <span className="pp-selmenu__busy"><Spinner size={14}/></span>}
         </button>
       </Tooltip>
     ) : (
-      <button key={action.id} type="button" className="pp-selmenu__action" onClick={() => onAction?.(action.id)}>
+      <button key={action.id} type="button" className="pp-selmenu__action" aria-label={action.label} aria-busy={action.busy||undefined} data-busy={action.busy||undefined} disabled={action.busy||action.disabled} onClick={() => onAction?.(action.id)}>
         {look !== 'text' && <Icon name={action.icon} size={look === 'stacked' ? 17 : 15} strokeWidth={1.5} />}
         {look === 'reveal' ? (
           <span className="pp-selmenu__reveal">
@@ -107,6 +111,7 @@ export function SelectionMenu({
         ) : (
           <span>{action.label}</span>
         )}
+        {action.busy && <span className="pp-selmenu__busy"><Spinner size={14}/></span>}
       </button>
     );
 
@@ -116,7 +121,7 @@ export function SelectionMenu({
       onDismiss?.();
       return;
     }
-    const items = Array.from(ref.current?.querySelectorAll<HTMLButtonElement>('button') ?? []);
+    const items = Array.from(ref.current?.querySelectorAll<HTMLButtonElement>('button:not(:disabled)') ?? []);
     const index = items.indexOf(document.activeElement as HTMLButtonElement);
     const target =
       event.key === 'ArrowRight' ? items[(index + 1) % items.length]

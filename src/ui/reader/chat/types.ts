@@ -44,6 +44,8 @@ export type GenerationView =
   | { state: 'failed' | 'save-failed'; error: ErrorView };
 
 export interface ChatMessageView {
+  usage?: import('@/ai/types').Usage;
+  context?: import('@/ai/types').ContextManifest;
   id: string;
   role: 'user' | 'assistant';
   markdown: string;

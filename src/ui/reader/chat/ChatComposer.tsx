@@ -1,5 +1,5 @@
 import { useLayoutEffect, useRef, useState, type KeyboardEvent, type PointerEvent, type RefObject } from 'react';
-import { Icon, IconButton, Menu, Tooltip, type MenuEntry } from '@/ui/components';
+import { Button, Icon, IconButton, Menu, Tooltip, type MenuEntry } from '@/ui/components';
 import type { AttachmentView, ModelView } from './types';
 
 interface ChatComposerProps {
@@ -19,10 +19,12 @@ interface ChatComposerProps {
   onRemoveAttachment: (id: string) => void;
   onSend: () => void;
   onStop: () => void;
+  onLatest?:()=>void;
   onModel: (modelId: string) => void;
   onReasoning?: (level: string) => void;
   /** Starts picking a region of the paper to ask about; shown for models that read images. */
   onCaptureRegion?: () => void;
+  onPasteImages?: (files: File[]) => void;
 }
 
 const AUTO_ROWS = 8;
@@ -166,6 +168,17 @@ export function ChatComposer(props: ChatComposerProps) {
         placeholder={props.placeholder}
         value={text}
         onChange={(event) => props.onText(event.target.value)}
+        onPaste={(event) => {
+          const files = Array.from(event.clipboardData.items).filter(item => item.kind === 'file' && item.type.startsWith('image/')).map(item => item.getAsFile()).filter((file): file is File => file !== null);
+          if (!files.length || !props.onPasteImages) return;
+          event.preventDefault();
+          const text = event.clipboardData.getData('text/plain');
+          if (text) {
+            const input = event.currentTarget, start = input.selectionStart, end = input.selectionEnd;
+            props.onText(props.text.slice(0, start) + text + props.text.slice(end));
+          }
+          props.onPasteImages(files);
+        }}
         onKeyDown={(event) => {
           // Enter sends, Shift+Enter breaks the line; never while an input method is composing.
           if (event.key === 'Enter' && !event.shiftKey && !event.nativeEvent.isComposing) {
@@ -211,6 +224,7 @@ export function ChatComposer(props: ChatComposerProps) {
         )}
         {props.draftSaveFailed && <span className="pp-composer__warn">草稿未能保存</span>}
         <span className="pp-composer__spacer" />
+        {props.onLatest && <Button className="pp-composer__latest" variant="quiet" size="sm" onClick={props.onLatest}>回到最新</Button>}
         {busy ? (
           <IconButton icon="stop" label="停止生成" size="md" shape="pill" className="pp-composer__stop" onClick={props.onStop} />
         ) : (

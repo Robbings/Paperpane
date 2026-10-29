@@ -25,6 +25,14 @@ export const DEFAULT_SELECTION_BAR: SelectionBarPrefs = {
 };
 
 export interface Preferences {
+  elementDetection: boolean;
+  detectPictures: boolean;
+  detectTables: boolean;
+  detectFormulas: boolean;
+  formulaPreprocess: boolean;
+  formulaPreprocessLimit: number;
+  formulaCopyMode: 'formula' | 'image';
+  tableCopyFormat: 'image' | 'markdown' | 'latex' | 'excel';
   /** Default target for new PDF and selection translations; independent of AI answers. */
   translationLanguage: import('@/translation/languages').TranslationLanguage;
   theme: 'system' | 'light' | 'dark';
@@ -55,6 +63,9 @@ export interface PreferencesState {
 }
 
 export const DEFAULT_PREFERENCES: Preferences = {
+  elementDetection: true, detectPictures: true, detectTables: true, detectFormulas: true,
+  formulaPreprocess: true, formulaPreprocessLimit: 45,
+  formulaCopyMode: 'formula', tableCopyFormat: 'image',
   theme: 'system',
   pdfTheme: 'auto',
   pdfScroll: 'vertical',
@@ -101,6 +112,8 @@ export type ReasoningCapability =
 export type ReasoningChoice = { kind: 'default' } | { kind: 'effort'; value: string } | { kind: 'budget'; tokens: number };
 
 export interface ModelConfigView {
+  /** Token capacity. Missing uses 256k, not a restrictive legacy context window. */
+  contextWindow?: number;
   id: string;
   endpointId: string;
   /** The id sent to the endpoint. */

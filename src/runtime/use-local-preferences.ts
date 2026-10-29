@@ -6,6 +6,10 @@ import { DEFAULT_PREFERENCES, DEFAULT_SELECTION_BAR, FONT_SIZE, UI_SCALE, type P
 
 function valid<K extends keyof Preferences>(key: K, value: unknown): value is Preferences[K] {
   switch (key) {
+    case 'elementDetection': case 'detectPictures': case 'detectTables': case 'detectFormulas': case 'formulaPreprocess': return typeof value === 'boolean';
+    case 'formulaPreprocessLimit': return typeof value === 'number' && Number.isInteger(value) && value >= 5 && value <= 100;
+    case 'formulaCopyMode': return value === 'formula' || value === 'image';
+    case 'tableCopyFormat': return ['image','markdown','latex','excel'].includes(String(value));
     case 'pdfTheme': return ['auto','original','dark','black','sepia'].includes(String(value));
     case 'pdfScroll': return ['vertical','horizontal','page'].includes(String(value));
     case 'pdfSpread': return ['none','odd','even'].includes(String(value));

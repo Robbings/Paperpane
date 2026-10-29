@@ -1,0 +1,4 @@
+.pp-element-layer{position:absolute;inset:0;pointer-events:none;z-index:4}
+.pp-element-outline{position:absolute;pointer-events:none;border:1px solid color-mix(in srgb,var(--pp-accent) 35%,transparent);border-radius:3px}
+.pp-element-toolbar{position:absolute;pointer-events:auto;width:max-content}
+.pp-element-toolbar .pp-selmenu{max-width:none}

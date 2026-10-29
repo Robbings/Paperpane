@@ -97,6 +97,8 @@ interface ReaderShellProps {
   settings?: ReaderSettingsProps;
   /** Content for research panels the page supplies itself (discussion, overview, …); the rest show a placeholder. */
   panels?: Partial<Record<ResearchPanelId, ReactNode>>;
+  /** AI actions may request their existing research panel without replacing the shell. */
+  panelRequest?: { id: ResearchPanelId; token: string };
 }
 
 export interface ReaderLibraryProps extends ReaderLibraryData {
@@ -164,6 +166,7 @@ export function ReaderShell(props: ReaderShellProps) {
   const [showTitle, setShowTitle] = useState(props.initialLayout?.showTitle ?? true);
   const [panel, setPanel] = useState<ResearchPanelId>('annotations');
   const [panelOpen, setPanelOpen] = useState(true);
+  useEffect(()=>{const request=props.panelRequest;if(!request)return;setPanel(request.id);setPanelOpen(true);setVisited(current=>new Set([...current,request.id]));},[props.panelRequest]);
   // Panels stay mounted once opened, so drafts and running tasks survive switching.
   const [visited, setVisited] = useState<ReadonlySet<ResearchPanelId>>(() => new Set(['annotations']));
   const [sidebarPref, setSidebarPref] = useState<boolean | null>(null);

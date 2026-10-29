@@ -1,0 +1,42 @@
+.pp-ai-capture {
+  position: fixed;
+  z-index: 45;
+  overflow: hidden;
+  cursor: crosshair;
+  touch-action: none;
+}
+.pp-ai-capture__shade {
+  position: absolute;
+  inset: 0;
+  background: rgb(0 0 0 / 28%);
+  pointer-events: none;
+}
+.pp-ai-capture__rect {
+  position: absolute;
+  border: 1px solid var(--pp-accent);
+  box-shadow: 0 0 0 99999px rgb(0 0 0 / 28%);
+  pointer-events: none;
+}
+.pp-ai-capture__rect span {
+  position: absolute;
+  width: 9px;
+  height: 9px;
+  border: 1px solid var(--pp-accent);
+  background: var(--pp-surface);
+  border-radius: 2px;
+  pointer-events: auto;
+}
+.pp-ai-capture__rect [data-corner^="n"] {
+  top: -5px;
+}
+.pp-ai-capture__rect [data-corner^="s"] {
+  bottom: -5px;
+}
+.pp-ai-capture__rect [data-corner$="w"] {
+  left: -5px;
+  cursor: nwse-resize;
+}
+.pp-ai-capture__rect [data-corner$="e"] {
+  right: -5px;
+  cursor: nesw-resize;
+}
