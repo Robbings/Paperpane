@@ -88,6 +88,7 @@ interface ReaderShellProps {
   library?: ReaderLibraryProps;
   /** A back button at the start of the toolbar, for a paper opened from the library. */
   onBack?: () => void;
+  onOriginalPdf?: () => void;
   /** What the toolbar's 导出 offers (e.g. the original PDF); without it the button calls onTool('export'). */
   exports?: readonly ExportOption[];
   onExport?: (id: string) => void;
@@ -659,6 +660,7 @@ export function ReaderShell(props: ReaderShellProps) {
         translationOpen={props.translation ? translationOpen : undefined}
         onToggleTranslation={props.translation?.onToggle}
         onBack={props.onBack}
+        onOriginalPdf={props.onOriginalPdf}
         exports={props.exports}
         onExport={props.onExport}
         onTool={props.onTool}

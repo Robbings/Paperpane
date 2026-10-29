@@ -1,4 +1,5 @@
 import { Badge, Icon, Skeleton, Switch, type IconName } from '@/ui/components';
+import { useEffect, useState } from 'react';
 import { sinceText, StatusLine } from '@/ui/settings/StatusLine';
 import type { ActiveTabView, PopupViewProps } from './types';
 import './popup.css';
@@ -27,11 +28,13 @@ function PageThumb() {
 const blockText: Record<NonNullable<ActiveTabView['block']>, { icon: IconName; title: string; detail: string }> = {
   'not-pdf': { icon: 'file', title: '当前页面不是 PDF', detail: '打开论文的 PDF 链接后，可以在这里一键转到纸窗阅读。' },
   restricted: { icon: 'lock', title: '这个页面无法打开', detail: '浏览器不允许扩展读取设置页、扩展商店等页面。' },
-  'file-access': { icon: 'lock', title: '需要允许访问本地文件', detail: '在扩展详情里打开「允许访问文件网址」后，就能用纸窗打开电脑上的 PDF。' },
+  'file-access': { icon: 'file', title: '请手动导入本地 PDF', detail: '点击下方「打开文件」，选择电脑上的 PDF 导入纸窗。' },
   'in-reader': { icon: 'check', title: '正在纸窗中阅读', detail: '这篇论文已经在阅读器里打开了。' },
+  'in-paperpane': { icon: 'check', title: '当前在纸窗中', detail: '切换到论文网页或 PDF 标签页后，可在这里打开论文。' },
+  unavailable: { icon: 'explain', title: '暂时无法读取页面', detail: '请重新打开弹窗重试。' },
 };
 
-function CurrentTab({ tab, onOpen, onAllowFileAccess }: { tab: ActiveTabView | null; onOpen: () => void; onAllowFileAccess: () => void }) {
+function CurrentTab({ tab, onOpen }: { tab: ActiveTabView | null; onOpen: () => void }) {
   if (!tab || tab.pdf === 'checking' || tab.pdf === 'unknown') {
     return (
       <section className="pp-popup__card pp-popup__tab" aria-busy="true" aria-label="当前页面">
@@ -58,12 +61,6 @@ function CurrentTab({ tab, onOpen, onAllowFileAccess }: { tab: ActiveTabView | n
             <p className="pp-popup__tab-detail">{block.detail}</p>
           </div>
         </div>
-        {tab.block === 'file-access' && (
-          <button type="button" className="pp-popup__primary pp-popup__primary--soft" onClick={onAllowFileAccess}>
-            打开扩展详情
-            <Icon name="openExternal" size={15} />
-          </button>
-        )}
       </section>
     );
   }
@@ -97,6 +94,8 @@ function CurrentTab({ tab, onOpen, onAllowFileAccess }: { tab: ActiveTabView | n
  */
 export function PopupView(props: PopupViewProps) {
   const { activeTab: tab, recent } = props;
+  const [now,setNow]=useState(()=>Date.now());
+  useEffect(()=>{const timer=window.setInterval(()=>setNow(Date.now()),30000);return()=>window.clearInterval(timer);},[]);
 
   return (
     <div className="pp-popup">
@@ -106,18 +105,24 @@ export function PopupView(props: PopupViewProps) {
         <span className="pp-popup__name-en">Paperpane</span>
       </header>
 
-      <CurrentTab tab={tab} onOpen={() => tab && props.onOpenInReader(tab.tabId)} onAllowFileAccess={props.onAllowFileAccess} />
+      <CurrentTab tab={tab} onOpen={() => tab && props.onOpenInReader(tab.tabId)} />
 
       <section className="pp-popup__card pp-popup__group" aria-label="自动打开">
         <div className="pp-popup__row">
           <span className="pp-popup__row-label">自动打开 PDF</span>
           <Switch label="自动打开 PDF" hideLabel checked={props.autoOpenPdf} onChange={props.onAutoOpenPdf} />
         </div>
+        {props.onShowPdfButtons && <div className="pp-popup__row">
+          <span className="pp-popup__row-label">显示网页打开按钮</span>
+          <Switch label="显示网页打开按钮" hideLabel checked={props.showPdfButtons??true} onChange={props.onShowPdfButtons}/>
+        </div>}
       </section>
+      {props.error && <p role="alert">{props.error}</p>}
 
-      {recent.length > 0 && (
+      {(
         <section className="pp-popup__recent" aria-labelledby="pp-popup-recent">
           <h2 id="pp-popup-recent">继续阅读</h2>
+          {recent.length===0&&<p role="status">{props.recentState==='loading'?'正在读取最近阅读…':props.recentState==='failed'?'暂时无法显示最近阅读':'还没有最近阅读记录'}</p>}
           <ul>
             {recent.slice(0, 3).map((paper) => (
               <li key={paper.id}>
@@ -125,7 +130,7 @@ export function PopupView(props: PopupViewProps) {
                   <span className="pp-popup__recent-title">{paper.title}</span>
                   <span className="pp-popup__recent-meta">
                     {paper.progress !== undefined && paper.progress > 0 && paper.progress < 1 ? `读到 ${Math.round(paper.progress * 100)}% · ` : ''}
-                    {sinceText(paper.lastReadAt)}
+                    {sinceText(paper.lastReadAt,now)}
                   </span>
                 </button>
               </li>

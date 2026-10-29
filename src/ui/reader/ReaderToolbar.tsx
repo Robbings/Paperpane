@@ -51,6 +51,7 @@ interface ReaderToolbarProps {
   onToggleTranslation?: () => void;
   /** A back button at the start, to the library the paper was opened from. */
   onBack?: () => void;
+  onOriginalPdf?: () => void;
   /** What 导出 offers; without it the button reports onTool('export'). */
   exports?: readonly ExportOption[];
   onExport?: (id: string) => void;
@@ -97,6 +98,7 @@ export function ReaderToolbar({
   translationOpen,
   onToggleTranslation,
   onBack,
+  onOriginalPdf,
   exports,
   onExport,
   onTool,
@@ -196,6 +198,7 @@ export function ReaderToolbar({
       onContextMenu={openContextMenu}
     >
       {onBack && <IconButton icon="chevronLeft" label="返回文献库" shape="pill" onClick={onBack} />}
+      {onOriginalPdf && <IconButton icon="openExternal" label="返回原 PDF" shape="pill" onClick={onOriginalPdf} />}
       {/* Layout toggles show their state in the icon, not in accent colour. */}
       <IconButton
         icon={sidebarOpen ? 'sidebarShown' : 'sidebar'}

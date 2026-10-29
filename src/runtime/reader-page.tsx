@@ -18,7 +18,7 @@ export function LiveReaderPage() {
   const [owner,setOwner] = useState<ReaderController>();
   const [,redraw] = useState(0);
   const [password,setPassword] = useState('');
-  const [openFiles,setOpenFiles] = useState(false);
+  const [openFiles,setOpenFiles] = useState(()=>new URLSearchParams(location.search).get('open')==='file');
   const input = useRef<HTMLInputElement>(null);
   useEffect(() => {
     if (!container || !surface) return;
@@ -35,6 +35,7 @@ export function LiveReaderPage() {
   const jobs=owner?.imports.service.getSnapshot().data.jobs??[];
   const job=jobs.find(job=>['reading','validating','password-required'].includes(job.phase));
   const failedJob=[...jobs].reverse().find(job=>job.phase==='failed');
+  const external=owner?.externalImport;
   const passwordRequest=job?.passwordRequest??state?.passwordRequest;
   useEffect(()=>setPassword(''),[passwordRequest?.requestId]);
   const target=state?.menuTarget;
@@ -77,7 +78,15 @@ export function LiveReaderPage() {
       notes={{value:'',onChange:()=>report('整篇笔记将在后续接入。'),local:'unmodified',sync:'unconfigured'}}
       panels={{overview:unavailable,discuss:unavailable,explain:unavailable,notes:unavailable,cite:unavailable}}
       document={<>
-        {(!state||state.phase==='empty'||state.phase==='failed')&&<EmptyState icon="file" title={state?.phase==='failed'?'无法打开 PDF':'打开一份论文'} description={state?.error?.message} actions={<Button onClick={()=>setOpenFiles(true)}>选择论文</Button>}/>}
+        {external ? <EmptyState icon="file" title={external.phase==='failed'?'论文导入失败':external.phase==='permission'?'允许读取论文':`正在从 ${new URL(external.url).hostname} 导入论文`}
+          description={external.error??'PDF 将保存到本机文献库，下载完成后自动打开。'}
+          actions={<>
+            {(external.phase==='permission'||external.phase==='failed')&&<Button variant="primary" onClick={()=>void owner?.importExternal()}>{external.phase==='permission'?'允许并打开':'重试导入'}</Button>}
+            <Button onClick={()=>void owner?.returnToOriginal()}>返回原 PDF</Button>
+            {(external.phase==='permission'||external.phase==='failed')&&<Button onClick={()=>input.current?.click()}>导入本地 PDF</Button>}
+          </>}/>
+          : (!state||state.phase==='empty'||state.phase==='failed')&&<EmptyState icon="file" title={state?.phase==='failed'?'无法打开 PDF':'打开一份论文'} description={state?.error?.message??owner?.message} actions={<Button onClick={()=>setOpenFiles(true)}>选择论文</Button>}/>}
+        {job&&<ProgressBar label="导入论文" value={job.progress?.total?job.progress.completed/job.progress.total:undefined} detail={job.phase==='validating'?'正在校验并保存 PDF…':job.phase==='password-required'?'等待输入 PDF 密码':job.progress?`已下载 ${(job.progress.completed/1024/1024).toFixed(1)} MiB`:'正在下载 PDF…'}/>}
         {state?.phase==='loading'&&<ProgressBar label="载入 PDF" value={state.loadProgress}/>}
         {state?.textLayer==='none'&&<p role="status">当前已加载页面没有可选择的文字，扫描件的文字识别将在后续提供。</p>}
         <div ref={setSurface} className="pdfViewer pp-pdf-surface"/>
@@ -85,9 +94,10 @@ export function LiveReaderPage() {
       interaction={interaction}
       translation={translation.shell}
       onBack={()=>void owner?.leaveForLibrary()}
-      exports={[{id:'original',label:'导出原 PDF',disabled:!owner?.document}]}
-      onExport={()=>{if(owner?.document)void owner.db.readFile(owner.document).then(blob=>downloadFile(blob,`${owner.document!.title}.pdf`)).catch(()=>report('原文件导出失败，请重试。'));}}
-      settings={{preferences:preferences.state.preferences,onPreference:preferences.setPreference,models:modelSettings.settings.models.map(m=>({value:m.id,label:m.label||m.modelId})),defaultModelId:modelSettings.settings.defaultModelId,onDefaultModel:id=>void modelSettings.save({...toDraft(modelSettings.settings),defaultModelId:id},modelSettings.settings.revision).then(r=>{if(!r.ok)report('默认模型没有保存，请到设置页重试。');}),status:{local:preferences.state.local,sync:'unconfigured',lastSyncedAt:null,modelAvailability:modelSettings.status.modelAvailability},onOpenSettings:section=>window.open(`options.html${section?'#'+section:''}`,'_blank','noopener')}}
+      onOriginalPdf={owner?.originalPdfUrl||owner?.document?.sourceUrl?()=>void owner?.returnToOriginal():undefined}
+      exports={[{id:'original',label:'导出原 PDF',disabled:!owner?.document},...(owner?.document?.sourceUrl?[{id:'source',label:'返回原 PDF'}]:[])]}
+      onExport={id=>{if(id==='source')void owner?.returnToOriginal();else if(owner?.document)void owner.db.readFile(owner.document).then(blob=>downloadFile(blob,`${owner.document!.title}.pdf`)).catch(()=>report('原文件导出失败，请重试。'));}}
+      settings={{preferences:preferences.state.preferences,onPreference:preferences.setPreference,models:modelSettings.settings.models.map(m=>({value:m.id,label:m.label||m.modelId})),defaultModelId:modelSettings.settings.defaultModelId,onDefaultModel:id=>void modelSettings.save({...toDraft(modelSettings.settings),defaultModelId:id},modelSettings.settings.revision).then(r=>{if(!r.ok)report('默认模型没有保存，请到设置页重试。');}),status:{...modelSettings.status,local:preferences.state.local},onOpenSettings:section=>window.open(`options.html${section?'#'+section:''}`,'_blank','noopener')}}
       onNavigate={index=>{void owner?.reader.navigate(index).then(r=>{if(!r.ok)report(r.error.message);});}}
       onZoom={direction=>{const r=owner?.reader.setZoom((state?.position.zoom??1)+(direction==='in'?.1:-.1));if(r&&!r.ok)report(r.error.message);}}
       onZoomTo={percent=>{const r=owner?.reader.setZoom(percent/100);if(r&&!r.ok)report(r.error.message);}}

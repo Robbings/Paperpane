@@ -7,15 +7,29 @@ import type { DocumentAnchor } from '@/contracts/document';
 import type { StoredDocument } from '@/data/database';
 import type { TranslationSession } from '@/translation/session';
 import { readingPersistence } from './reading-persistence';
+import { pdfSourceUrl } from '@/browser-entry/pdf';
+import { browser } from 'wxt/browser';
+import { hasImportOrigin, requestImportOrigin } from '@/document/permissions';
+
+type ExternalImport = {
+  url: string;
+  phase: 'checking' | 'permission' | 'importing' | 'failed';
+  jobId?: string;
+  error?: string;
+};
 
 /** Session ownership and UI mapping only; file identity/import remains with the library. */
 export class ReaderController {
   readonly db = new AnnotationDatabase();
-  readonly imports = createDocumentService(this.db);
+  readonly imports = createDocumentService(this.db, { checkUrlPermissionOnly: true });
   readonly reader: PdfjsReader;
   annotations?: AnnotationSession;
   document?: StoredDocument;
+  originalPdfUrl?: string;
   message = '';
+  externalImport?: ExternalImport;
+  private started = false;
+  private stopping = false;
   translateSelection?: (anchor: DocumentAnchor, text?: string) => void;
   private translations = new Set<TranslationSession>();
   isChangingDocument = false;
@@ -40,18 +54,68 @@ export class ReaderController {
       if (state.tool === 'auto-highlight' && state.menuTarget?.kind === 'selection') void this.createHighlight(state.menuTarget.selection.id);
       update();
     }), this.reader.subscribeProjection('viewport', update), this.imports.service.subscribe(() => {
+      const external = this.externalImport;
+      const job = external?.jobId ? this.imports.service.getSnapshot().data.jobs.find(j => j.id === external.jobId) : undefined;
+      if (external && job && (job.phase === 'failed' || job.phase === 'cancelled')) {
+        external.phase = 'failed';
+        external.error = job.error?.message ?? '导入已取消，可以重试或先下载 PDF 再导入。';
+      }
       for (const job of this.imports.service.getSnapshot().data.jobs) if (job.phase === 'readable' && job.document && !this.openedJobs.has(job.id)) {
-        this.openedJobs.add(job.id); void this.open(job.document.documentId);
+        this.openedJobs.add(job.id);
+        void this.open(job.document.documentId, job.id === this.externalImport?.jobId ? this.externalImport.url : undefined);
       }
       update();
     }));
   }
   report(message: string) { if (!this.disposed) { this.message = message; this.update(); } }
   async start() {
+    if (this.started) return;
+    this.started = true;
     const params = new URLSearchParams(location.search);
+    try { const original = params.get('originalPdf'); if (original) this.originalPdfUrl = pdfSourceUrl(original); } catch { /* Ignore an invalid source hint. */ }
+    if (params.get('open') === 'file') return;
+    const external = params.get('import');
+    if (external !== null) {
+      try {
+        this.externalImport = { url: pdfSourceUrl(external), phase: 'checking' };
+        this.update();
+        await this.importExternal(false);
+      } catch (error) { this.report(error instanceof Error ? error.message : '论文链接无效。'); }
+      return;
+    }
     const id = params.get('documentId') ?? params.get('item');
     if (id) await this.open(id);
     else { const docs = await this.db.list().catch(() => []); if (!this.disposed && docs[0]) await this.open(docs[0].id); }
+  }
+  /** Permission requests originate in the retry/allow button's user gesture. */
+  async importExternal(requestAccess = true) {
+    const external = this.externalImport;
+    if (!external || this.disposed || this.stopping) return;
+    if (external.phase === 'importing') return;
+    const permission = requestAccess ? requestImportOrigin(external.url) : hasImportOrigin(external.url);
+    external.phase = 'checking'; external.error = undefined; this.update();
+    try {
+      const allowed = await permission;
+      if (this.disposed || this.stopping) return;
+      if (!allowed) {
+        external.phase = 'permission'; external.error = `需要允许 Paperpane 读取 ${new URL(external.url).hostname} 的 PDF。`; this.update(); return;
+      }
+      if (external.jobId) {
+        const result = await this.imports.service.retry(external.jobId);
+        if (!result.ok) throw new Error(result.error.message);
+        // retry() publishes the reading phase synchronously before returning.
+        external.phase = 'importing';
+      } else {
+        external.phase = 'importing';
+        const result = await this.imports.service.importDocument({ kind: 'url', url: external.url, intent: 'import' });
+        if (!result.ok) throw new Error(result.error.message);
+        external.jobId = result.value;
+      }
+      this.update();
+    } catch (error) {
+      if (this.disposed || this.stopping) return;
+      external.phase = 'failed'; external.error = error instanceof Error ? error.message : '无法导入论文，请重试。'; this.update();
+    }
   }
   trackTranslation(session: TranslationSession) { this.translations.add(session); }
   async releaseTranslation(session: TranslationSession) {
@@ -82,7 +146,17 @@ export class ReaderController {
     if (!await this.prepareDocumentChange()) return;
     try { location.href = 'library.html'; } finally { this.releaseDocumentChange(); }
   }
-  async open(id: string) {
+  async returnToOriginal() {
+    const url = this.originalPdfUrl ?? this.externalImport?.url ?? this.document?.sourceUrl;
+    if (!url || !await this.prepareDocumentChange()) return;
+    try {
+      if (!browser.runtime?.id) { location.assign(pdfSourceUrl(url)); return; }
+      const result = await browser.runtime.sendMessage({ type: 'OPEN_ORIGINAL_PDF', pdfUrl: url });
+      if (!result?.ok) throw new Error(result?.error ?? '无法返回原 PDF。');
+    } catch (error) { this.report(error instanceof Error ? error.message : '无法返回原 PDF。'); }
+    finally { this.releaseDocumentChange(); }
+  }
+  async open(id: string, importedSource?: string) {
     if (!await this.prepareDocumentChange()) return;
     const epoch = ++this.epoch;
     try {
@@ -92,13 +166,17 @@ export class ReaderController {
       if (this.disposed || epoch !== this.epoch) return;
       this.unsubscribeAnnotations?.(); await this.annotations?.dispose(); await this.reading?.dispose();
       if (this.disposed || epoch !== this.epoch) return;
+      this.originalPdfUrl = importedSource ?? (!this.externalImport && (!this.document || this.document.id === doc.id) ? this.originalPdfUrl : undefined) ?? doc.sourceUrl;
       this.document = doc; this.message = ''; this.creations.clear();
       const ref = {documentId:doc.id,fileVersion:doc.fileVersion};
       this.annotations = new AnnotationSession(this.db, ref);
       const annotations = this.annotations;
       this.unsubscribeAnnotations = annotations.subscribe(() => { this.reader.setAnnotations(annotations.getSnapshot().data.items); this.update(); });
       this.restoring = true;
-      const url = new URL(location.href); url.searchParams.delete('item'); url.searchParams.set('documentId', doc.id); history.replaceState(null, '', url);
+      const url = new URL(location.href); url.searchParams.delete('item'); url.searchParams.delete('import'); url.searchParams.delete('source'); url.searchParams.set('documentId', doc.id);
+      if (this.originalPdfUrl) url.searchParams.set('originalPdf', this.originalPdfUrl); else url.searchParams.delete('originalPdf');
+      history.replaceState(null, '', url);
+      this.externalImport = undefined;
       this.update();
       const opening = this.reader.open(blob, ref);
       await annotations.refresh();
@@ -147,11 +225,12 @@ export class ReaderController {
     const a=document.createElement('a'); a.href=url; a.download=result.value.filename; a.click(); setTimeout(()=>URL.revokeObjectURL(url),1000);
   }
   async dispose() {
+    this.stopping = true;
     if (this.isChangingDocument) await this.transition;
     if (this.disposed) return true;
-    if (!await this.prepareDocumentChange()) return false;
+    if (!await this.prepareDocumentChange()) { this.stopping = false; return false; }
     const released = await Promise.all([...this.translations].map(s => this.releaseTranslation(s)));
-    if (released.some(ok => !ok)) { this.releaseDocumentChange(); return false; }
+    if (released.some(ok => !ok)) { this.stopping = false; this.releaseDocumentChange(); return false; }
     window.removeEventListener('beforeunload', this.beforeUnload);
     this.disposed=true; this.epoch++; this.cleanups.forEach(fn=>fn()); this.unsubscribeAnnotations?.(); this.imports.dispose();
     await Promise.all([this.annotations?.dispose(),this.reading?.dispose(),this.reader.dispose()]); await this.db.close(); this.releaseDocumentChange(); return true;

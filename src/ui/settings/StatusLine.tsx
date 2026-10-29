@@ -16,6 +16,8 @@ export function sinceText(iso: string, now = Date.now()): string {
 }
 
 function syncLine(status: StatusSummary): { text: string; tone: Tone } {
+  if (status.syncMessage) return { text: status.syncMessage, tone: status.settingsState === 'failed' ? 'danger' : status.settingsState === 'loading' ? 'busy' : 'neutral' };
+  if (status.syncImplemented === false) return { text: status.syncConfigured ? '同步已配置，功能尚未接入' : '数据仅保存在本机，尚未接入同步', tone: 'neutral' };
   const since = status.lastSyncedAt ? sinceText(status.lastSyncedAt) : null;
   switch (status.sync) {
     case 'unconfigured':
@@ -34,9 +36,10 @@ function syncLine(status: StatusSummary): { text: string; tone: Tone } {
 }
 
 function modelLine(status: StatusSummary): { text: string; tone: Tone } {
+  if (status.modelAvailability === 'checking') return { text: '正在读取模型配置…', tone: 'busy' };
   if (status.modelAvailability === 'unconfigured') return { text: '还没有配置模型', tone: 'warn' };
-  if (status.modelAvailability === 'unavailable') return { text: '模型暂不可用', tone: 'danger' };
-  return { text: '模型已配置', tone: 'ok' };
+  if (status.modelAvailability === 'unavailable') return { text: status.modelMessage ?? '模型暂不可用', tone: 'danger' };
+  return { text: status.modelLabel ? `模型已配置 · ${status.modelLabel}` : '模型已配置', tone: 'ok' };
 }
 
 interface StatusLineProps {
@@ -59,7 +62,7 @@ export function StatusLine({ status, onOpen, inline, className }: StatusLineProp
         <li key={line.key + line.text} data-tone={line.tone}>
           <span className="pp-statusline__dot" aria-hidden="true" />
           {onOpen ? (
-            <button type="button" onClick={() => onOpen(line.key)}>
+            <button type="button" title={line.key==='models'&&status.modelAvailability==='configured'?'配置已保存，未进行接口连通性测试。':undefined} onClick={() => onOpen(line.key)}>
               {line.text}
             </button>
           ) : (
