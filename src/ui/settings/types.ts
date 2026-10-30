@@ -92,6 +92,7 @@ export type Protocol = 'openai-responses' | 'openai-chat' | 'anthropic' | 'gemin
 export type SecretEdit = { kind: 'keep' } | { kind: 'clear' } | { kind: 'replace'; value: string };
 
 export interface EndpointView {
+  presetId?: string;
   id: string;
   name: string;
   protocol: Protocol;
@@ -105,6 +106,7 @@ export interface EndpointDraft extends Omit<EndpointView, 'hasKey'> {
 }
 
 export type ReasoningCapability =
+  | { kind: 'unknown' | 'auto' | 'toggle' }
   | { kind: 'none' }
   | { kind: 'effort'; values: readonly string[] }
   | { kind: 'budget'; minTokens: number; maxTokens: number; presets: readonly number[] };
@@ -112,7 +114,15 @@ export type ReasoningCapability =
 export type ReasoningChoice = { kind: 'default' } | { kind: 'effort'; value: string } | { kind: 'budget'; tokens: number };
 
 export interface ModelConfigView {
-  /** Token capacity. Missing uses 256k, not a restrictive legacy context window. */
+  inputLimit?: number;
+  maxOutputTokens?: number;
+  protocolOverride?: Protocol;
+  defaultReasoning?: string;
+  visionKnown?: boolean;
+  catalogRef?: { provider: string; modelId: string; updatedAt: string };
+  metadataSource?: 'catalog' | 'endpoint' | 'manual';
+  overrides?: string[];
+  /** Known capacity; unknown models use a conservative runtime budget without inventing metadata. */
   contextWindow?: number;
   id: string;
   endpointId: string;

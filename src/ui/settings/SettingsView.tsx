@@ -179,6 +179,33 @@ export function SettingsView(props: SettingsViewProps) {
 
   const current = sections.find((item) => item.id === section)!;
 
+  const renderSaveBar = (layout: "floating" | "inline") => (
+    <SaveBar
+      state={bar}
+      layout={layout}
+      onSave={() => void save(base.revision)}
+      onDiscard={discard}
+      onReload={() => {
+        const next = latest.current ?? settings;
+        latest.current = null;
+        setBase(next);
+        setDraft(toDraft(next));
+        setProblems(new Map());
+        setBar(null);
+      }}
+      onOverwrite={() => {
+        const next = latest.current;
+        if (!next) return;
+        const { merged } = mergeOnto(next, base, draftNow.current);
+        latest.current = null;
+        setBase(next);
+        setDraft(merged);
+        void save(next.revision, merged);
+      }}
+    />
+  );
+
+
   return (
     <div className="pp-settings">
       <GlassSurface as="aside" tone="panel" radius="panel" className="pp-settings__nav" aria-label="设置分类">
@@ -203,14 +230,14 @@ export function SettingsView(props: SettingsViewProps) {
       <main className="pp-settings__main">
         <ScrollArea className="pp-settings__scroll" viewportClassName="pp-settings__viewport">
           <div className="pp-settings__content">
-            <header className="pp-settings__head">
+            {section !== 'models' && <header className="pp-settings__head">
               <h1>{current.label}</h1>
               <p>{current.description}</p>
-            </header>
+            </header>}
             {section === 'general' ? (
               <GeneralSection state={props.preferences} onPreference={props.onPreference} onRetry={props.onRetryPreferences} />
             ) : section === 'models' ? (
-              <ModelsSection draft={draft} onChange={edit} />
+              <ModelsSection draft={draft} onChange={edit} renderSaveBar={renderSaveBar} />
             ) : section === 'features' ? (
               <TranslationSection draft={draft} onChange={edit} preferences={props.preferences.preferences} onPreference={props.onPreference} />
             ) : section === 'advanced' ? (
@@ -222,30 +249,7 @@ export function SettingsView(props: SettingsViewProps) {
             )}
           </div>
         </ScrollArea>
-        {bar && (
-          <SaveBar
-            state={bar}
-            onSave={() => void save(base.revision)}
-            onDiscard={discard}
-            onReload={() => {
-              const next = latest.current ?? settings;
-              latest.current = null;
-              setBase(next);
-              setDraft(toDraft(next));
-              setProblems(new Map());
-              setBar(null);
-            }}
-            onOverwrite={() => {
-              const next = latest.current;
-              if (!next) return;
-              const { merged } = mergeOnto(next, base, draftNow.current);
-              latest.current = null;
-              setBase(next);
-              setDraft(merged);
-              void save(next.revision, merged);
-            }}
-          />
-        )}
+        {section !== 'models' && renderSaveBar('floating')}
       </main>
     </div>
   );

@@ -24,7 +24,10 @@
     "zip": "wxt zip -b chrome --mv3",
     "zip:edge": "wxt zip -b edge --mv3",
     "typecheck": "wxt prepare && tsc --noEmit",
-    "postinstall": "wxt prepare"
+    "postinstall": "wxt prepare",
+    "test:models": "node tests/model-settings-extension.mjs",
+    "test:providers": "node --experimental-strip-types tests/model-providers-browser.mjs",
+    "preview:models": "pnpm build && node scripts/build-settings-preview.mjs"
   },
   "dependencies": {
     "@assistant-ui/react": "0.15.31",

@@ -1,12 +1,20 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { modelConfigurationStatus, resolveConfiguredModel, supportsModelOperation } from '../src/ai/model-configuration.ts';
+import { endpointUrl, modelConfigurationStatus, resolveConfiguredModel, supportsModelOperation } from '../src/ai/model-configuration.ts';
 import { deriveSettingsStatus } from '../src/runtime/settings-status.ts';
 
 const settings = protocol => ({
   endpoints: [{ id: 'endpoint', protocol, baseUrl: 'https://model.example/v1', hasKey: false }],
   models: [{ id: 'model', endpointId: 'endpoint', modelId: 'example', label: 'My model' }],
   defaultModelId: 'model', features: [], sync: { enabled: false },
+});
+
+test('model protocol override is shared by routing, status and feature checks',()=>{
+  const view=settings('openai-chat');view.models[0].protocolOverride='anthropic';
+  assert.equal(resolveConfiguredModel(view).endpoint.protocol,'anthropic');
+  assert.equal(modelConfigurationStatus(view).state,'configured');
+  assert.equal(modelConfigurationStatus(view,'translate').state,'unavailable');
+  assert.equal(view.endpoints[0].protocol,'openai-chat');
 });
 
 for (const protocol of ['openai-chat', 'openai-responses', 'anthropic', 'gemini']) {
@@ -56,4 +64,10 @@ test('invalid endpoint, missing model and unknown protocols fail before dispatch
   assert.equal(modelConfigurationStatus(view).state, 'configured');
   view.defaultModelId = 'removed';
   assert.equal(modelConfigurationStatus(view).state, 'unavailable');
+});
+
+test('pasted native request paths normalize without changing destination or accepting credentials',()=>{
+ assert.equal(endpointUrl('https://api.anthropic.com/v1/messages'),'https://api.anthropic.com/v1');
+ assert.equal(endpointUrl('https://generativelanguage.googleapis.com/v1beta/models/gemini:streamGenerateContent'),'https://generativelanguage.googleapis.com/v1beta');
+ assert.throws(()=>endpointUrl('https://key:secret@example.com/v1'));
 });

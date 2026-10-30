@@ -25,7 +25,7 @@ export function endpointUrl(raw: string): string {
     throw new Error('接口地址应为不含凭据、查询参数的 HTTP(S) 地址。');
   if (url.protocol === 'http:' && !['localhost', '127.0.0.1', '[::1]'].includes(url.hostname))
     throw new Error('远程模型接口必须使用 HTTPS。');
-  return url.href.replace(/\/$/, '').replace(/\/(?:chat\/completions|responses)$/, '');
+  return url.href.replace(/\/$/, '').replace(/\/(?:chat\/completions|responses|messages)$/, '').replace(/\/models\/[^/]+:(?:streamGenerateContent|generateContent)$/, '');
 }
 
 /** Shared routing for configuration status and actual requests. No I/O or secrets. */
@@ -36,7 +36,8 @@ export function resolveConfiguredModel(view: SettingsView, modelId?: string, fea
   const selected = modelId ?? route?.modelId ?? view.defaultModelId ?? fallback ?? view.models[0]?.id;
   const model = view.models.find(item => item.id === selected);
   if (!model?.modelId.trim()) throw new Error('所选模型不存在或模型 ID 为空');
-  const endpoint = view.endpoints.find(item => item.id === model.endpointId);
+  const storedEndpoint = view.endpoints.find(item => item.id === model.endpointId);
+  const endpoint = storedEndpoint && {...storedEndpoint, protocol: model.protocolOverride ?? storedEndpoint.protocol};
   if (!endpoint) throw new Error('模型关联的接口不存在');
   endpointUrl(endpoint.baseUrl);
   if (!supportsModelOperation(endpoint.protocol, feature === 'translate' ? 'translation' : 'generation'))
