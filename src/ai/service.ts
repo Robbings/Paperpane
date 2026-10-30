@@ -31,6 +31,7 @@ import {
   type ResearchConversation,
   type ResearchMessage,
   type ResearchAttempt,
+  type OverviewRun,
   type Usage,
 } from "./types";
 import {
@@ -391,13 +392,11 @@ export class ResearchService implements ConversationService {
     return task;
   }
   async closeExplanation(sid: string) {
-    await this.stop(sid);
     const entry = this.record.explanationWindows?.find((w) => w.id === sid);
-    if (entry) {
-      entry.closed = true;
-      this.changed();
-      await this.flush();
-    }
+    // Invalidate deferred sends synchronously, before stop/save yields to a paste callback.
+    if (entry) { entry.closed = true; this.changed(); }
+    await this.stop(sid);
+    if (entry) await this.flush();
   }
   async collapseExplanation(sid: string, collapsed: boolean) {
     const entry = this.record.explanationWindows?.find(
@@ -446,6 +445,11 @@ export class ResearchService implements ConversationService {
     this.schedule();
     return Promise.resolve(success(undefined));
   }
+  canSend(sid: string) {
+    const session = this.record.sessions.find(s => s.id === sid && !s.deletedAt);
+    return !this.disposed && !this.leaving && !!session && (!session.explanation ||
+      this.record.explanationWindows?.some(w => w.id === sid && !w.closed) === true);
+  }
   async send(
     sid: string,
     input: ChatDraft,
@@ -457,7 +461,7 @@ export class ResearchService implements ConversationService {
       const s = this.session(sid);
       if (this.controllers.has(sid) || this.accepting.has(sid))
         return failure("BUSY", "正在生成回答");
-      if (this.disposed || this.leaving) return failure("INVALID_INPUT", "阅读器正在关闭");
+      if (!this.canSend(sid)) return failure("INVALID_INPUT", "对话已关闭");
       this.accepting.add(sid);
       accepted = true;
       if (parentId !== null && !s.messages.some((m) => m.id === parentId))
@@ -502,6 +506,8 @@ export class ResearchService implements ConversationService {
         this.changed();
         return failure("SAVE_FAILED", this.error ?? "问题尚未保存");
       }
+      // The question save may have overlapped closing its explanation window.
+      if (!this.canSend(sid)) return failure("INVALID_INPUT", "对话已关闭");
       if (
         s.draft.text === input.text &&
         s.draft.attachments.map((a) => a.id).join() ===
@@ -532,6 +538,7 @@ export class ResearchService implements ConversationService {
       : failure<string>("NOT_FOUND", "原问题不存在");
   }
   async regenerate(sid: string, mid: string) {
+    if (!this.canSend(sid)) return failure<string>("INVALID_INPUT", "对话已关闭");
     const m = this.session(sid).messages.find((m) => m.id === mid);
     if (!m?.parentId) return failure<string>("NOT_FOUND", "原回答不存在");
     if (this.controllers.has(sid))
@@ -839,6 +846,7 @@ export class ResearchService implements ConversationService {
     mid = id(),
     choice?: { modelId: string; reasoning?: string; cancelled?: boolean },
   ) {
+    if (!this.canSend(sid)) return;
     const s = this.session(sid),
       controller = new AbortController();
     this.controllers.set(sid, controller);
@@ -933,7 +941,7 @@ export class ResearchService implements ConversationService {
     }
   }
   async suggest(sid: string) {
-    if (this.disposed || this.leaving) return failure("INVALID_INPUT", "阅读器正在关闭");
+    if (!this.canSend(sid)) return failure("INVALID_INPUT", "对话已关闭");
     const s = this.session(sid),
       key = "suggest:" + sid,
       leaf = s.activeLeafId;
@@ -1264,9 +1272,11 @@ export class ResearchService implements ConversationService {
       return;
     const controller = new AbortController();
     this.controllers.set("overview", controller);
+    let ownedRun: OverviewRun | undefined;
     try {
       await this.overviewOwned(controller, async () => {
         const latest = await this.store.read(this.key);
+        controller.signal.throwIfAborted();
         if (!this.unsaved) {
           adoptRecord(this.record, latest);
           this.base = structuredClone(latest);
@@ -1279,7 +1289,7 @@ export class ResearchService implements ConversationService {
         )
           return;
         const previousId = this.record.activeOverviewId;
-        const run = {
+        const run = ownedRun = {
           id: id(),
           signature,
           cards: structuredClone(this.record.cards),
@@ -1407,24 +1417,22 @@ export class ResearchService implements ConversationService {
             };
       });
     } catch (e) {
-      const run = this.record.overviews.find(
-        (r) => r.id === this.record.activeOverviewId,
-      );
-      if (run)
-        for (const [key, value] of Object.entries(run.results))
+      // A waiter that never acquired the lock has no run to stop or persist.
+      if (ownedRun)
+        for (const [key, value] of Object.entries(ownedRun.results))
           if (value.state !== "completed")
-            run.results[key] = {
+            ownedRun.results[key] = {
               ...value,
               state: controller.signal.aborted ? "stopped" : "failed",
               error: { message: errorText(e), recovery: ["retry"] },
             };
-      this.error = errorText(e);
+      if (ownedRun || !controller.signal.aborted) this.error = errorText(e);
     } finally {
       try {
-        this.changed();
-        await this.flush();
+        if (ownedRun) { this.changed(); await this.flush(); }
       } finally {
         if (this.controllers.get("overview") === controller) this.controllers.delete("overview");
+        this.notify();
       }
     }
   }

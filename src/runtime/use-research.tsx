@@ -237,15 +237,18 @@ function ConversationPanel({
           void service.setDraft(sid, { ...draft, text });
         }}
         onSend={() => {
-          void pasteTail.current.then(()=>service.send(
+          void pasteTail.current.then(()=> {
+            if (!service.canSend(sid)) return;
+            return service.send(
               sid,
               service.getSnapshot().data.sessions.find((s) => s.id === sid)!
                 .draft,
               service.getSnapshot().data.sessions.find((s) => s.id === sid)!
                 .activeLeafId,
-            ))
+            );
+          })
             .then((r) => {
-              if (!r.ok) report(r.error.message);
+              if (r && !r.ok) report(r.error.message);
             }).catch(report);
         }}
         onStop={() => void service.stop(sid)}
