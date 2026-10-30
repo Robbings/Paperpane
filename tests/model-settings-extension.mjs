@@ -3,6 +3,7 @@ import http from "node:http";
 import { mkdir, readFile } from "node:fs/promises";
 import { resolve } from "node:path";
 import { pathToFileURL } from "node:url";
+import { checkModelSettingsConcurrency } from './model-settings-concurrency.mjs';
 const { chromium } = await import(
   process.env.PAPERPANE_PLAYWRIGHT_MODULE
     ? pathToFileURL(process.env.PAPERPANE_PLAYWRIGHT_MODULE).href
@@ -424,6 +425,17 @@ try {
   console.log(
     "PASS: duplicate excludes key, narrow viewport and no uncaught browser errors",
   );
+  await page.setViewportSize({ width: 1440, height: 1100 });
+  const concurrent = await context.newPage();
+  await concurrent.goto(root + '/options.html#models');
+  const reopen = async (target) => {
+    await target.reload();
+    await target.locator('.pp-provider-card').filter({ hasText: 'Shared renamed' }).click();
+  };
+  await reopen(page); await reopen(concurrent);
+  for (const result of await checkModelSettingsConcurrency(page, concurrent, { reopen })) console.log('PASS:', result);
+  await concurrent.close();
+  assert.deepEqual(errors, []);
 } catch (error) {
   const p = context.pages().at(-1);
   console.error("PAGE", await p?.locator("body").innerText());

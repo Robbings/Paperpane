@@ -39,10 +39,14 @@ export function ModelsSection({
   draft,
   onChange,
   renderSaveBar,
+  editor,
+  setEditor,
 }: {
   draft: SettingsDraft;
   onChange: (v: SettingsDraft) => void;
   renderSaveBar: (layout: "floating" | "inline") => ReactNode;
+  editor: ModelConfigView | null;
+  setEditor: (model: ModelConfigView | null) => void;
 }) {
   const [active, setActive] = useState<string | null>(null),
     [search, setSearch] = useState(""),
@@ -56,8 +60,7 @@ export function ModelsSection({
   const [catalog, setCatalog] = useState(readCatalog),
     [discovered, setDiscovered] = useState<CatalogModel[]>([]),
     [chosen, setChosen] = useState<string[]>([]);
-  const [editor, setEditor] = useState<ModelConfigView | null>(null),
-    [message, setMessage] = useState(""),
+  const [message, setMessage] = useState(""),
     [error, setError] = useState(""),
     [busy, setBusy] = useState(false);
   const [testId, setTestId] = useState<string | null>(null),
