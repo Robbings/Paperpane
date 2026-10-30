@@ -174,6 +174,8 @@ export class AnnotationSession implements AnnotationService {
   async discardDrafts() { await this.queue; this.blocked.clear(); this.drafts.clear(); this.layoutDrafts.clear(); this.failedCreates.clear(); this.error = undefined; await this.refresh(); }
   async export(format: 'markdown' | 'csv') {
     await this.queue;
+    if(this.snapshot.state==='loading')return failure('BUSY','批注仍在读取，请稍候。');
+    if(this.error)return {ok:false as const,error:this.error};
     if (this.drafts.size || this.failedCreates.size) return failure('BUSY', '请先保存批注草稿。');
     const rows = [...this.rows.values()].filter(row => !row.deletedAt);
     const csv = (value: string) => `"${value.replaceAll('"', '""')}"`;

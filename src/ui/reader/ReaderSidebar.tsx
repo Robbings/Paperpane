@@ -1,3 +1,4 @@
+import { PageThumbnail, type ThumbnailRenderer } from './PageThumbnail';
 import { useState, type ReactNode } from 'react';
 import { GlassSurface, Segmented } from '@/ui/components';
 import type { OutlineItemView } from './types';
@@ -7,6 +8,9 @@ interface ReaderSidebarProps {
   open: boolean;
   outline: readonly OutlineItemView[];
   navigationPending?: boolean;
+  navigationMessage?: string;
+  renderThumbnail?: ThumbnailRenderer;
+  onOutlineNavigate?: (id:string)=>void;
   pageCount: number;
   /** 0-based. */
   pageIndex: number;
@@ -19,7 +23,7 @@ interface ReaderSidebarProps {
 
 type SidebarTab = 'thumbs' | 'outline' | 'library';
 
-export function ReaderSidebar({ open, outline, pageCount, pageIndex, overlay, onNavigate, library, navigationPending }: ReaderSidebarProps) {
+export function ReaderSidebar({ open, outline, pageCount, pageIndex, overlay, onNavigate, library, navigationPending, navigationMessage, renderThumbnail, onOutlineNavigate }: ReaderSidebarProps) {
   const [tab, setTab] = useState<SidebarTab>('outline');
   const tabs: { value: SidebarTab; label: string }[] = [
     { value: 'thumbs', label: '缩略图' },
@@ -44,11 +48,12 @@ export function ReaderSidebar({ open, outline, pageCount, pageIndex, overlay, on
 
       {tab === 'library' && library ? (
         library
-      ) : navigationPending ? (
-        <p className="pp-sidebar__empty">{tab === 'outline' ? '目录暂不可用。' : '缩略图暂不可用。'}</p>
+      ) : navigationPending && tab==='outline' ? (
+        <p className="pp-sidebar__empty">{navigationMessage ?? '正在读取目录…'}</p>
       ) : tab === 'outline' ? (
         outline.length > 0 ? (
           <nav aria-label="目录" className="pp-sidebar__scroll pp-outline">
+            {navigationMessage&&<p className="pp-sidebar__empty">{navigationMessage}</p>}
             {outline.map((item) => {
               const current = item.id === currentId;
               return (
@@ -58,7 +63,7 @@ export function ReaderSidebar({ open, outline, pageCount, pageIndex, overlay, on
                   className="pp-outline__item"
                   style={{ paddingLeft: 10 + item.level * 16 }}
                   aria-current={current ? 'location' : undefined}
-                  onClick={() => onNavigate(item.pageIndex)}
+                  onClick={() => onOutlineNavigate ? onOutlineNavigate(item.id) : onNavigate(item.pageIndex)}
                 >
                   <span className="pp-outline__label">{item.label}</span>
                   <span className="pp-outline__page">{item.pageIndex + 1}</span>
@@ -67,7 +72,7 @@ export function ReaderSidebar({ open, outline, pageCount, pageIndex, overlay, on
             })}
           </nav>
         ) : (
-          <p className="pp-sidebar__empty">这篇论文没有目录。</p>
+          <p className="pp-sidebar__empty">{navigationMessage ?? '这篇论文没有可识别的目录。'}</p>
         )
       ) : (
         <nav className="pp-sidebar__scroll pp-thumbs" aria-label="页面缩略图">
@@ -80,14 +85,14 @@ export function ReaderSidebar({ open, outline, pageCount, pageIndex, overlay, on
               aria-current={index === pageIndex ? 'page' : undefined}
               onClick={() => onNavigate(index)}
             >
-              <span className="pp-thumb__page" aria-hidden="true">
+              {renderThumbnail ? <PageThumbnail index={index} render={renderThumbnail}/> : <span className="pp-thumb__page" aria-hidden="true">
                 <span />
                 <span />
                 <span />
                 <span />
                 <span />
                 <span />
-              </span>
+              </span>}
               <span className="pp-thumb__label">{index + 1}</span>
             </button>
           ))}
