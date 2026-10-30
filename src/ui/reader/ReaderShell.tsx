@@ -9,6 +9,7 @@ import {
   type SyncState,
 } from '@/ui/components';
 import { CommentNotes, NOTE_SIZE } from './notes/CommentNotes';
+import { useMiddlePan } from './use-middle-pan';
 import { FindBar } from './FindBar';
 import { QuickSettings, type ReaderSettingsProps } from './QuickSettings';
 import { TranslationDockContext } from './translation/dock';
@@ -18,13 +19,13 @@ import { ReaderLibraryNav, type ReaderLibraryData } from './library/ReaderLibrar
 import { SaveToLibraryPopover, type LibraryEntryDraft } from './library/SaveToLibraryPopover';
 import { OverlayScrollbar } from './OverlayScrollbar';
 import {
-  GAP,
+  GAP as BASE_GAP,
   PAPER_COMFORT_WIDTH,
   PAPER_MIN_WIDTH,
-  RAIL_GAP,
-  RAIL_LENGTH,
-  RAIL_ROW_LENGTH,
-  RAIL_THICKNESS,
+  RAIL_GAP as BASE_RAIL_GAP,
+  RAIL_LENGTH as BASE_RAIL_LENGTH,
+  RAIL_ROW_LENGTH as BASE_RAIL_ROW_LENGTH,
+  RAIL_THICKNESS as BASE_RAIL_THICKNESS,
   RESEARCH_HEIGHT,
   RESEARCH_WIDTH,
   clampHeight,
@@ -47,7 +48,6 @@ import type {
   OutlineItemView,
   ResearchPanelId,
   ReaderInteraction,
-  Rotation,
 } from './types';
 import { useViewport } from './useViewport';
 import type { TagView } from '@/ui/library/types';
@@ -102,6 +102,8 @@ interface ReaderShellProps {
   settings?: ReaderSettingsProps;
   /** Content for research panels the page supplies itself (discussion, overview, …); the rest show a placeholder. */
   panels?: Partial<Record<ResearchPanelId, ReactNode>>;
+  /** AI actions may request their existing research panel without replacing the shell. */
+  panelRequest?: { id: ResearchPanelId; token: string };
 }
 
 export interface ReaderLibraryProps extends ReaderLibraryData {
@@ -143,9 +145,10 @@ const PAPER_BESIDE_TRANSLATION = 360;
 const FLOAT_MIN = { w: 300, h: 240 };
 
 /** Keeps the floating translation inside the window, with its header reachable. */
-function clampFloat(r: { x: number; y: number; w: number; h: number }, viewport: { width: number; height: number }) {
-  const w = Math.min(Math.max(r.w, FLOAT_MIN.w), viewport.width - 2 * GAP);
-  const h = Math.min(Math.max(r.h, FLOAT_MIN.h), viewport.height - 2 * GAP);
+function clampFloat(r: { x: number; y: number; w: number; h: number }, viewport: { width: number; height: number }, scale = 1) {
+  const GAP = BASE_GAP * scale;
+  const w = Math.min(Math.max(r.w, FLOAT_MIN.w * scale), viewport.width - 2 * GAP);
+  const h = Math.min(Math.max(r.h, FLOAT_MIN.h * scale), viewport.height - 2 * GAP);
   return {
     w,
     h,
@@ -157,6 +160,10 @@ function clampFloat(r: { x: number; y: number; w: number; h: number }, viewport:
 export function ReaderShell(props: ReaderShellProps) {
   const { header, outline, pageIndex, zoomPercent, annotations, annotationStatus, notes, document: paper } = props;
   const viewport = useViewport();
+  const uiScale = (props.settings?.preferences.uiScale ?? 100) / 100;
+  const GAP = BASE_GAP * uiScale, RAIL_GAP = BASE_RAIL_GAP * uiScale;
+  const RAIL_LENGTH = BASE_RAIL_LENGTH * uiScale, RAIL_ROW_LENGTH = BASE_RAIL_ROW_LENGTH * uiScale;
+  const RAIL_THICKNESS = BASE_RAIL_THICKNESS * uiScale;
 
   const [placement, setPlacement] = useState<DockPlacement>(props.initialLayout?.placement ?? 'right');
   const [width, setWidth] = useState(props.initialLayout?.width ?? RESEARCH_WIDTH.default);
@@ -164,6 +171,7 @@ export function ReaderShell(props: ReaderShellProps) {
   const [showTitle, setShowTitle] = useState(props.initialLayout?.showTitle ?? true);
   const [panel, setPanel] = useState<ResearchPanelId>('annotations');
   const [panelOpen, setPanelOpen] = useState(true);
+  useEffect(()=>{const request=props.panelRequest;if(!request)return;setPanel(request.id);setPanelOpen(true);setVisited(current=>new Set([...current,request.id]));},[props.panelRequest]);
   // Panels stay mounted once opened, so drafts and running tasks survive switching.
   const [visited, setVisited] = useState<ReadonlySet<ResearchPanelId>>(() => new Set(['annotations']));
   const [sidebarPref, setSidebarPref] = useState<boolean | null>(null);
@@ -172,22 +180,22 @@ export function ReaderShell(props: ReaderShellProps) {
   // 'settling' while content fades back in near the end of the move.
   const [switching, setSwitching] = useState<'out' | 'settling' | null>(null);
 
-  const effectiveWidth = clampWidth(width, viewport.width);
-  const effectiveHeight = clampHeight(height, viewport.height);
+  const effectiveWidth = clampWidth(width, viewport.width / uiScale) * uiScale;
+  const effectiveHeight = clampHeight(height, viewport.height / uiScale) * uiScale;
 
   // Keep the paper readable: fold the sidebar away first, then dock the
   // research area at the bottom. The saved placement itself is unchanged.
   // These decisions assume the panel is open, so collapsing or expanding it
   // never moves it to the other side.
   const space = (docked: boolean, at: DockPlacement) =>
-    paperWidth({ viewportWidth: viewport.width, sidebarDocked: docked, placement: at, panelOpen: true, width: effectiveWidth });
+    paperWidth({ viewportWidth: viewport.width, sidebarDocked: docked, placement: at, panelOpen: true, width: effectiveWidth, scale: uiScale });
   const sidebarFits = space(true, placement) >= PAPER_MIN_WIDTH;
   // A docked translation takes room from the paper: the sidebar folds away first when it no longer fits.
   const translationOpen = Boolean(props.translation?.open);
   const [translationFloating, setTranslationFloating] = useState(false);
   const [translationPref, setTranslationPref] = useState<number | null>(null);
   const translationDocked = translationOpen && !translationFloating;
-  const translationRoom = translationDocked ? (translationPref ?? TRANSLATION_DEFAULT) : 0;
+  const translationRoom = translationDocked ? (translationPref ?? TRANSLATION_DEFAULT * uiScale) : 0;
   const sidebarOpen = sidebarPref ?? space(true, placement) - translationRoom >= PAPER_COMFORT_WIDTH;
   const sidebarDocked = sidebarOpen && sidebarFits;
   const canDockRight = space(sidebarDocked, 'right') >= PAPER_MIN_WIDTH;
@@ -199,6 +207,7 @@ export function ReaderShell(props: ReaderShellProps) {
     panelOpen,
     width: effectiveWidth,
     height: effectiveHeight,
+    scale: uiScale,
   });
 
   // The card is placed by explicit coordinates in both docks, so moving
@@ -296,17 +305,18 @@ export function ReaderShell(props: ReaderShellProps) {
   // move over to make room. Floating: a card over the paper the reader can move and size.
   const readingWidth = viewport.width - edges.left - edges.right;
   const translationWidth = Math.round(
-    Math.min(Math.max(translationPref ?? TRANSLATION_DEFAULT, TRANSLATION_MIN), Math.max(TRANSLATION_MIN, readingWidth - PAPER_BESIDE_TRANSLATION)),
+    Math.min(Math.max(translationPref ?? TRANSLATION_DEFAULT * uiScale, TRANSLATION_MIN * uiScale), Math.max(TRANSLATION_MIN * uiScale, readingWidth - PAPER_BESIDE_TRANSLATION)),
   );
   const [floatPref, setFloatPref] = useState<{ x: number; y: number; w: number; h: number } | null>(null);
   const floatRect = clampFloat(
     floatPref ?? {
-      w: 380,
+      w: 380 * uiScale,
       h: Math.min(620, Math.round(viewport.height * 0.62)),
-      x: viewport.width - edges.right - 380 - 16,
-      y: GAP + 44 + 16,
+      x: viewport.width - edges.right - 380 * uiScale - 16,
+      y: GAP + 60 * uiScale,
     },
     viewport,
+    uiScale,
   );
   const [translationDrag, setTranslationDrag] = useState(false);
   /** Follows one pointer gesture on the pane: docked width, or moving / sizing the floating card. */
@@ -350,7 +360,7 @@ export function ReaderShell(props: ReaderShellProps) {
           r.h = FLOAT_MIN.h;
         }
       }
-      setFloatPref(clampFloat(r, viewport));
+      setFloatPref(clampFloat(r, viewport, uiScale));
     };
     const end = () => {
       setTranslationDrag(false);
@@ -369,7 +379,7 @@ export function ReaderShell(props: ReaderShellProps) {
   };
   // The paper's own right edge: past the docked translation when it is open.
   const paperRight = edges.right + (translationDocked ? translationWidth : 0);
-  const density = toolbarDensity(viewport.width - edges.left - paperRight, showTitle);
+  const density = toolbarDensity((viewport.width - edges.left - paperRight) / uiScale, showTitle);
 
   const selectPanel = (id: ResearchPanelId) => {
     if (panelOpen && id === panel) {
@@ -396,6 +406,7 @@ export function ReaderShell(props: ReaderShellProps) {
   // Hand the scroll container to the runtime: its viewer mounts and listens there.
   const onScrollContainer = interaction.onScrollContainer;
   const [paperElement, setPaperElement] = useState<HTMLDivElement | null>(null);
+  const panIndicator = useMiddlePan(paperElement);
   useEffect(() => {
     setPaperElement(scrollRef.current);
     onScrollContainer(scrollRef.current);
@@ -537,7 +548,25 @@ export function ReaderShell(props: ReaderShellProps) {
     return () => window.removeEventListener('keydown', onKey);
   }, []);
 
-  const nextRotation = ((interaction.rotation + 90) % 360) as Rotation;
+
+  // Fixed reader shortcuts: never scale the browser chrome, even when a panel
+  // or editor has focus. Keep a ref so repeats use the latest PDF percentage.
+  const zoomCommands = useRef({ zoom: props.onZoom, to: props.onZoomTo });
+  zoomCommands.current = { zoom: props.onZoom, to: props.onZoomTo };
+  useEffect(() => {
+    const onZoomKey = (event: KeyboardEvent) => {
+      if (!(event.ctrlKey || event.metaKey) || event.altKey || event.isComposing) return;
+      const key = event.key;
+      if (key === '+' || key === '=' || key === '-' || key === '−' || key === '0') {
+        event.preventDefault();
+        event.stopPropagation();
+        if (key === '0') zoomCommands.current.to(100);
+        else zoomCommands.current.zoom(key === '-' || key === '−' ? 'out' : 'in');
+      }
+    };
+    window.addEventListener('keydown', onZoomKey, true);
+    return () => window.removeEventListener('keydown', onZoomKey, true);
+  }, []);
 
   // ---- Layout variables ----------------------------------------------------
   const style = {
@@ -572,6 +601,7 @@ export function ReaderShell(props: ReaderShellProps) {
       data-translation={translationOpen ? (translationFloating ? 'floating' : 'docked') : undefined}
       style={style}
     >
+      {panIndicator}
       <div ref={scrollRef} className="pp-reader__paper">
         {paper}
       </div>
@@ -658,9 +688,9 @@ export function ReaderShell(props: ReaderShellProps) {
         onToggleAutoHighlight={() => interaction.onToolChange(interaction.tool === 'auto-highlight' ? 'select' : 'auto-highlight')}
         findOpen={Boolean(find)}
         onFind={() => (find ? closeFind() : openFind())}
+        readingSettings={props.settings}
+        onRotateTo={interaction.onRotate}
         rotation={interaction.rotation}
-        onRotate={() => interaction.onRotate(nextRotation)}
-        onResetRotation={() => interaction.onRotate(0)}
         settingsRef={settingsRef}
         settingsOpen={settingsOpen}
         onSettings={props.settings ? () => setSettingsOpen((open) => !open) : undefined}
@@ -689,12 +719,12 @@ export function ReaderShell(props: ReaderShellProps) {
         <Splitter
           placement={effectivePlacement}
           value={effectivePlacement === 'right' ? effectiveWidth : effectiveHeight}
-          min={effectivePlacement === 'right' ? RESEARCH_WIDTH.min : RESEARCH_HEIGHT.min}
-          max={effectivePlacement === 'right' ? clampWidth(Infinity, viewport.width) : clampHeight(Infinity, viewport.height)}
+          min={(effectivePlacement === 'right' ? RESEARCH_WIDTH.min : RESEARCH_HEIGHT.min) * uiScale}
+          max={effectivePlacement === 'right' ? clampWidth(Infinity, viewport.width / uiScale) * uiScale : clampHeight(Infinity, viewport.height / uiScale) * uiScale}
           sizeFromPointer={(x, y) => (effectivePlacement === 'right' ? window.innerWidth - rail - x : window.innerHeight - rail - y)}
           onDragChange={setResizing}
           onResize={(size) =>
-            effectivePlacement === 'right' ? setWidth(clampWidth(size, viewport.width)) : setHeight(clampHeight(size, viewport.height))
+            effectivePlacement === 'right' ? setWidth(clampWidth(size / uiScale, viewport.width / uiScale)) : setHeight(clampHeight(size / uiScale, viewport.height / uiScale))
           }
         />
       )}
@@ -813,6 +843,7 @@ export function ReaderShell(props: ReaderShellProps) {
       )}
 
       <CommentNotes
+        uiScale={uiScale}
         notes={noteLayouts}
         zoomPercent={zoomPercent}
         annotations={annotations}

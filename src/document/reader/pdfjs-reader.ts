@@ -1,8 +1,9 @@
 import { nativeOutline, generatedOutline, type NavigationItem } from './navigation';
-import { TextLayer, AnnotationEditorType, GlobalWorkerOptions, PasswordResponses, getDocument, type PDFDocumentLoadingTask, type PDFDocumentProxy } from 'pdfjs-dist';
+import { setPaperpaneViewerTheme } from 'pdfjs-dist/build/paperpane-theme.mjs';
+import { TextLayer, AnnotationMode, AnnotationEditorType, GlobalWorkerOptions, PasswordResponses, getDocument, type PDFDocumentLoadingTask, type PDFDocumentProxy } from 'pdfjs-dist';
 import { mergeHighlightRects } from 'pdfjs-dist/build/paperpane-highlight-geometry.mjs';
 import workerUrl from 'pdfjs-dist/build/pdf.worker.min.mjs?url';
-import { EventBus, PDFFindController, PDFLinkService, PDFViewer } from 'pdfjs-dist/web/pdf_viewer.mjs';
+import { EventBus, PDFFindController, PDFLinkService, PDFViewer, ScrollMode, SpreadMode } from 'pdfjs-dist/web/pdf_viewer.mjs';
 import type { AnnotationEditorUIManager } from 'pdfjs-dist/types/src/display/editor/tools';
 import type { AnchorService, DocumentAnchor, DocumentRef, Projection, ProjectionSpace, SelectionSnapshot } from '@/contracts/document';
 import type { ReaderService, ReaderState } from '@/contracts/reader';
@@ -28,6 +29,7 @@ export class PdfjsReader implements ReaderService, AnchorService {
   private projections = { page: new Set<() => void>(), viewport: new Set<() => void>() };
   private eventBus = new EventBus();
   private viewer: PDFViewer;
+  private pageTheme: {background:string;foreground:string} | null = null;
   private links: PDFLinkService;
   private task?: PDFDocumentLoadingTask;
   private pdf?: PDFDocumentProxy;
@@ -41,6 +43,7 @@ export class PdfjsReader implements ReaderService, AnchorService {
   private findScrollLeft?: number;
   private locateFlash:LocateFlash;
   private disposed = false;
+  private lastWheelTurn = 0;
   private pointerStart?: {x:number;y:number};
   private observer: ResizeObserver;
   private lifecycle = new AbortController();
@@ -83,7 +86,7 @@ export class PdfjsReader implements ReaderService, AnchorService {
     this.eventBus.on('updatefindmatchescount', matches);
     this.eventBus.on('updatefindcontrolstate', matches);
     this.eventBus.on('pagechanging', ({ pageNumber }: { pageNumber: number }) => this.position({ pageIndex: pageNumber - 1 }));
-    this.eventBus.on('scalechanging', ({ scale }: { scale: number }) => { this.position({ zoom: scale }); this.invalidate(true); });
+    this.eventBus.on('scalechanging', ({ scale, presetValue }: { scale: number; presetValue?: string }) => { this.position({ zoom: scale, zoomMode: presetValue === 'page-width' ? 'width' : 'manual' }); this.invalidate(true); });
     this.eventBus.on('rotationchanging', ({ pagesRotation }: { pagesRotation: 0 | 90 | 180 | 270 }) => { this.position({ rotation: pagesRotation }); this.invalidate(true); });
     this.eventBus.on('pagerendered', () => this.invalidate(true));
     // Paperpane owns the pen and menus; native editor mode stays NONE.
@@ -92,9 +95,31 @@ export class PdfjsReader implements ReaderService, AnchorService {
     surface.addEventListener('mouseup', this.captureSelection, { ...options, capture: true });
     surface.addEventListener('keyup', this.captureSelection, options);
     container.addEventListener('scroll', () => { this.invalidate(false); this.capturePosition(); }, { ...options, passive: true });
+    container.addEventListener('wheel', this.scrollPages, {...options, passive:false});
     window.addEventListener('resize', () => this.invalidate(true), options);
-    this.observer = new ResizeObserver(() => this.invalidate(true)); this.observer.observe(container);
+    this.observer = new ResizeObserver(() => {
+      if (this.ready().ok && this.snapshot.data.position.zoomMode === 'width') {
+        this.applyWidthScale();
+      }
+      this.invalidate(true);
+    }); this.observer.observe(container);
   }
+  private scrollPages = (event: WheelEvent) => {
+    if(!this.ready().ok||event.ctrlKey||event.metaKey||(event.target as Element).closest('[data-pp-overlay]'))return;
+    if(this.viewer.scrollMode===ScrollMode.HORIZONTAL&&!event.shiftKey&&!event.deltaX&&event.deltaY){
+      event.preventDefault();
+      this.container.scrollLeft+=event.deltaY*(event.deltaMode===1?16:event.deltaMode===2?this.container.clientWidth:1);
+      return;
+    }
+    if(this.viewer.scrollMode!==ScrollMode.PAGE||Math.abs(event.deltaX)>Math.abs(event.deltaY)||!event.deltaY)return;
+    const forward=event.deltaY>0;
+    const atEdge=forward?this.container.scrollTop+this.container.clientHeight>=this.container.scrollHeight-2:this.container.scrollTop<=2;
+    if(!atEdge)return;
+    event.preventDefault();
+    const now=performance.now();if(now-this.lastWheelTurn<400)return;
+    const changed=forward?this.viewer.nextPage():this.viewer.previousPage();
+    if(changed){this.lastWheelTurn=now;if(!forward)this.container.scrollTop=this.container.scrollHeight-this.container.clientHeight;this.invalidate(true);}
+  };
   /** Visible paper viewport, for clipping transient translation geometry. */
   translationViewport = () => this.container.getBoundingClientRect();
   translationScrollElement = () => this.container;
@@ -126,7 +151,7 @@ export class PdfjsReader implements ReaderService, AnchorService {
     const ready = this.ready(); if (!ready.ok) return ready;
     if (!Number.isFinite(position.offset) || position.offset < 0 || position.offset > 1) return failure('INVALID_INPUT', '阅读位置无效');
     const rotated = this.setRotation(position.rotation); if (!rotated.ok) return rotated;
-    const zoomed = this.setZoom(position.zoom); if (!zoomed.ok) return zoomed;
+    const zoomed = position.zoomMode === 'width' ? this.fitWidth() : this.setZoom(position.zoom); if (!zoomed.ok) return zoomed;
     const navigated = await this.navigate(position.pageIndex); if (!navigated.ok) return navigated;
     const session = this.snapshot.data.sessionId;
     await new Promise<void>(resolve => requestAnimationFrame(() => resolve()));
@@ -162,7 +187,7 @@ export class PdfjsReader implements ReaderService, AnchorService {
       const initialized = this.waitForEvent('pagesinit', this.sessionLifecycle.signal);
       this.viewer.setDocument(pdf); await initialized;
       if (this.disposed || this.snapshot.data.sessionId !== sessionId) return;
-      this.viewer.currentScaleValue = 'page-width';
+      this.applyWidthScale();
       this.publish({ phase: 'ready', pageCount: pdf.numPages, passwordRequest: undefined, loadProgress: 1 });
       this.invalidate(true);
       void this.loadNavigation(pdf,sessionId,this.sessionLifecycle.signal);
@@ -208,8 +233,104 @@ export class PdfjsReader implements ReaderService, AnchorService {
   submitPassword(requestId: string, password: string): Result<void> { if (!this.password || this.password.id !== requestId) return failure('STALE_CONFIRMATION', '密码请求已过期'); const submit = this.password.submit; this.password = undefined; this.publish({ phase: 'loading', passwordRequest: undefined }); submit(password); return success(undefined); }
   private ready(): Result<void> { return !this.disposed && this.snapshot.data.phase === 'ready' ? success(undefined) : failure('BUSY', '论文尚未就绪'); }
   async navigate(pageIndex: number): Promise<Result<void>> { this.locateFlash.clear(); ++this.locateRequest; const ready = this.ready(); if (!ready.ok) return ready; if (!Number.isInteger(pageIndex) || pageIndex < 0 || pageIndex >= this.snapshot.data.pageCount) return failure('INVALID_INPUT', '页码超出范围'); this.viewer.scrollPageIntoView({ pageNumber: pageIndex + 1 }); return success(undefined); }
-  setZoom(zoom: number): Result<void> { const ready = this.ready(); if (!ready.ok) return ready; if (!Number.isFinite(zoom) || zoom < .25 || zoom > 4) return failure('INVALID_INPUT', '缩放须在 25% 至 400% 之间'); this.viewer.currentScale = zoom; return success(undefined); }
-  setRotation(rotation: 0 | 90 | 180 | 270): Result<void> { const ready = this.ready(); if (!ready.ok) return ready; if (![0,90,180,270].includes(rotation)) return failure('INVALID_INPUT', '旋转角度无效'); this.viewer.pagesRotation = rotation; return success(undefined); }
+  setZoom(zoom: number): Result<void> { const ready = this.ready(); if (!ready.ok) return ready; if (!Number.isFinite(zoom) || zoom < .25 || zoom > 4) return failure('INVALID_INPUT', '缩放须在 25% 至 400% 之间'); this.viewer.currentScale = zoom; this.position({zoomMode:'manual'}); return success(undefined); }
+  private applyWidthScale() {
+    const page = this.viewer.getPageView(this.viewer.currentPageNumber - 1);
+    if (!page) return;
+    // The reader reserves real padding for its floating bar and page actions.
+    // PDF.js' native page-width preset only subtracts its own viewer borders.
+    const style = getComputedStyle(this.container);
+    const room = this.container.clientWidth - parseFloat(style.paddingLeft) - parseFloat(style.paddingRight);
+    const spread = this.viewer.spreadMode !== SpreadMode.NONE && this.viewer.scrollMode !== ScrollMode.HORIZONTAL;
+    const scale = Math.max(.01, (room - (spread ? 8 : 0)) / (page.width / page.scale) / (spread ? 2 : 1));
+    this.viewer.currentScale = scale;
+    this.position({zoomMode:'width'});
+  }
+  fitWidth(): Result<void> {
+    const ready = this.ready(); if (!ready.ok) return ready;
+    this.applyWidthScale(); return success(undefined);
+  }
+  setDisplay(options: {scroll:'vertical'|'horizontal'|'page'; spread:'none'|'odd'|'even'; theme:'original'|'dark'|'black'|'sepia'}) {
+    if(this.disposed)return;
+    const colors = options.theme==='dark' ? {background:'#2f3440',foreground:'#d9dce3'}
+      : options.theme==='black' ? {background:'#101114',foreground:'#e1e1e5'}
+      : options.theme==='sepia' ? {background:'#f4ecd8',foreground:'#4d4233'} : null;
+    if(JSON.stringify(this.pageTheme)!==JSON.stringify(colors)) {
+      this.pageTheme=colors;
+      setPaperpaneViewerTheme(this.surface, colors);
+      this.surface.style.setProperty('--page-bg-color',colors?.background??'#ffffff');
+      for(let i=0;i<this.viewer.pagesCount;i++){
+        const page=this.viewer.getPageView(i);
+        page.reset({keepAnnotationLayer:true,keepAnnotationEditorLayer:true,keepTextLayer:true});
+      }
+      this.viewer.update();
+    }
+    this.viewer.scrollMode=options.scroll==='horizontal'?ScrollMode.HORIZONTAL:options.scroll==='page'?ScrollMode.PAGE:ScrollMode.VERTICAL;
+    this.viewer.spreadMode=options.spread==='odd'?SpreadMode.ODD:options.spread==='even'?SpreadMode.EVEN:SpreadMode.NONE;
+    if(this.snapshot.data.position.zoomMode==='width')this.applyWidthScale();
+    this.invalidate(true);
+  }
+  setRotation(rotation: 0 | 90 | 180 | 270): Result<void> { const ready = this.ready(); if (!ready.ok) return ready; if (![0,90,180,270].includes(rotation)) return failure('INVALID_INPUT', '旋转角度无效'); const fit = this.snapshot.data.position.zoomMode === 'width'; this.viewer.pagesRotation = rotation; if(fit)this.applyWidthScale(); return success(undefined); }
+  async captureImage(pageIndex:number,rect:{left:number;top:number;width:number;height:number}) {
+    const view=this.viewer.getPageView(pageIndex),pdf=this.pdf,ref=this.snapshot.data.document,session=this.snapshot.data.sessionId;
+    if(!view?.pdfPage||!pdf||!ref||!this.surface.contains(view.div))throw new Error('目标页尚未就绪');
+    const bounds=view.div.getBoundingClientRect(),crop=view.pdfPage.view as number[];
+    const a=view.viewport.convertToPdfPoint((rect.left-bounds.left)*view.viewport.width/bounds.width,(rect.top-bounds.top)*view.viewport.height/bounds.height);
+    const b=view.viewport.convertToPdfPoint((rect.left+rect.width-bounds.left)*view.viewport.width/bounds.width,(rect.top+rect.height-bounds.top)*view.viewport.height/bounds.height);
+    const points=[Math.min(a[0],b[0]),Math.min(a[1],b[1]),Math.max(a[0],b[0]),Math.max(a[1],b[1])];
+    const anchor:DocumentAnchor={...ref,pages:[{pageIndex,rects:[{x:points[0]!-crop[0]!,y:points[1]!-crop[1]!,width:points[2]!-points[0]!,height:points[3]!-points[1]!}]}]};
+    const pdfPage=await pdf.getPage(pageIndex+1);let viewport=pdfPage.getViewport({scale:8/3,rotation:view.viewport.rotation});
+    const project=(v:typeof viewport)=>[...v.convertToViewportPoint(points[0]!,points[1]!),...v.convertToViewportPoint(points[2]!,points[3]!)];
+    let projected=project(viewport);const factor=Math.min(1,2048/Math.max(Math.abs(projected[2]-projected[0]),Math.abs(projected[3]-projected[1])));
+    viewport=pdfPage.getViewport({scale:8/3*factor,rotation:view.viewport.rotation});projected=project(viewport);
+    const canvas=document.createElement('canvas');canvas.width=Math.max(1,Math.ceil(Math.abs(projected[2]-projected[0])));canvas.height=Math.max(1,Math.ceil(Math.abs(projected[3]-projected[1])));
+    const task=pdfPage.render({canvas,viewport,transform:[1,0,0,1,-Math.min(projected[0],projected[2]),-Math.min(projected[1],projected[3])],background:'#ffffff',annotationMode:AnnotationMode.DISABLE});
+    const abort=()=>task.cancel();this.sessionLifecycle.signal.addEventListener('abort',abort,{once:true});
+    try{await task.promise;if(this.snapshot.data.sessionId!==session)throw new Error('论文已切换');const blob=await new Promise<Blob>((ok,no)=>canvas.toBlob(b=>b?ok(b):no(new Error('无法生成截图')),'image/png'));return {anchor,blob};}
+    finally{this.sessionLifecycle.signal.removeEventListener('abort',abort);canvas.width=canvas.height=0;}
+  }
+  /** Original white page, independent of viewer zoom, theme and saved annotations. */
+  async layoutPage(pageIndex:number,signal:AbortSignal){
+    const pdf=this.pdf,ref=this.snapshot.data.document,session=this.snapshot.data.sessionId;
+    if(!pdf||!ref)throw new Error('论文尚未就绪');
+    const page=await pdf.getPage(pageIndex+1),base=page.getViewport({scale:1,rotation:0});
+    const viewport=page.getViewport({scale:1600/Math.max(base.width,base.height),rotation:0});
+    const canvas=document.createElement('canvas');canvas.width=Math.ceil(viewport.width);canvas.height=Math.ceil(viewport.height);
+    const all=AbortSignal.any([signal,this.sessionLifecycle.signal]);all.throwIfAborted();
+    const task=page.render({canvas,viewport,background:'#ffffff',annotationMode:AnnotationMode.DISABLE}),abort=()=>task.cancel();all.addEventListener('abort',abort,{once:true});
+    try{await task.promise;all.throwIfAborted();if(this.snapshot.data.sessionId!==session)throw new Error('论文已切换');
+      const blob=await new Promise<Blob>((ok,no)=>canvas.toBlob(b=>b?ok(b):no(new Error('页面渲染失败')),'image/png'));
+      return {blob,width:canvas.width,height:canvas.height};
+    }finally{all.removeEventListener('abort',abort);canvas.width=canvas.height=0;}
+  }
+  async elementAnchor(pageIndex:number,box:readonly number[]):Promise<DocumentAnchor>{
+    const pdf=this.pdf,ref=this.snapshot.data.document;if(!pdf||!ref)throw new Error('论文尚未就绪');
+    const page=await pdf.getPage(pageIndex+1),crop=page.view as number[],v=page.getViewport({scale:1,rotation:0});
+    const a=v.convertToPdfPoint(box[0]!*v.width,box[1]!*v.height),b=v.convertToPdfPoint(box[2]!*v.width,box[3]!*v.height);
+    return {...ref,pages:[{pageIndex,rects:[{x:Math.min(a[0],b[0])-crop[0]!,y:Math.min(a[1],b[1])-crop[1]!,width:Math.abs(b[0]-a[0]),height:Math.abs(b[1]-a[1])}]}]};
+  }
+  async elementText(anchor:DocumentAnchor){
+    if(!this.pdf||!this.matches(anchor))return '';
+    const parts:string[]=[];
+    for(const a of anchor.pages){const page=await this.pdf.getPage(a.pageIndex+1),crop=page.view as number[],text=await page.getTextContent();
+      for(const item of text.items){if(!('str' in item))continue;const x=item.transform[4]-crop[0]!,y=item.transform[5]-crop[1]!,w=item.width,h=item.height;
+        if(a.rects.some(r=>x+w>=r.x&&x<=r.x+r.width&&y+h>=r.y&&y<=r.y+r.height))parts.push(item.str);
+      }
+    }return parts.join(' ').replace(/\s+/g,' ').trim();
+  }
+  async captureAnchor(anchor:DocumentAnchor,signal:AbortSignal){
+    const pdf=this.pdf,session=this.snapshot.data.sessionId;
+    if(!pdf||!this.matches(anchor))throw new Error('论文已切换');
+    const part=anchor.pages[0]!,r=part.rects[0]!,page=await pdf.getPage(part.pageIndex+1),crop=page.view as number[];
+    const scale=Math.min(4,2048/Math.max(r.width,r.height)),v=page.getViewport({scale,rotation:0});
+    const a=v.convertToViewportPoint(r.x+crop[0]!,r.y+crop[1]!),b=v.convertToViewportPoint(r.x+r.width+crop[0]!,r.y+r.height+crop[1]!);
+    const canvas=document.createElement('canvas');canvas.width=Math.max(1,Math.ceil(Math.abs(b[0]-a[0])));canvas.height=Math.max(1,Math.ceil(Math.abs(b[1]-a[1])));
+    const all=AbortSignal.any([signal,this.sessionLifecycle.signal]);all.throwIfAborted();
+    const task=page.render({canvas,viewport:v,transform:[1,0,0,1,-Math.min(a[0],b[0]),-Math.min(a[1],b[1])],background:'#ffffff',annotationMode:AnnotationMode.DISABLE}),abort=()=>task.cancel();all.addEventListener('abort',abort,{once:true});
+    try{await task.promise;all.throwIfAborted();if(this.snapshot.data.sessionId!==session)throw new Error('论文已切换');
+      const blob=await new Promise<Blob>((ok,no)=>canvas.toBlob(b=>b?ok(b):no(new Error('截图失败')),'image/png'));return {anchor,blob};
+    }finally{all.removeEventListener('abort',abort);canvas.width=canvas.height=0;}
+  }
   async extractTranslation(signal: AbortSignal, progress: (n:number)=>void) {
     const pdf=this.pdf, ref=this.snapshot.data.document;
     if(!pdf||!ref||this.snapshot.data.phase!=='ready')throw new Error('论文尚未就绪。');
@@ -290,6 +411,11 @@ export class PdfjsReader implements ReaderService, AnchorService {
       const view = this.viewer.getPageView(item.pageIndex); const layer = view?.div;
       if (!view?.pdfPage || !layer) { pending.push(item.pageIndex); continue; }
       const bounds = layer.getBoundingClientRect(); const crop = view.pdfPage.view as number[];
+      // PAGE mode retains page views but detaches every other spread. Their
+      // local PDF geometry is valid; zero screen bounds are not a projection.
+      if (space === 'viewport' && (!layer.isConnected || !this.surface.contains(layer) || bounds.width <= 0 || bounds.height <= 0)) {
+        pending.push(item.pageIndex); continue;
+      }
       for (const r of item.rects) { const a = view.viewport.convertToViewportPoint(r.x+crop[0]!,r.y+crop[1]!) as number[], b = view.viewport.convertToViewportPoint(r.x+r.width+crop[0]!,r.y+r.height+crop[1]!) as number[]; const v = [...a,...b];
         rects.push({ pageIndex: item.pageIndex, rect: { left: Math.min(v[0]!,v[2]!)+(space==='viewport'?bounds.left:0), top: Math.min(v[1]!,v[3]!)+(space==='viewport'?bounds.top:0), width: Math.abs(v[2]!-v[0]!), height: Math.abs(v[3]!-v[1]!) } }); }
     }
@@ -315,9 +441,17 @@ export class PdfjsReader implements ReaderService, AnchorService {
       if(!view)throw new Error('Missing page');
       // Load the page's true crop/rotation geometry without first jumping to its upper-left corner.
       if(!view.pdfPage)view.setPdfPage(pdfPage);
+      const preferredLeft=this.container.scrollLeft;
+      if(this.viewer.scrollMode===ScrollMode.PAGE&&!this.surface.contains(view.div)){
+        // Let PDF.js attach the requested page/spread before measuring it.
+        // Do not call navigate(): that would cancel this location request.
+        this.viewer.scrollPageIntoView({pageNumber:page.pageIndex+1});
+        await new Promise<void>(resolve=>requestAnimationFrame(()=>resolve()));
+        if(this.disposed||this.snapshot.data.sessionId!==session||ticket!==this.locateRequest)throw new Error('Stale location');
+      }
       const projection=this.project({...anchor,pages:[page]},'viewport');
       if(projection.state!=='ready')throw new Error('Missing geometry');
-      this.revealPassage(projection.rects.length?projection.rects.map(r=>r.rect):[view.div.getBoundingClientRect()]);
+      this.revealPassage(projection.rects.length?projection.rects.map(r=>r.rect):[view.div.getBoundingClientRect()],preferredLeft);
       this.locateFlash.show(()=>anchor.pages.flatMap(part=>{
         const current=this.project({...anchor,pages:[part]},'viewport');
         return current.state==='ready'?current.rects.map(r=>r.rect):[];
@@ -372,5 +506,5 @@ export class PdfjsReader implements ReaderService, AnchorService {
     if (this.password?.id !== id) return failure('STALE_CONFIRMATION','密码请求已结束');
     await this.cancelOpen(); return success(undefined);
   }
-  async dispose() { if (this.disposed) return; this.locateFlash.clear(); this.disposed = true; this.sessionLifecycle.abort(); this.lifecycle.abort(); this.observer.disconnect(); this.listeners.clear(); Object.values(this.projections).forEach(s=>s.clear()); this.password = undefined; this.highlights?.dispose(); this.highlights = undefined; this.links.setDocument(null); this.viewer.setDocument(null); await this.task?.destroy().catch(()=>{}); }
+  async dispose() { if (this.disposed) return; setPaperpaneViewerTheme(this.surface, null); this.locateFlash.clear(); this.disposed = true; this.sessionLifecycle.abort(); this.lifecycle.abort(); this.observer.disconnect(); this.listeners.clear(); Object.values(this.projections).forEach(s=>s.clear()); this.password = undefined; this.highlights?.dispose(); this.highlights = undefined; this.links.setDocument(null); this.viewer.setDocument(null); await this.task?.destroy().catch(()=>{}); }
 }

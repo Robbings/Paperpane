@@ -18,12 +18,12 @@ export const readingScale = (fontSize: number) => fontSize / 16;
 
 /**
  * Applies the appearance preferences to the current page: theme, reading text
- * size (panels, notes, answers; not the toolbar or the PDF) and page dimming.
+ * size (panels, notes, answers) and UI size. PDF geometry stays in CSS pixels.
  */
-export function applyAppearance(preferences: { theme: ThemeMode; uiFontSize: number; dimPagesInDark: boolean }): void {
+export function applyAppearance(preferences: { theme: ThemeMode; uiFontSize: number; uiScale?: number }): void {
   applyTheme(preferences.theme);
   const root = document.documentElement;
+  root.style.fontSize = `${16 * (preferences.uiScale ?? 100) / 100}px`;
   root.style.setProperty('--pp-read-scale', String(readingScale(preferences.uiFontSize)));
-  if (preferences.dimPagesInDark) delete root.dataset.dimPages;
-  else root.dataset.dimPages = 'off';
+  delete root.dataset.dimPages;
 }

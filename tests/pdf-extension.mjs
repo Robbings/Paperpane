@@ -88,14 +88,16 @@ try {
   await redirectReturn.goto(root+'/reader.html?import='+encodeURIComponent(base+'/redirect-chain'));
   await rendered(redirectReturn);
   assert.equal(new URL(redirectReturn.url()).searchParams.get('originalPdf'),base+'/redirect-chain');
-  await redirectReturn.getByRole('button',{name:'返回原 PDF',exact:true}).click();
+  await redirectReturn.getByRole('button',{name:'更多工具',exact:true}).click();
+  await redirectReturn.getByRole('menuitem',{name:'返回原 PDF',exact:true}).click();
   await redirectReturn.waitForURL(base+'/download',{timeout:10000});
   await redirectReturn.reload().catch(e=>{if(!String(e).includes('ERR_ABORTED'))throw e;});
   assert.equal(redirectReturn.url(),base+'/download');
   console.log('PASS: returning to a manually imported redirect URL stays in native PDF viewer');
 
   // Trigger source return through the reader's actual UI.
-  await direct.getByRole('button',{name:'返回原 PDF',exact:true}).click();
+  await direct.getByRole('button',{name:'更多工具',exact:true}).click();
+  await direct.getByRole('menuitem',{name:'返回原 PDF',exact:true}).click();
   await direct.waitForURL(base+'/download',{timeout:15000});
   await direct.waitForLoadState('load');
   await direct.reload().catch(e=>{if(!String(e).includes('ERR_ABORTED'))throw e;});

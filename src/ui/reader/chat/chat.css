@@ -48,13 +48,17 @@
 
 /* ---- Transcript ------------------------------------------------------------------ */
 
+.pp-chat { min-width:0; overflow:hidden; }
 .pp-chat__scroll {
   flex: 1;
+  min-height:0;
+  min-width:0;
+  overflow:hidden;
   margin: 0 -6px;
 }
 
 .pp-chat__viewport {
-  padding: 8px 6px var(--pp-space-4);
+  padding: 8px 20px var(--pp-space-4) 6px;
 }
 
 /* Docked at the bottom the panel is wide: keep a readable column. */
@@ -407,13 +411,13 @@
 
 .pp-chat .pp-panel__body {
   position: relative;
+  overflow:hidden;
 }
 
 .pp-chat__dock {
-  position: absolute;
-  right: 0;
-  bottom: 0;
-  left: 0;
+  flex-shrink:0;
+  min-width:0;
+  margin-top:8px;
   z-index: 2;
 }
 
@@ -749,3 +753,27 @@
   font-size: var(--pp-text-md);
   line-height: 1.7;
 }
+
+/* AI transcript controls share the existing button and hover tools. */
+.pp-composer__latest { flex-shrink:0; white-space:nowrap; }
+.pp-composer textarea { scrollbar-width:none; }
+.pp-composer textarea::-webkit-scrollbar { display:none; }
+.pp-chat-a:focus-within .pp-chat-a__hover { opacity:1; pointer-events:auto; }
+
+/* The composer sits in a reserved footer; it must not cast a clipped floating shadow. */
+.pp-glass.pp-composer {
+  background:var(--pp-reading-surface);
+  -webkit-backdrop-filter:none;
+  backdrop-filter:none;
+  box-shadow:inset 0 0 0 0.5px var(--pp-hairline);
+}
+.pp-composer .pp-composer__latest {
+  height:22px;
+  padding:0 7px;
+  border-radius:var(--pp-radius-pill);
+  background:var(--pp-fill);
+  color:var(--pp-text-2);
+  font-size:var(--pp-text-xs);
+  font-weight:400;
+}
+.pp-composer .pp-composer__latest:hover { background:var(--pp-fill-hover);color:var(--pp-text); }

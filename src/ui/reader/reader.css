@@ -963,23 +963,29 @@
 
 /* ---- PDF pages rendered by the runtime ---------------------------------------------
  * The runtime mounts its viewer as `.pp-pdf-surface` inside the paper's scroll
- * container and owns geometry only; the page's look (paper, shadow, spacing,
- * dimming in dark mode) is defined here, matching the sample pages. */
+ * container. Blender handles page colors during rendering; do not dim the
+ * entire page again, since that would also dim figures and annotations. */
 
 .pp-pdf-surface .page,
 .pp-pdf-surface.pdfViewer.removePageBorders .page {
   margin: 0 auto 24px;
   border: 0;
-  background: #ffffff;
+  background: var(--page-bg-color, #ffffff);
   box-shadow:
     0 1px 2px rgba(0, 0, 0, 0.06),
     0 8px 28px rgba(0, 0, 0, 0.08);
-  filter: var(--pp-paper-filter);
+  filter: none;
 }
 
-.pp-pdf-surface .page:last-child,
-.pp-pdf-surface.pdfViewer.removePageBorders .page:last-child {
+.pp-pdf-surface > .page:last-child,
+.pp-pdf-surface.pdfViewer.removePageBorders > .page:last-child {
   margin-bottom: 0;
+}
+
+/* Spread pages share one row. A page's bottom margin must not shift its
+ * neighbour, and mixed page heights should still align at the top. */
+.pp-pdf-surface .spread > :is(.page, .dummyPage) {
+  vertical-align: top;
 }
 
 /* ---- Find bar --------------------------------------------------------------- */
@@ -1259,6 +1265,27 @@
 .pp-tr-resize[data-dir='se'] { bottom: -4px; right: -4px; cursor: nwse-resize; }
 .pp-tr-resize[data-dir='sw'] { bottom: -4px; left: -4px; cursor: nesw-resize; }
 
+/* Fewer controls, rather than shrinking touch targets past readability. */
+.pp-toolbar { gap: 4px; max-width: min(920px, max(0px, calc(100% - var(--pp-edge-left) - var(--pp-edge-right) - 8px))); }
+.pp-toolbar[data-title='hidden'] { gap: 4px; }
+.pp-toolbar[data-density='single'] { padding: 0 4px; }
+.pp-page-options { padding: 12px; }
+.pp-page-options__row { display:flex; align-items:center; justify-content:space-between; gap:12px; padding:8px 0; font-size:var(--pp-text-sm); }
+.pp-page-options__row > span { color:var(--pp-text-2); }
+.pp-page-options__rotation { display:flex; align-items:center; gap:12px; }
+.pp-page-options__counterclockwise svg { transform:scaleX(-1); }
+.pp-page-options__angle { border:0; background:transparent; color:var(--pp-text); font:inherit; min-width:38px; cursor:pointer; }
+.pp-page-options__themes { display:grid; grid-template-columns:repeat(3,1fr); gap:8px; padding-top:12px; margin-top:4px; border-top:1px solid var(--pp-hairline); }
+.pp-page-options__themes button { font:inherit; font-size:var(--pp-text-sm); border:1px solid var(--pp-hairline-strong); border-radius:var(--pp-radius-control); padding:9px 0; cursor:pointer; }
+.pp-page-options__themes button[aria-pressed='true'] { outline:2px solid var(--pp-accent); outline-offset:1px; }
+
+.pp-reader__paper[data-middle-pan] { cursor: grabbing; user-select: none; }
+.pp-reader__paper[data-middle-pan] * { cursor: inherit !important; }
+.pp-reader__paper[data-middle-pan="auto"] { cursor: all-scroll; }
+.pp-pan-origin { position: fixed; transform: translate(-50%, -50%); width: 30px; height: 30px; border-radius: 50%; display: grid; place-items: center; color: var(--pp-text-2); pointer-events: none; z-index: 1000; }
+
+/* Keep PDF annotation/link layers beneath passage windows in the same scroll plane. */
+.pp-reader__paper > .pdfViewer, .pp-reader__paper .pp-pdf-surface { isolation: isolate; }
 .pp-thumb__page--live { padding: 0; height: auto; min-height: 130px; overflow: hidden; }
 .pp-thumb__page--live img { display: block; width: 112px; height: auto; }
 .pp-thumb__page--live .pp-thumb__status { background: none; height: auto; width: auto; margin: auto; font-size: 12px; color: #555; }

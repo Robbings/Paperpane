@@ -269,8 +269,3 @@
   --pp-hl-pink-dot: #ec86b6;
   --pp-hl-purple-dot: #a98bee;
 }
-
-/* Page dimming in dark mode can be turned off in settings. */
-:root[data-dim-pages='off'] {
-  --pp-paper-filter: none;
-}

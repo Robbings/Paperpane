@@ -60,7 +60,7 @@ export function Popover({ anchorRef, open, onClose, label, placement = 'bottom',
       data-tone="float"
       data-side={position?.side}
       style={{
-        width,
+        width: width === undefined ? undefined : `${width / 16}rem`,
         top: position?.top ?? 0,
         left: position?.left ?? 0,
         visibility: position ? undefined : 'hidden',

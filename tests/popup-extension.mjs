@@ -67,11 +67,11 @@ try{
     const result=await db.save(draft,view.revision);await db.close();if(!result.ok)throw new Error(JSON.stringify(result));const c=new BroadcastChannel('paperpane-model-settings');c.postMessage('changed');c.close();
   },{chunk:modelUrl,base,kind});}
   await saveModel('configured');await popup.getByText('模型已配置 · Popup test model',{exact:true}).waitFor();
-  await saveModel('no-default');await popup.getByText('请选择默认模型',{exact:true}).waitFor();
+  await saveModel('no-default');await popup.getByText('模型已配置 · Popup test model',{exact:true}).waitFor();
   await saveModel('sync');await popup.getByText('同步已配置，功能尚未接入',{exact:true}).waitFor();
   await popup.getByText('模型已配置 · Popup test model',{exact:true}).waitFor();
   assert.equal(apiRequests,0,'opening the popup must not send an API health-check or paid request');
-  console.log('PASS: committed model settings, missing-default state and honest sync capability update live');
+  console.log('PASS: committed model settings, model fallback and honest sync capability update live');
 
   await popup.evaluate(()=>{globalThis.__failModelReads=true;const c=new BroadcastChannel('paperpane-model-settings');c.postMessage('changed');c.close();});
   await popup.getByText('模型配置读取失败',{exact:true}).waitFor();await popup.getByText('同步配置读取失败',{exact:true}).waitFor();

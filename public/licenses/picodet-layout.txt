@@ -1,0 +1,6 @@
+PicoDet-S_layout_17cls, PaddlePaddle, Apache-2.0.
+Source: https://huggingface.co/PaddlePaddle/PicoDet-S_layout_17cls
+Revision: 9cea1f4678e9c299a4094ee6bc1de9d0f0da3084
+Converted with paddle2onnx 2.1.0, opset 17, batch 1. Original inference.yml preprocessing and exported NMS retained.
+Model license: https://www.apache.org/licenses/LICENSE-2.0
+ONNX Runtime Web 1.30.0: MIT, https://github.com/microsoft/onnxruntime

@@ -27,7 +27,11 @@ export interface AnchorService {
    * Viewport space additionally invalidates on scrolling/page movement. */
   subscribeProjection(space: ProjectionSpace, listener: () => void): () => void;
 }
-export interface ReadingPosition { pageIndex: number; offset: number; zoom: number; rotation: 0 | 90 | 180 | 270 }
+export interface ReadingPosition {
+  pageIndex: number; offset: number; zoom: number; rotation: 0 | 90 | 180 | 270;
+  /** Missing on older records means a fixed zoom. */
+  zoomMode?: 'manual' | 'width';
+}
 export type FileAvailability = 'local' | 'uploading' | 'uploaded' | 'remote-missing' | 'local-missing';
 export interface DocumentRecord extends RecordStamp, DocumentRef {
   title: string; sourceUrl?: string; pageCount?: number;

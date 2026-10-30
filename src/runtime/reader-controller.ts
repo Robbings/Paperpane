@@ -31,11 +31,12 @@ export class ReaderController {
   private started = false;
   private stopping = false;
   translateSelection?: (anchor: DocumentAnchor, text?: string) => void;
+  readonly researchSessions = new Set<{readonly unsaved:boolean;prepareToLeave:()=>Promise<boolean>}>();
   private translations = new Set<TranslationSession>();
   isChangingDocument = false;
   private transition: Promise<void> = Promise.resolve();
   private endTransition?: () => void;
-  private beforeUnload = (event: BeforeUnloadEvent) => { if ([...this.translations].some(s => s.hasUnsavedChanges)) event.preventDefault(); };
+  private beforeUnload = (event: BeforeUnloadEvent) => { if ([...this.translations].some(s => s.hasUnsavedChanges)||[...this.researchSessions].some(s=>s.unsaved)) event.preventDefault(); };
   private reading?: ReturnType<typeof readingPersistence>;
   private unsubscribeAnnotations?: () => void;
   private cleanups: (() => void)[] = [];
@@ -133,6 +134,8 @@ export class ReaderController {
     this.transition = new Promise(resolve => { this.endTransition = resolve; });
     try {
       const saved = await Promise.all([...this.translations].map(s => s.prepareToLeave()));
+      const aiSaved=await Promise.all([...this.researchSessions].map(s=>s.prepareToLeave()));
+      if(aiSaved.some(ok=>!ok))throw new Error('AI 内容尚未保存，请先重试保存再切换论文。');
       await this.annotations?.flush();
       if (saved.some(ok => !ok)) throw new Error('译文尚未保存，已保留当前论文和翻译窗口。请先重试保存，再切换论文。');
       if (this.annotations?.getSnapshot().data.hasDrafts) throw new Error('当前批注有未保存的更改，请处理后再切换论文。');

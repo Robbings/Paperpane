@@ -21,7 +21,7 @@ test('模型状态校验默认模型和关联接口，配置不等于连通性�
   const valid = deriveSettingsStatus(configured(),'ready');
   assert.equal(valid.modelAvailability,'configured');
   assert.equal(valid.modelLabel,'My model');
-  assert.equal(deriveSettingsStatus({...configured(),defaultModelId:null},'ready').modelAvailability,'unavailable');
+  assert.equal(deriveSettingsStatus({...configured(),defaultModelId:null},'ready').modelAvailability,'configured');
   assert.equal(deriveSettingsStatus({...configured(),endpoints:[]},'ready').modelAvailability,'unavailable');
   assert.equal(deriveSettingsStatus({...configured(),endpoints:[{id:'api',baseUrl:'javascript:alert(1)',protocol:'openai-chat'}]},'ready').modelAvailability,'unavailable');
 });

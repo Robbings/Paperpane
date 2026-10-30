@@ -1,13 +1,14 @@
 import type { DockPlacement } from './types';
+import { researchPanels } from './research-panels';
 
 // Floating layout metrics, in CSS pixels.
 export const GAP = 10;
 export const SIDEBAR_WIDTH = 240;
 /** The function rail is the research card's edge: this thick across... */
 export const RAIL_THICKNESS = 48;
-/** ...and, when collapsed, this long (6 icon buttons, vertical) or this wide (6 labelled buttons, horizontal). */
-export const RAIL_LENGTH = 6 * 36 + 5 * 4 + 12;
-export const RAIL_ROW_LENGTH = 6 * 72 + 5 * 4 + 12;
+/** Collapsed length follows the visible buttons, vertically or horizontally. */
+export const RAIL_LENGTH = researchPanels.length * 36 + Math.max(0, researchPanels.length - 1) * 4 + 12;
+export const RAIL_ROW_LENGTH = researchPanels.length * 72 + Math.max(0, researchPanels.length - 1) * 4 + 12;
 /** Space between the paper area and the research card. */
 export const RAIL_GAP = 8;
 
@@ -29,11 +30,13 @@ export const clampHeight = (value: number, viewportHeight: number) =>
  * Toolbar density from the room above the paper. Widths are the toolbar's
  * natural size at each density, with and without the title.
  */
-export function toolbarDensity(room: number, showTitle: boolean): 'full' | 'compact' | 'tight' {
-  // Measured with the bookmark button; the title keeps at least ~96px.
-  const full = showTitle ? 720 : 610;
-  const compact = showTitle ? 640 : 540;
-  return room >= full ? 'full' : room >= compact ? 'compact' : 'tight';
+export function toolbarDensity(room: number, showTitle: boolean): import('./ReaderToolbar').ToolbarDensity {
+  if(room<56)return 'hidden';
+  if(room<190)return 'single';
+  if(room<370)return 'mini';
+  if(room<620)return 'tight';
+  if(room<(showTitle?920:760))return 'compact';
+  return 'full';
 }
 
 /** Width left for the paper with the given chrome. */
@@ -43,10 +46,11 @@ export function paperWidth(options: {
   placement: DockPlacement;
   panelOpen: boolean;
   width: number;
+  scale?: number;
 }): number {
-  const { viewportWidth, sidebarDocked, placement, panelOpen, width } = options;
-  const left = sidebarDocked ? GAP + SIDEBAR_WIDTH + GAP : GAP;
-  const right = placement === 'right' ? GAP + RAIL_THICKNESS + (panelOpen ? width : 0) + RAIL_GAP : GAP;
+  const { viewportWidth, sidebarDocked, placement, panelOpen, width, scale = 1 } = options;
+  const left = (sidebarDocked ? GAP + SIDEBAR_WIDTH + GAP : GAP) * scale;
+  const right = placement === 'right' ? (GAP + RAIL_THICKNESS + RAIL_GAP) * scale + (panelOpen ? width : 0) : GAP * scale;
   return viewportWidth - left - right;
 }
 
@@ -63,12 +67,13 @@ export function layoutEdges(options: {
   panelOpen: boolean;
   width: number;
   height: number;
+  scale?: number;
 }): Edges {
-  const { placement, sidebarDocked, panelOpen, width, height } = options;
-  const card = GAP + RAIL_THICKNESS + RAIL_GAP;
+  const { placement, sidebarDocked, panelOpen, width, height, scale = 1 } = options;
+  const card = (GAP + RAIL_THICKNESS + RAIL_GAP) * scale;
   return {
-    left: sidebarDocked ? GAP + SIDEBAR_WIDTH + GAP : GAP,
-    right: placement === 'right' ? card + (panelOpen ? width : 0) : GAP,
-    bottom: placement === 'bottom' ? card + (panelOpen ? height : 0) : GAP,
+    left: (sidebarDocked ? GAP + SIDEBAR_WIDTH + GAP : GAP) * scale,
+    right: placement === 'right' ? card + (panelOpen ? width : 0) : GAP * scale,
+    bottom: placement === 'bottom' ? card + (panelOpen ? height : 0) : GAP * scale,
   };
 }

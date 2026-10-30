@@ -45,3 +45,8 @@
   font-variant-numeric: tabular-nums;
   text-align: center;
 }
+
+.pp-stepper button.pp-stepper__value {
+  width: auto;
+  padding: 0 4px;
+}

@@ -1,3 +1,4 @@
+import type { ResearchTextRenderer } from '@/ai/markdown';
 import { useState, type ReactNode } from 'react';
 import { Button, Icon, IconButton, Markdown, Spinner, TextArea, stripSourceMarkers, toast } from '@/ui/components';
 import { SourceMarker } from '../SourceMarker';
@@ -119,6 +120,7 @@ export function ChatQuestion({ message, busy, onEdit, onVersion }: QuestionProps
 
 interface AnswerProps {
   message: ChatMessageView;
+  renderText?: ResearchTextRenderer;
   /** The newest answer in the conversation. */
   latest: boolean;
   busy: boolean;
@@ -144,7 +146,7 @@ function numbering(markdown: string, citations: readonly CitationView[]) {
 }
 
 /** A generated answer: plain text with faint source markers, and one quiet line of tools. */
-export function ChatAnswer({ message, latest, busy, onRegenerate, onVersion, onLocate, onRecover }: AnswerProps) {
+export function ChatAnswer({ message, latest, busy, onRegenerate, onVersion, onLocate, onRecover, renderText }: AnswerProps) {
   const state = message.generation?.state ?? 'completed';
   const running = state === 'running' || state === 'queued';
   const numbers = numbering(message.markdown, message.citations);
@@ -195,7 +197,7 @@ export function ChatAnswer({ message, latest, busy, onRegenerate, onVersion, onL
         </p>
       ) : (
         message.markdown && (
-          <Markdown text={message.markdown} renderCitation={marker} className={state === 'running' ? 'pp-chat-a__text pp-chat-a__text--streaming' : 'pp-chat-a__text'} />
+          renderText ? renderText(message.markdown,marker,state === 'running' ? 'pp-chat-a__text pp-chat-a__text--streaming' : 'pp-chat-a__text') : <Markdown text={message.markdown} renderCitation={marker} className={state === 'running' ? 'pp-chat-a__text pp-chat-a__text--streaming' : 'pp-chat-a__text'} />
         )
       )}
 
@@ -206,6 +208,7 @@ export function ChatAnswer({ message, latest, busy, onRegenerate, onVersion, onL
         <div className="pp-chat-a__tools">
           {state === 'stopped' && <span className="pp-chat-a__state">已停止</span>}
           <span className="pp-chat-a__hover">
+            {message.usage && <span className="pp-chat-a__model" title={message.context?.mode==='full'?'本次请求包含全文':message.context?.mode==='chunked'?'分段覆盖全文':'本次请求使用相关段落'}>{message.usage.input===undefined||message.usage.output===undefined?'用量未知':`${message.usage.input+message.usage.output} tokens`} · {(message.usage.elapsedMs/1000).toFixed(1)}s</span>}
             {message.model && <span className="pp-chat-a__model">{message.model.displayName}</span>}
             <IconButton icon="copy" label="复制回答" size="md" shape="pill" disabled={!message.markdown} onClick={() => copy(stripSourceMarkers(message.markdown))} />
             <IconButton icon="rotate" label="重新生成" size="md" shape="pill" disabled={busy} onClick={onRegenerate} />

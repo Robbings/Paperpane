@@ -197,7 +197,7 @@ export class PaperDatabase {
       req.onsuccess = () => {
         const doc = req.result as StoredDocument | undefined;
         if (!doc || doc.deletedAt || doc.fileVersion !== ref.fileVersion) { problem = new StorageFault('missing', '此文档版本不存在'); tx.abort(); return; }
-        if (!Number.isInteger(position.pageIndex) || position.pageIndex < 0 || position.pageIndex >= (doc.pageCount ?? 0) || !Number.isFinite(position.offset) || position.offset < 0 || position.offset > 1 || !Number.isFinite(position.zoom) || position.zoom <= 0 || ![0, 90, 180, 270].includes(position.rotation)) {
+        if (!Number.isInteger(position.pageIndex) || position.pageIndex < 0 || position.pageIndex >= (doc.pageCount ?? 0) || !Number.isFinite(position.offset) || position.offset < 0 || position.offset > 1 || !Number.isFinite(position.zoom) || position.zoom <= 0 || (position.zoomMode !== undefined && position.zoomMode !== 'manual' && position.zoomMode !== 'width') || ![0, 90, 180, 270].includes(position.rotation)) {
           problem = new StorageFault('invalid', '阅读位置无效'); tx.abort(); return;
         }
         const at = new Date().toISOString(); const revision = crypto.randomUUID();

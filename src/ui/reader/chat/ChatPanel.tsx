@@ -1,3 +1,4 @@
+import type { ResearchTextRenderer } from '@/ai/markdown';
 import { useEffect, useLayoutEffect, useRef, useState, type ReactNode } from 'react';
 import { Button, Dialog, EmptyState, Icon, IconButton, ScrollArea, Skeleton, cleanCopyHandlers } from '@/ui/components';
 import { PanelBody } from '../panels/PanelBody';
@@ -10,6 +11,10 @@ import './chat.css';
 export interface ChatPanelProps {
   /** Panel name: "讨论", or "解释" for explanation sessions. */
   title: string;
+  mode?:'conversation'|'explanation';
+  hideHeader?:boolean;
+  headerActions?:ReactNode;
+  renderAnswerText?: ResearchTextRenderer;
   /** Demo data: say so, since nothing is sent or saved. */
   demo?: boolean;
   models: readonly ModelView[];
@@ -46,6 +51,7 @@ export interface ChatPanelProps {
   onReasoning?: (level: string) => void;
   /** Starts picking a region of the paper to attach as an image. */
   onCaptureRegion?: () => void;
+  onPasteImages?: (files: File[]) => void;
   onConfirmModelChange: () => void;
   onCancelModelChange: () => void;
   onNewSession: () => void;
@@ -59,6 +65,7 @@ export interface ChatPanelProps {
 function useStickToBottom(dep: unknown) {
   const ref = useRef<HTMLDivElement>(null);
   const pinned = useRef(true);
+  const [away,setAway]=useState(false);
   useLayoutEffect(() => {
     const el = ref.current;
     if (el && pinned.current) el.scrollTop = el.scrollHeight;
@@ -75,9 +82,9 @@ function useStickToBottom(dep: unknown) {
   }, []);
   const onScroll = () => {
     const el = ref.current;
-    if (el) pinned.current = el.scrollHeight - el.scrollTop - el.clientHeight < 48;
+    if (el) {pinned.current = el.scrollHeight - el.scrollTop - el.clientHeight < 48;setAway(!pinned.current);}
   };
-  return { ref, onScroll, pin: () => (pinned.current = true) };
+  return { ref, onScroll, away, pin: () => { pinned.current = true;setAway(false);const el=ref.current;if(el)el.scrollTop=el.scrollHeight; } };
 }
 
 export function ChatPanel(props: ChatPanelProps) {
@@ -86,22 +93,12 @@ export function ChatPanel(props: ChatPanelProps) {
   const [removing, setRemoving] = useState<SessionSummary | null>(null);
   const titleRef = useRef<HTMLButtonElement>(null);
   const inputRef = useRef<HTMLTextAreaElement>(null);
-  const dockRef = useRef<HTMLDivElement>(null);
-  // The composer floats over the end of the transcript; the transcript keeps that much room at its end.
-  const [dockHeight, setDockHeight] = useState(0);
-  useEffect(() => {
-    const el = dockRef.current;
-    if (!el) return;
-    const observer = new ResizeObserver(() => setDockHeight(el.offsetHeight));
-    observer.observe(el);
-    return () => observer.disconnect();
-  }, [models.length]);
   const messages = session?.messages ?? [];
   const last = messages[messages.length - 1];
   const busy = messages.some((m) => m.generation?.state === 'running' || m.generation?.state === 'queued');
   const modelId = session?.modelId ?? props.defaultModelId;
   // Follow the text as it streams: the length of the last message changes on every chunk.
-  const scroll = useStickToBottom(`${session?.id}:${messages.length}:${last?.markdown.length}:${session?.suggestions.state}:${dockHeight}`);
+  const scroll = useStickToBottom(`${session?.id}:${messages.length}:${last?.markdown.length}:${session?.suggestions.state}`);
 
   /** Puts a quick question or follow-up in the box, ready to send or adjust. */
   const prefill = (question: string) => {
@@ -116,7 +113,7 @@ export function ChatPanel(props: ChatPanelProps) {
   const header = (
     <div className="pp-panel__header pp-chat__header">
       <h2 className="pp-panel__title">{props.title}</h2>
-      {models.length > 0 && (
+      {props.mode!=='explanation' && models.length > 0 && (
         <button
           ref={titleRef}
           type="button"
@@ -130,14 +127,15 @@ export function ChatPanel(props: ChatPanelProps) {
         </button>
       )}
       <span className="pp-panel__spacer" />
-      <IconButton icon="plus" label="新对话" size="md" shape="pill" disabled={busy || !session} onClick={props.onNewSession} />
+      {props.mode!=='explanation' && <IconButton icon="plus" label="新对话" size="md" shape="pill" disabled={busy || !session} onClick={props.onNewSession} />}
+      {props.headerActions}
     </div>
   );
 
   if (models.length === 0) {
     return (
       <div className="pp-panel pp-chat">
-        {header}
+        {!props.hideHeader && header}
         <PanelBody>
           <EmptyState
             icon="discuss"
@@ -156,14 +154,14 @@ export function ChatPanel(props: ChatPanelProps) {
 
   return (
     <div className="pp-panel pp-chat">
-      {header}
+      {!props.hideHeader && header}
       <PanelBody>
         <ScrollArea
           className="pp-chat__scroll"
           viewportClassName="pp-chat__viewport"
           viewportRef={scroll.ref}
           onScroll={scroll.onScroll}
-          style={{ paddingBottom: dockHeight + 20 }}
+          style={{ paddingBottom: 8 }}
           {...cleanCopyHandlers}
         >
           {props.source}
@@ -199,6 +197,7 @@ export function ChatPanel(props: ChatPanelProps) {
                     />
                   ) : (
                     <ChatAnswer
+                      renderText={props.renderAnswerText}
                       message={message}
                       latest={message === last}
                       busy={busy}
@@ -228,7 +227,7 @@ export function ChatPanel(props: ChatPanelProps) {
                   </Button>
                 </p>
               ) : (
-                session.suggestions.questions.map((question) => (
+                session.suggestions.questions.slice(0,3).map((question) => (
                   <button key={question} type="button" className="pp-chat-ask pp-chat-ask--follow" onClick={() => prefill(question)}>
                     <Icon name="chevronRight" size={11} strokeWidth={2} />
                     {question}
@@ -239,7 +238,7 @@ export function ChatPanel(props: ChatPanelProps) {
           )}
         </ScrollArea>
 
-        <div ref={dockRef} className="pp-chat__dock">
+        <div className="pp-chat__dock">
         <ChatComposer
           inputRef={inputRef}
           text={session?.draft.text ?? props.newDraft ?? ''}
@@ -256,15 +255,17 @@ export function ChatPanel(props: ChatPanelProps) {
             props.onSend();
           }}
           onStop={props.onStop}
+          onLatest={scroll.away?scroll.pin:undefined}
           onModel={props.onModel}
           reasoning={session?.reasoning}
           onReasoning={props.onReasoning}
           onCaptureRegion={props.onCaptureRegion}
+          onPasteImages={props.onPasteImages}
         />
         </div>
       </PanelBody>
 
-      <ChatSessions
+      {props.mode!=='explanation' && <ChatSessions
         anchorRef={titleRef}
         open={sessionsOpen}
         onClose={() => setSessionsOpen(false)}
@@ -275,7 +276,7 @@ export function ChatPanel(props: ChatPanelProps) {
         onOpen={props.onOpenSession}
         onRename={props.onRenameSession}
         onRemove={(id) => setRemoving(props.sessions.find((s) => s.id === id) ?? null)}
-      />
+      />}
 
       <Dialog
         open={props.modelChange !== null}

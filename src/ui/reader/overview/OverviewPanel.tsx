@@ -1,3 +1,4 @@
+import type { ResearchTextRenderer } from '@/ai/markdown';
 import { useMemo, useRef, useState } from 'react';
 import { Button, EmptyState, IconButton, Menu, ScrollArea, Spinner, cleanCopyHandlers, stripSourceMarkers, toast } from '@/ui/components';
 import { formatDate } from '@/ui/library/columns';
@@ -9,7 +10,12 @@ import type { OverviewCardDef, OverviewContent, OverviewResultView, OverviewSour
 import './overview.css';
 
 export interface OverviewPanelProps {
+  renderText?: ResearchTextRenderer;
+  versions?:readonly {id:string;label:string;active:boolean}[];
+  onVersion?:(id:string)=>void;
   demo?: boolean;
+  /** Label an isolated UI preview displayed next to a real PDF. */
+  preview?: boolean;
   /** All cards in display order; hidden ones are skipped. */
   cards: readonly OverviewCardDef[];
   /**
@@ -116,7 +122,7 @@ export function OverviewPanel(props: OverviewPanelProps) {
 
   const header = (
     <PanelHeader
-      title="概览"
+      title={props.preview ? '概览 · 示例内容' : '概览'}
       meta={
         running ? (
           <span className="pp-ov__status">
@@ -155,6 +161,7 @@ export function OverviewPanel(props: OverviewPanelProps) {
         { id: 'copy', label: '复制全部（Markdown）', icon: 'copy', disabled: !anyContent },
         { kind: 'separator', id: 'sep' },
         { id: 'manage', label: '管理概览内容…', icon: 'settings' },
+        ...(props.versions?.map(v=>({id:'version:'+v.id,label:v.label,checked:v.active,disabled:running}))??[]),
       ]}
       anchor={(() => {
         const box = moreRef.current?.getBoundingClientRect();
@@ -162,7 +169,7 @@ export function OverviewPanel(props: OverviewPanelProps) {
       })()}
       align="end"
       triggerRef={moreRef}
-      onSelect={(id) => (id === 'copy' ? copyAll() : setSettings(true))}
+      onSelect={(id) => id.startsWith('version:') ? props.onVersion?.(id.slice(8)) : id === 'copy' ? copyAll() : setSettings(true)}
       onClose={() => setMenu(false)}
     />
   );
@@ -194,6 +201,7 @@ export function OverviewPanel(props: OverviewPanelProps) {
       {header}
       <PanelBody>
       <ScrollArea className="pp-ov__scroll" viewportClassName="pp-ov__viewport" {...cleanCopyHandlers}>
+        {props.preview && <p className="pp-ov__notice">界面预览，与当前论文无关；不调用模型，刷新后重置。</p>}
         {!props.modelReady && (
           <p className="pp-ov__notice">
             模型暂不可用，下面是上次整理的结果。
@@ -208,6 +216,7 @@ export function OverviewPanel(props: OverviewPanelProps) {
           <div className="pp-ov__page">
             {visible.map((card) => (
               <OverviewSection
+                renderText={props.renderText}
                 key={card.id}
                 card={card}
                 result={resultOf(card.id)}
@@ -221,7 +230,7 @@ export function OverviewPanel(props: OverviewPanelProps) {
                   })
                 }
                 numberOf={(label) => numbers.get(`${card.id}:${label}`)}
-                canGenerate={props.modelReady}
+                canGenerate={props.modelReady && !running}
                 onRegenerate={() => props.onRegenerate([card.id])}
                 onHide={() => props.onHide(card.id)}
                 onCopy={() => {

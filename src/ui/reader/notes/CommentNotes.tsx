@@ -2,6 +2,7 @@ import { useEffect, useLayoutEffect, useRef, useState, type CSSProperties, type 
 import { createPortal } from 'react-dom';
 import { Icon, IconButton } from '@/ui/components';
 import type { AnnotationView, NoteLayout, ViewRect } from '../types';
+import { floatingLeft, floatingMargin, useFloatingCanvas } from '../windows/floating-canvas';
 
 export type { NoteLayout };
 import './notes.css';
@@ -17,6 +18,7 @@ interface CommentNotesProps {
   /** Changes when the paper is laid out anew (zoom, docking), so passages are measured again. */
   layoutKey: string;
   zoomPercent: number;
+  uiScale?: number;
   annotationRects: (id: string) => readonly ViewRect[] | null;
   /** Geometry updates from the runtime (pages rendered, zoom, relayout). */
   subscribeGeometry: (listener: () => void) => () => void;
@@ -54,12 +56,18 @@ export function CommentNotes(props: CommentNotesProps) {
   const [anchors, setAnchors] = useState<ReadonlyMap<string, { x: number; y: number }>>(new Map());
   const known = useRef(new Map<string, { x: number; y: number }>());
   const elements = useRef(new Map<string, HTMLElement>());
+  const [dragging, setDragging] = useState(false);
   const [hovered, setHovered] = useState<string | null>(null);
   const [, setTick] = useState(0);
   const openIds = notes.filter((n) => n.open).map((n) => n.id).join(',');
   // Observers and subscriptions call measure later: read the latest props, not the ones they closed over.
   const latest = useRef(props);
   latest.current = props;
+  const lefts = notes.flatMap(note => {
+    const anchor = anchors.get(note.id);
+    return container && note.open && anchor ? [floatingLeft(container, anchor.x + note.dx * props.zoomPercent / (note.zoom ?? 100))] : [];
+  });
+  const canvas = useFloatingCanvas(container, lefts.length ? Math.min(...lefts) : null);
 
   // Where each open note's passage starts, in the paper's own coordinates. A passage on
   // a page that is not rendered keeps its last known place until it renders.
@@ -72,7 +80,7 @@ export function CommentNotes(props: CommentNotesProps) {
       if (!note.open) continue;
       const first = annotationRects(note.id)?.[0];
       const point = first
-        ? { x: first.left - box.left - el.clientLeft + el.scrollLeft, y: first.top - box.top - el.clientTop + el.scrollTop }
+        ? { x: first.left - box.left - el.clientLeft + el.scrollLeft - canvas.readInset(), y: first.top - box.top - el.clientTop + el.scrollTop }
         : known.current.get(note.id);
       if (point) {
         known.current.set(note.id, point);
@@ -82,7 +90,7 @@ export function CommentNotes(props: CommentNotesProps) {
     setAnchors(next);
   };
 
-  useLayoutEffect(measure, [openIds, props.layoutKey, props.annotations, container]);
+  useLayoutEffect(measure, [openIds, props.layoutKey, props.annotations, container, canvas.inset]);
 
   // Measure again when the runtime says positions changed (a page rendered, zoom, relayout)
   // and when the paper changes size.
@@ -126,13 +134,13 @@ export function CommentNotes(props: CommentNotesProps) {
     connector = { x1: start.x, y1: start.y, x2: target.x, y2: target.y };
   }
 
-  // Reserve one generous screen of margin beside the PDF. Derive it from pages,
+  // Reserve a bounded outer margin beside the PDF. Derive it from pages,
   // never scrollWidth (which includes notes and would grow on each drag).
   const viewport = container.getBoundingClientRect();
   const pages = [...container.querySelectorAll<HTMLElement>('.page, [data-page-index]')];
-  const pageRight = Math.max(container.clientWidth, ...pages.map(page=>page.getBoundingClientRect().right-viewport.left+container.scrollLeft));
+  const pageRight = Math.max(container.clientWidth, ...pages.map(page=>page.getBoundingClientRect().right-viewport.left+container.scrollLeft-canvas.readInset()));
   const pageBottom = Math.max(container.clientHeight, ...pages.map(page=>page.getBoundingClientRect().bottom-viewport.top+container.scrollTop));
-  const bounds = { width: pageRight + Math.max(520, container.clientWidth), height: pageBottom + 300 };
+  const bounds = { width: pageRight + floatingMargin(container), height: pageBottom + 300 };
 
   return (
     <>
@@ -148,7 +156,7 @@ export function CommentNotes(props: CommentNotesProps) {
       {createPortal(
         // Inside the scroll container, so notes move with the paper. Runtimes ignore pointer events from here.
         <div className="pp-notes-layer" data-pp-overlay="">
-          {openIds && <div aria-hidden="true" style={{position:'absolute',width:bounds.width,height:bounds.height,pointerEvents:'none'}}/>}
+          {dragging && <div aria-hidden="true" style={{position:'absolute',width:bounds.width+canvas.inset,height:bounds.height,pointerEvents:'none'}}/>}
           {notes.map((note) => {
             const annotation = props.annotations.find((a) => a.id === note.id);
             const anchor = anchors.get(note.id);
@@ -160,10 +168,13 @@ export function CommentNotes(props: CommentNotesProps) {
                 anchor={anchor}
                 bounds={bounds}
                 container={container}
+                uiScale={props.uiScale ?? 1}
                 scale={props.zoomPercent / (note.zoom ?? 100)}
+                canvas={canvas}
                 annotation={annotation}
                 register={(el) => (el ? elements.current.set(note.id, el) : elements.current.delete(note.id))}
                 onHover={(on) => setHovered((current) => (on ? note.id : current === note.id ? null : current))}
+                onDragging={setDragging}
                 onChange={props.onChange}
                 onRaise={() => props.onRaise(note.id)}
                 onClose={() => {
@@ -184,6 +195,7 @@ export function CommentNotes(props: CommentNotesProps) {
 }
 
 interface CommentNoteProps {
+  onDragging: (active: boolean) => void;
   note: NoteLayout;
   /** The passage's top-left on the paper. */
   anchor: { x: number; y: number };
@@ -191,6 +203,8 @@ interface CommentNoteProps {
   bounds: { width: number; height: number };
   container: HTMLElement;
   scale: number;
+  uiScale: number;
+  canvas: { inset: number; readInset: () => number };
   annotation: AnnotationView;
   register: (element: HTMLElement | null) => void;
   onHover: (on: boolean) => void;
@@ -202,12 +216,13 @@ interface CommentNoteProps {
   onRemoveComment: () => void;
 }
 
-function CommentNote({ note, anchor, bounds, container, scale, annotation, register, onHover, onChange, onRaise, onClose, onComment, onLocate, onRemoveComment }: CommentNoteProps) {
+function CommentNote({ onDragging, note, anchor, bounds, container, scale, uiScale, canvas, annotation, register, onHover, onChange, onRaise, onClose, onComment, onLocate, onRemoveComment }: CommentNoteProps) {
   const [draft, setDraft] = useState(annotation.note ?? '');
-  const gesture = useRef<{ kind:'move'|'resize'; pointerId:number; target:HTMLElement; x:number;y:number;px:number;py:number;scrollX:number;scrollY:number;start:NoteLayout;moved:boolean }|null>(null);
+  const gesture = useRef<{ kind:'move'|'resize'; pointerId:number; target:HTMLElement; x:number;y:number;px:number;py:number;scrollX:number;scrollY:number;inset:number;width:number;height:number;startLeft:number;start:NoteLayout;moved:boolean }|null>(null);
+  const element = useRef<HTMLElement | null>(null);
   const frame = useRef(0);
-  const current = useRef({note,anchor,bounds,scale,onChange});
-  current.current = {note,anchor,bounds,scale,onChange};
+  const current = useRef({note,anchor,bounds,scale,uiScale,onChange});
+  current.current = {note,anchor,bounds,scale,uiScale,onChange};
   const textRef = useRef<HTMLTextAreaElement>(null);
 
   // Take outside changes (e.g. edited in the annotation list) unless typing here.
@@ -215,17 +230,17 @@ function CommentNote({ note, anchor, bounds, container, scale, annotation, regis
     if (document.activeElement !== textRef.current) setDraft(annotation.note ?? '');
   }, [annotation.note]);
 
-  const left = anchor.x + note.dx * scale;
+  const left = floatingLeft(container, anchor.x + note.dx * scale) + canvas.inset;
   const top = anchor.y + note.dy * scale;
-  const width = note.collapsed ? undefined : note.width;
-  const height = note.collapsed ? PILL_HEIGHT : note.height;
+  const width = note.collapsed ? undefined : note.width * uiScale;
+  const height = (note.collapsed ? PILL_HEIGHT : note.height) * uiScale;
 
   const finish = (expand = false) => {
-    const g=gesture.current; gesture.current=null; cancelAnimationFrame(frame.current);
+    const g=gesture.current; gesture.current=null; if(g)onDragging(false); cancelAnimationFrame(frame.current);
     if(g?.target.hasPointerCapture(g.pointerId))g.target.releasePointerCapture(g.pointerId);
     if(expand && g?.moved && g.kind==='move') {
-      const {note,anchor,scale}=current.current;
-      const left=anchor.x+note.dx*scale, right=left+note.width*scale;
+      const {note,anchor,scale,uiScale}=current.current;
+      const left=floatingLeft(container,anchor.x+note.dx*scale)+canvas.readInset(), right=left+(element.current?.getBoundingClientRect().width??note.width*scale*uiScale);
       if(right>container.scrollLeft+container.clientWidth-16)container.scrollLeft=right-container.clientWidth+16;
       else if(left<container.scrollLeft+16)container.scrollLeft=Math.max(0,left-16);
     }
@@ -237,18 +252,18 @@ function CommentNote({ note, anchor, bounds, container, scale, annotation, regis
     const up=(event:PointerEvent)=>{if(event.pointerId===gesture.current?.pointerId)finish(event.type==='pointerup');};
     window.addEventListener('pointerup',up);window.addEventListener('pointercancel',up);window.addEventListener('blur',stop);
     return ()=>{stop();window.removeEventListener('pointerup',up);window.removeEventListener('pointercancel',up);window.removeEventListener('blur',stop);};
-  },[container,scale]);
+  },[container,scale,uiScale]);
   const updateGesture = () => {
     const g=gesture.current;if(!g)return;
-    const {anchor,bounds,scale,note:latest,onChange}=current.current;
-    const dx=g.px-g.x+container.scrollLeft-g.scrollX, dy=g.py-g.y+container.scrollTop-g.scrollY;
+    const {anchor,bounds,scale,uiScale,note:latest,onChange}=current.current;
+    const dx=g.px-g.x+container.scrollLeft-g.scrollX-(canvas.readInset()-g.inset), dy=g.py-g.y+container.scrollTop-g.scrollY;
     if(Math.abs(dx)+Math.abs(dy)>3)g.moved=true;
     if(!g.moved)return;
     if(g.kind==='move')onChange({...latest,
-      dx:(clamp(anchor.x+g.start.dx*scale+dx,0,bounds.width-g.start.width*scale)-anchor.x)/scale,
-      dy:(clamp(anchor.y+g.start.dy*scale+dy,0,bounds.height-(g.start.collapsed?PILL_HEIGHT:g.start.height)*scale)-anchor.y)/scale,
+      dx:(clamp(g.startLeft+dx,12-floatingMargin(container),bounds.width-g.width)-anchor.x)/scale,
+      dy:(clamp(anchor.y+g.start.dy*scale+dy,0,bounds.height-g.height)-anchor.y)/scale,
     });
-    else onChange({...latest,width:clamp(g.start.width+dx/scale,NOTE_SIZE.minWidth,NOTE_SIZE.maxWidth),height:clamp(g.start.height+dy/scale,NOTE_SIZE.minHeight,NOTE_SIZE.maxHeight)});
+    else onChange({...latest,width:clamp(g.start.width+dx/scale/uiScale,NOTE_SIZE.minWidth,NOTE_SIZE.maxWidth),height:clamp(g.start.height+dy/scale/uiScale,NOTE_SIZE.minHeight,NOTE_SIZE.maxHeight)});
   };
   const pan = () => {
     const g=gesture.current;if(!g)return;
@@ -265,8 +280,8 @@ function CommentNote({ note, anchor, bounds, container, scale, annotation, regis
     if(event.button!==0 || !event.isPrimary || (kind==='move' && (event.target as HTMLElement).closest('button, textarea')))return;
     event.preventDefault();event.stopPropagation();finish();
     event.currentTarget.setPointerCapture(event.pointerId);
-    gesture.current={kind,pointerId:event.pointerId,target:event.currentTarget,x:event.clientX,y:event.clientY,px:event.clientX,py:event.clientY,scrollX:container.scrollLeft,scrollY:container.scrollTop,start:note,moved:false};
-    onRaise();frame.current=requestAnimationFrame(pan);
+    gesture.current={kind,pointerId:event.pointerId,target:event.currentTarget,x:event.clientX,y:event.clientY,px:event.clientX,py:event.clientY,scrollX:container.scrollLeft,scrollY:container.scrollTop,inset:canvas.readInset(),width:element.current?.getBoundingClientRect().width??note.width*scale*uiScale,height:element.current?.getBoundingClientRect().height??note.height*scale*uiScale,startLeft:left-canvas.readInset(),start:note,moved:false};
+    onDragging(true);onRaise();frame.current=requestAnimationFrame(pan);
   };
   const move = (event:ReactPointerEvent<HTMLElement>) => {
     const g=gesture.current;if(!g || g.pointerId!==event.pointerId)return;
@@ -279,7 +294,7 @@ function CommentNote({ note, anchor, bounds, container, scale, annotation, regis
 
   return (
     <section
-      ref={register}
+      ref={el => { element.current=el;register(el); }}
       className={note.collapsed ? 'pp-glass pp-note pp-note--pill' : 'pp-glass pp-note'}
       data-tone="float"
       aria-label={`评论：${title}`}
