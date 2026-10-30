@@ -41,6 +41,7 @@ export class ReaderController {
   isChangingDocument = false;
   private transition: Promise<void> = Promise.resolve();
   private endTransition?: () => void;
+  private resumeMarkdown?: () => void;
   private beforeUnload = (event: BeforeUnloadEvent) => { if (markdownWork.unsaved||this.notes?.unsaved||[...this.translations].some(s => s.hasUnsavedChanges)||[...this.researchSessions].some(s=>s.unsaved)) event.preventDefault(); };
   private reading?: ReturnType<typeof readingPersistence>;
   private unsubscribeAnnotations?: () => void;
@@ -129,6 +130,8 @@ export class ReaderController {
     this.translations.delete(session); return true;
   }
   private releaseDocumentChange() {
+    this.notes?.cancelLeave();
+    this.resumeMarkdown?.(); this.resumeMarkdown = undefined;
     this.isChangingDocument = false;
     this.endTransition?.(); this.endTransition = undefined;
     this.translations.forEach(s => s.cancelLeave());
@@ -137,12 +140,13 @@ export class ReaderController {
     if (this.isChangingDocument || this.disposed) return false;
     this.isChangingDocument = true;
     this.transition = new Promise(resolve => { this.endTransition = resolve; });
+    this.resumeMarkdown = markdownWork.uploads.holdNewUploads();
     try {
       const saved = await Promise.all([...this.translations].map(s => s.prepareToLeave()));
       const aiSaved=await Promise.all([...this.researchSessions].map(s=>s.prepareToLeave()));
       if(aiSaved.some(ok=>!ok))throw new Error('AI 内容尚未保存，请先重试保存再切换论文。');
       if(!await markdownWork.prepareToLeave())throw new Error('图片尚未保存，请回到编辑器重试后再切换论文。');
-      if(this.notes&&!await this.notes.flush())throw new Error('笔记尚未保存，请重试或处理冲突后再切换论文。');
+      if(this.notes&&!await this.notes.prepareToLeave())throw new Error('笔记尚未保存，请重试或处理冲突后再切换论文。');
       await this.annotations?.flush();
       if (saved.some(ok => !ok)) throw new Error('译文尚未保存，已保留当前论文和翻译窗口。请先重试保存，再切换论文。');
       if (this.annotations?.getSnapshot().data.hasDrafts) throw new Error('当前批注有未保存的更改，请处理后再切换论文。');
@@ -174,7 +178,11 @@ export class ReaderController {
       if (!doc) throw new Error('文献没有可读取的 PDF，请先在文献库关联原文件。');
       const blob = await this.db.readFile(doc);
       if (this.disposed || epoch !== this.epoch) return;
-      this.unsubscribeAnnotations?.();this.unsubscribeNotes?.();await this.notes?.dispose(); await this.annotations?.dispose(); await this.reading?.dispose();
+      // The old view remains owned and subscribed until its last save confirms release.
+      await this.annotations?.flush();
+      if (this.annotations?.getSnapshot().data.hasDrafts) throw new Error('当前批注有未保存的更改，请处理后再切换论文。');
+      if (this.notes && !await this.notes.dispose()) throw new Error('笔记尚未保存，已保留当前论文和草稿，请重试或处理冲突后再切换论文。');
+      this.unsubscribeAnnotations?.();this.unsubscribeNotes?.();await this.annotations?.dispose(); await this.reading?.dispose();
       if (this.disposed || epoch !== this.epoch) return;
       this.originalPdfUrl = importedSource ?? (!this.externalImport && (!this.document || this.document.id === doc.id) ? this.originalPdfUrl : undefined) ?? doc.sourceUrl;
       this.document = doc; this.message = ''; this.creations.clear();
@@ -270,8 +278,12 @@ export class ReaderController {
     if (!await this.prepareDocumentChange()) { this.stopping = false; return false; }
     const released = await Promise.all([...this.translations].map(s => this.releaseTranslation(s)));
     if (released.some(ok => !ok)) { this.stopping = false; this.releaseDocumentChange(); return false; }
+    if (this.notes && !await this.notes.dispose()) {
+      this.report('笔记尚未保存，已保留当前论文和草稿，请重试后再关闭。');
+      this.stopping = false; this.releaseDocumentChange(); return false;
+    }
     window.removeEventListener('beforeunload', this.beforeUnload);
     this.disposed=true; this.epoch++; this.cleanups.forEach(fn=>fn()); this.unsubscribeAnnotations?.();this.unsubscribeNotes?.(); this.imports.dispose();
-    await Promise.all([this.annotations?.dispose(),this.notes?.dispose(),this.reading?.dispose(),this.reader.dispose()]); await this.db.close(); this.releaseDocumentChange(); return true;
+    await Promise.all([this.annotations?.dispose(),this.reading?.dispose(),this.reader.dispose()]); await this.db.close(); this.releaseDocumentChange(); return true;
   }
 }

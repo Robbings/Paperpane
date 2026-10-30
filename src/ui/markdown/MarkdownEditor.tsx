@@ -59,6 +59,7 @@ export function MarkdownEditor(props: Props) {
   useSyncExternalStore(
     markdownWork.uploads.subscribe, markdownWork.uploads.getSnapshot,
   );
+  const editingDisabled = !!props.disabled || markdownWork.uploads.blocked;
   const failedUpload = markdownWork.uploads.firstFailure(uploadId.current);
   const visibleError = failedUpload?.error ?? error;
   useEffect(() => {
@@ -183,6 +184,10 @@ export function MarkdownEditor(props: Props) {
           upload: {
             accept: "image/png,image/jpeg,image/webp,image/gif,image/bmp",
             handler: async (files): Promise<null> => {
+              if (markdownWork.uploads.blocked) {
+                toast.show({message: "正在切换论文，请稍后再插入图片。"});
+                return null;
+              }
               try {
                 await upload(files);
               } catch {
@@ -219,7 +224,7 @@ export function MarkdownEditor(props: Props) {
                 characterData: true,
               });
             }
-            if (latest.current.disabled) instance!.disabled();
+            if (latest.current.disabled || markdownWork.uploads.blocked) instance!.disabled();
             if (latest.current.autoFocus) instance!.focus();
             setReady(true);
             repairImages();
@@ -277,9 +282,9 @@ export function MarkdownEditor(props: Props) {
   }, [props.value, ready]);
   useEffect(() => {
     if (editor.current) {
-      props.disabled ? editor.current.disabled() : editor.current.enable();
+      editingDisabled ? editor.current.disabled() : editor.current.enable();
     }
-  }, [props.disabled, ready]);
+  }, [editingDisabled, ready]);
   return (
     <div
       className="pp-markdown-editor"

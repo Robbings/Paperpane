@@ -181,3 +181,76 @@ test("settle also waits for tasks started while an earlier upload is pending", a
   await bp;
   assert(await leaving);
 });
+
+test("document transition blocks new uploads but drains accepted ones", async () => {
+  const q = new MarkdownUploadTasks(),
+    g = gate();
+  let inserted = 0;
+  const accepted = q.create(
+    "notes",
+    async () => {
+      await g.promise;
+      inserted++;
+    },
+    () => {},
+  );
+  const upload = accepted.retry(),
+    release = q.holdNewUploads();
+  assert(q.blocked);
+  assert.throws(
+    () =>
+      q.create(
+        "notes",
+        async () => {},
+        () => {},
+      ),
+    /切换论文/,
+  );
+  const settled = q.settle();
+  g.release();
+  await upload;
+  assert(await settled);
+  assert.equal(inserted, 1);
+  release();
+  assert(!q.blocked);
+  const next = q.create(
+    "notes",
+    async () => {
+      inserted++;
+    },
+    () => {},
+  );
+  await next.retry();
+  assert.equal(inserted, 2);
+});
+
+test("nested transition barriers release independently and idempotently", () => {
+  const q = new MarkdownUploadTasks(),
+    a = q.holdNewUploads(),
+    b = q.holdNewUploads();
+  a();
+  a();
+  assert(q.blocked);
+  b();
+  assert(!q.blocked);
+});
+
+test("transition barrier does not discard a failed accepted upload or prevent retry", async () => {
+  const q = new MarkdownUploadTasks();
+  let fail = true;
+  const a = q.create(
+    "notes",
+    async () => {
+      if (fail) throw Error("failed");
+    },
+    () => {},
+  );
+  await assert.rejects(a.retry());
+  const release = q.holdNewUploads();
+  assert(!(await q.settle()));
+  assert.equal(q.firstFailure("notes"), a);
+  fail = false;
+  await a.retry();
+  assert(await q.settle());
+  release();
+});

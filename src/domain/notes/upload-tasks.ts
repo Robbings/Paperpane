@@ -12,6 +12,7 @@ export class MarkdownUploadTasks {
   private running = new Map<string, Promise<void>>();
   private listeners = new Set<() => void>();
   private version = 0;
+  private barriers = new Set<symbol>();
 
   subscribe = (listener: () => void) => {
     this.listeners.add(listener);
@@ -23,6 +24,18 @@ export class MarkdownUploadTasks {
   private changed() {
     this.version++;
     this.listeners.forEach((listener) => listener());
+  }
+  get blocked() {
+    return this.barriers.size > 0;
+  }
+  /** Reject new uploads while accepted tasks finish for a document transition. */
+  holdNewUploads() {
+    const token = Symbol();
+    this.barriers.add(token);
+    this.changed();
+    return () => {
+      if (this.barriers.delete(token)) this.changed();
+    };
   }
   get unsaved() {
     return this.tasks.size > 0;
@@ -50,6 +63,7 @@ export class MarkdownUploadTasks {
     run: (cancelled: () => boolean) => Promise<void>,
     onSettled: () => void,
   ) {
+    if (this.blocked) throw new Error("正在切换论文，请稍后再插入图片。");
     let cancelled = false;
     const task: MarkdownUploadTask = {
       id: crypto.randomUUID(),

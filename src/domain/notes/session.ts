@@ -25,6 +25,7 @@ export class NoteSession implements NoteService {
   private queue = Promise.resolve();
   private pending = 0;
   private closed = false;
+  private leaving = false;
   private ready = false;
   private epoch = 0;
   private channel = new BroadcastChannel("paperpane-notes");
@@ -71,7 +72,7 @@ export class NoteSession implements NoteService {
   };
   private publish() {
     this.snapshot = this.ready
-      ? { mode: "live", state: "ready", data: { ...this.state } }
+      ? { mode: "live", state: this.leaving ? "loading" : "ready", data: { ...this.state } }
       : this.state.save.error
         ? {
             mode: "live",
@@ -114,6 +115,7 @@ export class NoteSession implements NoteService {
     }
   }
   edit(content: NoteContent): Result<void> {
+    if (this.leaving) return failure("BUSY", "正在切换论文，请稍后编辑笔记。");
     if (!this.ready || this.closed) return failure("BUSY", "笔记仍在读取");
     const valid = validateNote(content);
     if (!valid.ok) return valid;
@@ -215,7 +217,14 @@ export class NoteSession implements NoteService {
     return !this.unsaved;
   }
   async prepareToLeave() {
+    this.leaving = true;
+    this.publish();
     return this.flush();
+  }
+  cancelLeave() {
+    if (this.closed || !this.leaving) return;
+    this.leaving = false;
+    this.publish();
   }
   async resolve(
     id: string,
@@ -289,7 +298,11 @@ export class NoteSession implements NoteService {
     });
   }
   async dispose() {
-    if (!(await this.flush())) return false;
+    if (this.closed) return true;
+    if (!(await this.prepareToLeave()) || this.unsaved) {
+      this.cancelLeave();
+      return false;
+    }
     this.closed = true;
     this.channel.close();
     this.listeners.clear();
