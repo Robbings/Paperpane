@@ -1,6 +1,5 @@
+import { useResearch } from './use-research';
 import { useEffect, useRef, useState } from 'react';
-import { SampleChat } from '@/ui/reader/sample/SampleChat';
-import { SampleOverview } from '@/ui/reader/sample/SampleOverview';
 import { ReaderShell } from '@/ui/reader/ReaderShell';
 import { Button, Dialog, EmptyState, ProgressBar, TextField, Toaster, toast } from '@/ui/components';
 import type { ReaderInteraction } from '@/ui/reader/types';
@@ -36,6 +35,7 @@ export function LiveReaderPage() {
   const translation=useTranslation(owner,preferences.state.preferences);
   const modelSettings=useModelSettings();
   const state=owner?.reader.getSnapshot().data;
+  const research=useResearch(owner,preferences.state.preferences,modelSettings.settings.revision,preferences.state.local!=='unmodified'&&preferences.state.local!=='failed');
   useEffect(()=>{
     const media=window.matchMedia('(prefers-color-scheme: dark)');
     const apply=()=>{
@@ -68,8 +68,8 @@ export function LiveReaderPage() {
     onScrollContainer:setContainer, menuTarget, onDismissMenu:()=>owner?.reader.dismissMenu(),
     tool:state?.tool??'select',onToolChange:tool=>owner?.reader.setTool(tool),
     onCreateHighlight:(id,color)=>owner?.createHighlight(id,color)??Promise.resolve(null),
-    onSelectionAction:(id,action)=>owner?.selectionAction(id,action),
-    onAnnotationAction:(id,action)=>{const row=owner?.item(id);if(row){if(action==='translate'&&owner?.translateSelection)owner.translateSelection(row.anchor,row.quote);else owner?.textAction(row.quote,action);}},
+    onSelectionAction:(id,action)=>{if(action==='explain'||action==='ask'){const selection=owner?.reader.resolveSelection(id);if(selection?.ok)void research.selected(selection.value,action);else if(selection&&!selection.ok)report(selection.error.message);}else owner?.selectionAction(id,action);},
+    onAnnotationAction:(id,action)=>{const row=owner?.item(id);if(row){if(action==='explain'||action==='ask')void research.selected({anchor:row.anchor,text:row.quote},action);else if(action==='translate'&&owner?.translateSelection)owner.translateSelection(row.anchor,row.quote);else owner?.textAction(row.quote,action);}},
     onAnnotationColor:(id,color)=>owner?.colorAnnotation(id,color),
     onAnnotationComment:(id,comment)=>owner?.annotations?.edit(id,{comment}),
     onAnnotationCommentDelete:async id=>owner?.annotations?.deleteComment(id)??null,
@@ -85,8 +85,6 @@ export function LiveReaderPage() {
   const notice = saved?.error?.message || owner?.message || state?.error?.message || failedJob?.error?.message || (job ? '正在导入…' : '');
   useEffect(()=>{if(notice&&!saved?.error)toast.show({message:notice});},[notice,saved?.error]);
   const local=!saved?'unmodified':saved.error?'failed':saved.pending?'saving':'saved';
-  const previewKey=state?.document ? `${state.document.documentId}:${state.document.fileVersion}` : 'empty';
-  const previewCitation=()=>toast.show({message:'示例出处不对应当前论文。'});
   const unavailable=<EmptyState icon="file" title="尚未接入" description="本轮完成 PDF 阅读、高亮和评论保存，其余研究功能将在后续接入。"/>;
   return <>
     <ReaderShell header={{title:owner?.document?.title??'打开论文',sourceLabel:owner?.document?.sourceUrl?new URL(owner.document.sourceUrl).hostname:'本地文件',pageCount:state?.pageCount??0}}
@@ -94,12 +92,8 @@ export function LiveReaderPage() {
       annotations={(saved?.items??[]).filter(row=>!row.deletedAt).map(row=>({id:row.id,kind:row.kind==='page-comment'?'comment':'highlight',color:row.color,pageIndex:row.anchor.pages[0]!.pageIndex,quote:row.quote,note:row.comment}))}
       annotationStatus={{local,sync:'unconfigured'}}
       notes={{value:'',onChange:()=>report('整篇笔记将在后续接入。'),local:'unmodified',sync:'unconfigured'}}
-      panels={{
-        overview:<SampleOverview key={`overview:${previewKey}`} preview onLocateQuote={previewCitation}/>,
-        discuss:<SampleChat key={`discuss:${previewKey}`} preview onLocateQuote={previewCitation}/>,
-        explain:<SampleChat key={`explain:${previewKey}`} title="解释" preview onLocateQuote={previewCitation}/>,
-        notes:unavailable,cite:unavailable,
-      }}
+      panelRequest={research.panelRequest}
+      panels={{...research.panels,notes:unavailable,cite:unavailable}}
       document={<>
         {(!state||state.phase==='empty'||state.phase==='failed')&&<EmptyState icon="file" title={state?.phase==='failed'?'无法打开 PDF':'打开一份论文'} description={state?.error?.message} actions={<Button onClick={()=>setOpenFiles(true)}>选择论文</Button>}/>}
         {state?.phase==='loading'&&<ProgressBar label="载入 PDF" value={state.loadProgress}/>}
@@ -116,9 +110,10 @@ export function LiveReaderPage() {
       onZoom={direction=>{const r=owner?.reader.setZoom(Math.min(4,Math.max(.25,Math.round(((owner.reader.getSnapshot().data.position.zoom??1)+(direction==='in'?.1:-.1))*100)/100)));if(r&&!r.ok)report(r.error.message);}}
       onZoomTo={percent=>{const r=owner?.reader.setZoom(percent/100);if(r&&!r.ok)report(r.error.message);}}
       onLocateAnnotation={id=>{const row=owner?.item(id);if(row)void owner?.reader.locate(row.anchor).then(()=>owner.reader.showAnnotation(id));}}
-      onTool={tool=>{if(tool==='fit-width'){const r=owner?.reader.fitWidth();if(r&&!r.ok)report(r.error.message);}else if(tool==='copy-annotations'||tool==='export-annotations')void owner?.exportAnnotations(tool==='copy-annotations');else if(tool==='open'||tool==='library')setOpenFiles(true);else report('该工具将在后续阅读能力接入时提供。');}}
+      onTool={tool=>{if(tool==='region')research.startCapture();else if(tool==='fit-width'){const r=owner?.reader.fitWidth();if(r&&!r.ok)report(r.error.message);}else if(tool==='copy-annotations'||tool==='export-annotations')void owner?.exportAnnotations(tool==='copy-annotations');else if(tool==='open'||tool==='library')setOpenFiles(true);else report('该工具将在后续阅读能力接入时提供。');}}
     />
-    {translation.overlay}{translation.confirmation}
+    {translation.overlay}{translation.confirmation}{research.overlay}
+    <Dialog open={!!research.service?.saveError&&!!research.service?.unsaved} title="AI 内容尚未保存" description={research.service?.saveError} onClose={()=>{}} footer={<Button onClick={()=>void research.service?.flush()}>重试保存</Button>}/>
     <Dialog open={!!saved?.error} onClose={()=>{}} title="批注未能保存" description={saved?.error?.message} footer={<><Button onClick={()=>void owner?.annotations?.retry()}>重试保存</Button><Button onClick={()=>void owner?.annotations?.discardDrafts()}>放弃草稿，载入最新</Button></>}/>
     <Dialog open={openFiles} onClose={()=>setOpenFiles(false)} title="打开论文" description="复用文献库的 PDF 文件；导入的文件与批注保存在本机数据库。" footer={<><Button onClick={()=>{setOpenFiles(false);input.current?.click();}}>导入本地 PDF</Button><Button onClick={()=>void owner?.leaveForLibrary()}>文献库</Button></>}>
       {documents.length?documents.map(doc=><div key={doc.id}><Button onClick={()=>{setOpenFiles(false);void owner?.open(doc.id);}}>{doc.title}</Button></div>):<p>还没有导入论文。</p>}

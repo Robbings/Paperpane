@@ -1,13 +1,14 @@
 import type { DockPlacement } from './types';
+import { researchPanels } from './research-panels';
 
 // Floating layout metrics, in CSS pixels.
 export const GAP = 10;
 export const SIDEBAR_WIDTH = 240;
 /** The function rail is the research card's edge: this thick across... */
 export const RAIL_THICKNESS = 48;
-/** ...and, when collapsed, this long (6 icon buttons, vertical) or this wide (6 labelled buttons, horizontal). */
-export const RAIL_LENGTH = 6 * 36 + 5 * 4 + 12;
-export const RAIL_ROW_LENGTH = 6 * 72 + 5 * 4 + 12;
+/** Collapsed length follows the visible buttons, vertically or horizontally. */
+export const RAIL_LENGTH = researchPanels.length * 36 + Math.max(0, researchPanels.length - 1) * 4 + 12;
+export const RAIL_ROW_LENGTH = researchPanels.length * 72 + Math.max(0, researchPanels.length - 1) * 4 + 12;
 /** Space between the paper area and the research card. */
 export const RAIL_GAP = 8;
 

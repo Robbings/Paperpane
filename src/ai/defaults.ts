@@ -1,0 +1,50 @@
+import type { OverviewCardDef } from "@/ui/reader/overview/types";
+export const defaultCards: OverviewCardDef[] = [
+  {
+    id: "gist",
+    name: "概括",
+    prompt: "用一两句话说清论文做了什么、为什么重要。",
+    output: "markdown",
+    display: "lead",
+    builtIn: true,
+    visible: true,
+  },
+  {
+    id: "keywords",
+    name: "关键词",
+    prompt: "列出 5–8 个准确的主题或方法关键词。",
+    output: "list",
+    listStyle: "tags",
+    builtIn: true,
+    visible: true,
+  },
+  {
+    id: "summary",
+    name: "结构化摘要",
+    prompt: "概括研究问题、方法、数据、结果和局限，不要虚构未报告的数字。",
+    output: "fields",
+    schema: JSON.stringify({
+      type: "object",
+      properties: {
+        question: { type: "string", title: "研究问题" },
+        method: { type: "string", title: "方法" },
+        data: { type: "string", title: "数据" },
+        results: { type: "string", title: "主要结果" },
+        limits: { type: "string", title: "局限" },
+      },
+      required: ["question", "method", "data", "results", "limits"],
+      additionalProperties: false,
+    }),
+    builtIn: true,
+    visible: true,
+  },
+  {
+    id: "points",
+    name: "要点",
+    prompt: "列出 3–5 条最值得记住的结论，每条带短标题。",
+    output: "list",
+    listStyle: "items",
+    builtIn: true,
+    visible: true,
+  },
+];

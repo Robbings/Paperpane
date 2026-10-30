@@ -15,9 +15,10 @@ export class ModelSettingsStore extends PaperDatabase {
   async view(){return structuredClone((await this.record()).view);}
   async save(draft:SettingsDraft,expected:string):Promise<SaveSettingsResult>{
     const problems=runtimeProblems(draft.runtime);
-    for(const [i,e] of draft.endpoints.entries()){try{endpointUrl(e.baseUrl);}catch(error){problems.push({path:`endpoints.${i}.baseUrl`,message:(error as Error).message});}if(!['openai-chat','openai-responses'].includes(e.protocol))problems.push({path:`endpoints.${i}.protocol`,message:'当前翻译支持 OpenAI Responses 和 Chat Completions 接口。'});}
+    for(const [i,e] of draft.endpoints.entries()){try{endpointUrl(e.baseUrl);}catch(error){problems.push({path:`endpoints.${i}.baseUrl`,message:(error as Error).message});}if(!['openai-chat','openai-responses','anthropic','gemini'].includes(e.protocol))problems.push({path:`endpoints.${i}.protocol`,message:'请选择支持的接口协议。'});}
     if(new Set(draft.endpoints.map(e=>e.id)).size!==draft.endpoints.length||new Set(draft.models.map(m=>m.id)).size!==draft.models.length)problems.push({path:'models',message:'模型或接口标识重复。'});
     for(const m of draft.models)if(!m.modelId.trim()||!draft.endpoints.some(e=>e.id===m.endpointId))problems.push({path:'models',message:'请填写模型 ID 并选择对应接口。'});
+    for(const m of draft.models)if(m.contextWindow!==undefined&&(!Number.isInteger(m.contextWindow)||m.contextWindow<8192||m.contextWindow>10000000))problems.push({path:'models',message:'模型上下文容量须为 8192–10000000 tokens。'});
     for(const id of [draft.defaultModelId,...draft.features.map(f=>f.modelId)])if(id&&!draft.models.some(m=>m.id===id))problems.push({path:'models',message:'默认或翻译模型不存在。'});
     if(problems.length)return {ok:false,reason:'invalid',problems};
     const db=await this.open();const tx=db.transaction('meta','readwrite',{durability:'strict'});
@@ -41,9 +42,9 @@ export class ModelSettingsStore extends PaperDatabase {
     });
   }
   /** For request logic only; never expose this return value through a UI snapshot. */
-  async resolveConnection(modelId?:string){
-    const {view,keys}=await this.record();const route=view.features.find(f=>f.feature==='translate');if(route?.enabled===false)throw new Error('翻译已在设置中关闭。');
-    const model=view.models.find(m=>m.id===(modelId??route?.modelId??view.defaultModelId));const endpoint=view.endpoints.find(e=>e.id===model?.endpointId);
+  async resolveConnection(modelId?:string, feature: import('@/ui/settings/types').FeatureId = 'translate'){
+    const {view,keys}=await this.record();const route=view.features.find(f=>f.feature===feature);if(route?.enabled===false)throw new Error('此 AI 功能已在设置中关闭。');
+    const model=view.models.find(m=>m.id===(modelId??route?.modelId??view.defaultModelId??view.features.find(f=>f.feature==='translate')?.modelId??view.models[0]?.id));const endpoint=view.endpoints.find(e=>e.id===model?.endpointId);
     if(!model||!endpoint)throw new Error('请先在设置 → 模型中添加接口和模型。');
     return {view,model,endpoint,key:keys[endpoint.id]??''};
   }

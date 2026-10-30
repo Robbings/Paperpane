@@ -1,5 +1,5 @@
 import { setPaperpaneViewerTheme } from 'pdfjs-dist/build/paperpane-theme.mjs';
-import { TextLayer, AnnotationEditorType, GlobalWorkerOptions, PasswordResponses, getDocument, type PDFDocumentLoadingTask, type PDFDocumentProxy } from 'pdfjs-dist';
+import { TextLayer, AnnotationMode, AnnotationEditorType, GlobalWorkerOptions, PasswordResponses, getDocument, type PDFDocumentLoadingTask, type PDFDocumentProxy } from 'pdfjs-dist';
 import { mergeHighlightRects } from 'pdfjs-dist/build/paperpane-highlight-geometry.mjs';
 import workerUrl from 'pdfjs-dist/build/pdf.worker.min.mjs?url';
 import { EventBus, PDFFindController, PDFLinkService, PDFViewer, ScrollMode, SpreadMode } from 'pdfjs-dist/web/pdf_viewer.mjs';
@@ -230,6 +230,66 @@ export class PdfjsReader implements ReaderService, AnchorService {
     this.invalidate(true);
   }
   setRotation(rotation: 0 | 90 | 180 | 270): Result<void> { const ready = this.ready(); if (!ready.ok) return ready; if (![0,90,180,270].includes(rotation)) return failure('INVALID_INPUT', '旋转角度无效'); const fit = this.snapshot.data.position.zoomMode === 'width'; this.viewer.pagesRotation = rotation; if(fit)this.applyWidthScale(); return success(undefined); }
+  async captureImage(pageIndex:number,rect:{left:number;top:number;width:number;height:number}) {
+    const view=this.viewer.getPageView(pageIndex),pdf=this.pdf,ref=this.snapshot.data.document,session=this.snapshot.data.sessionId;
+    if(!view?.pdfPage||!pdf||!ref||!this.surface.contains(view.div))throw new Error('目标页尚未就绪');
+    const bounds=view.div.getBoundingClientRect(),crop=view.pdfPage.view as number[];
+    const a=view.viewport.convertToPdfPoint((rect.left-bounds.left)*view.viewport.width/bounds.width,(rect.top-bounds.top)*view.viewport.height/bounds.height);
+    const b=view.viewport.convertToPdfPoint((rect.left+rect.width-bounds.left)*view.viewport.width/bounds.width,(rect.top+rect.height-bounds.top)*view.viewport.height/bounds.height);
+    const points=[Math.min(a[0],b[0]),Math.min(a[1],b[1]),Math.max(a[0],b[0]),Math.max(a[1],b[1])];
+    const anchor:DocumentAnchor={...ref,pages:[{pageIndex,rects:[{x:points[0]!-crop[0]!,y:points[1]!-crop[1]!,width:points[2]!-points[0]!,height:points[3]!-points[1]!}]}]};
+    const pdfPage=await pdf.getPage(pageIndex+1);let viewport=pdfPage.getViewport({scale:8/3,rotation:view.viewport.rotation});
+    const project=(v:typeof viewport)=>[...v.convertToViewportPoint(points[0]!,points[1]!),...v.convertToViewportPoint(points[2]!,points[3]!)];
+    let projected=project(viewport);const factor=Math.min(1,2048/Math.max(Math.abs(projected[2]-projected[0]),Math.abs(projected[3]-projected[1])));
+    viewport=pdfPage.getViewport({scale:8/3*factor,rotation:view.viewport.rotation});projected=project(viewport);
+    const canvas=document.createElement('canvas');canvas.width=Math.max(1,Math.ceil(Math.abs(projected[2]-projected[0])));canvas.height=Math.max(1,Math.ceil(Math.abs(projected[3]-projected[1])));
+    const task=pdfPage.render({canvas,viewport,transform:[1,0,0,1,-Math.min(projected[0],projected[2]),-Math.min(projected[1],projected[3])],background:'#ffffff',annotationMode:AnnotationMode.DISABLE});
+    const abort=()=>task.cancel();this.sessionLifecycle.signal.addEventListener('abort',abort,{once:true});
+    try{await task.promise;if(this.snapshot.data.sessionId!==session)throw new Error('论文已切换');const blob=await new Promise<Blob>((ok,no)=>canvas.toBlob(b=>b?ok(b):no(new Error('无法生成截图')),'image/png'));return {anchor,blob};}
+    finally{this.sessionLifecycle.signal.removeEventListener('abort',abort);canvas.width=canvas.height=0;}
+  }
+  /** Original white page, independent of viewer zoom, theme and saved annotations. */
+  async layoutPage(pageIndex:number,signal:AbortSignal){
+    const pdf=this.pdf,ref=this.snapshot.data.document,session=this.snapshot.data.sessionId;
+    if(!pdf||!ref)throw new Error('论文尚未就绪');
+    const page=await pdf.getPage(pageIndex+1),base=page.getViewport({scale:1,rotation:0});
+    const viewport=page.getViewport({scale:1600/Math.max(base.width,base.height),rotation:0});
+    const canvas=document.createElement('canvas');canvas.width=Math.ceil(viewport.width);canvas.height=Math.ceil(viewport.height);
+    const all=AbortSignal.any([signal,this.sessionLifecycle.signal]);all.throwIfAborted();
+    const task=page.render({canvas,viewport,background:'#ffffff',annotationMode:AnnotationMode.DISABLE}),abort=()=>task.cancel();all.addEventListener('abort',abort,{once:true});
+    try{await task.promise;all.throwIfAborted();if(this.snapshot.data.sessionId!==session)throw new Error('论文已切换');
+      const blob=await new Promise<Blob>((ok,no)=>canvas.toBlob(b=>b?ok(b):no(new Error('页面渲染失败')),'image/png'));
+      return {blob,width:canvas.width,height:canvas.height};
+    }finally{all.removeEventListener('abort',abort);canvas.width=canvas.height=0;}
+  }
+  async elementAnchor(pageIndex:number,box:readonly number[]):Promise<DocumentAnchor>{
+    const pdf=this.pdf,ref=this.snapshot.data.document;if(!pdf||!ref)throw new Error('论文尚未就绪');
+    const page=await pdf.getPage(pageIndex+1),crop=page.view as number[],v=page.getViewport({scale:1,rotation:0});
+    const a=v.convertToPdfPoint(box[0]!*v.width,box[1]!*v.height),b=v.convertToPdfPoint(box[2]!*v.width,box[3]!*v.height);
+    return {...ref,pages:[{pageIndex,rects:[{x:Math.min(a[0],b[0])-crop[0]!,y:Math.min(a[1],b[1])-crop[1]!,width:Math.abs(b[0]-a[0]),height:Math.abs(b[1]-a[1])}]}]};
+  }
+  async elementText(anchor:DocumentAnchor){
+    if(!this.pdf||!this.matches(anchor))return '';
+    const parts:string[]=[];
+    for(const a of anchor.pages){const page=await this.pdf.getPage(a.pageIndex+1),crop=page.view as number[],text=await page.getTextContent();
+      for(const item of text.items){if(!('str' in item))continue;const x=item.transform[4]-crop[0]!,y=item.transform[5]-crop[1]!,w=item.width,h=item.height;
+        if(a.rects.some(r=>x+w>=r.x&&x<=r.x+r.width&&y+h>=r.y&&y<=r.y+r.height))parts.push(item.str);
+      }
+    }return parts.join(' ').replace(/\s+/g,' ').trim();
+  }
+  async captureAnchor(anchor:DocumentAnchor,signal:AbortSignal){
+    const pdf=this.pdf,session=this.snapshot.data.sessionId;
+    if(!pdf||!this.matches(anchor))throw new Error('论文已切换');
+    const part=anchor.pages[0]!,r=part.rects[0]!,page=await pdf.getPage(part.pageIndex+1),crop=page.view as number[];
+    const scale=Math.min(4,2048/Math.max(r.width,r.height)),v=page.getViewport({scale,rotation:0});
+    const a=v.convertToViewportPoint(r.x+crop[0]!,r.y+crop[1]!),b=v.convertToViewportPoint(r.x+r.width+crop[0]!,r.y+r.height+crop[1]!);
+    const canvas=document.createElement('canvas');canvas.width=Math.max(1,Math.ceil(Math.abs(b[0]-a[0])));canvas.height=Math.max(1,Math.ceil(Math.abs(b[1]-a[1])));
+    const all=AbortSignal.any([signal,this.sessionLifecycle.signal]);all.throwIfAborted();
+    const task=page.render({canvas,viewport:v,transform:[1,0,0,1,-Math.min(a[0],b[0]),-Math.min(a[1],b[1])],background:'#ffffff',annotationMode:AnnotationMode.DISABLE}),abort=()=>task.cancel();all.addEventListener('abort',abort,{once:true});
+    try{await task.promise;all.throwIfAborted();if(this.snapshot.data.sessionId!==session)throw new Error('论文已切换');
+      const blob=await new Promise<Blob>((ok,no)=>canvas.toBlob(b=>b?ok(b):no(new Error('截图失败')),'image/png'));return {anchor,blob};
+    }finally{all.removeEventListener('abort',abort);canvas.width=canvas.height=0;}
+  }
   async extractTranslation(signal: AbortSignal, progress: (n:number)=>void) {
     const pdf=this.pdf, ref=this.snapshot.data.document;
     if(!pdf||!ref||this.snapshot.data.phase!=='ready')throw new Error('论文尚未就绪。');

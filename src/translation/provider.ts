@@ -1,3 +1,4 @@
+import { modelSlot, coolModel } from '@/ai/limit';
 import type { TranslationDiagnostics } from '@/contracts/translation';
 import { TranslationError, safeDetail } from './errors';
 import { ModelSettingsStore, endpointUrl } from '@/data/model-settings';
@@ -9,6 +10,9 @@ const responseText = (body: ResponseBody) => body.output?.filter(item => item.ty
 const object = (v: unknown): Record<string, unknown> => v && typeof v === 'object' ? v as Record<string, unknown> : {};
 /** One transport attempt only. The task scheduler owns backoff and circuit breaking. */
 export async function streamTranslationText(connection: Connection, messages: { role: 'system' | 'user'; content: string }[], signal: AbortSignal, onText: (text: string) => Promise<void>, context: RequestContext) {
+  return modelSlot(connection, signal, () => streamTranslationAttempt(connection, messages, signal, onText, context));
+}
+async function streamTranslationAttempt(connection: Connection, messages: { role: 'system' | 'user'; content: string }[], signal: AbortSignal, onText: (text: string) => Promise<void>, context: RequestContext) {
   const responses = connection.endpoint.protocol === 'openai-responses';
   if (!responses && connection.endpoint.protocol !== 'openai-chat') throw new TranslationError('当前翻译暂不支持此接口协议。', false, true);
   const url = endpointUrl(connection.endpoint.baseUrl) + (responses ? '/responses' : '/chat/completions');
@@ -40,6 +44,7 @@ export async function streamTranslationText(connection: Connection, messages: { 
     const fatal = permanent || (!length && !rateLimited && (invalid || (status !== undefined && status >= 400 && status < 500 && !httpTemporary)));
     const retryable = !fatal && (length || rateLimited || httpTemporary || status === undefined || status === 200);
     const category = fatal ? 'configuration' : length ? 'content' : rateLimited ? 'rate-limit' : 'service';
+    if(retryable&&!length)coolModel(connection.endpoint.baseUrl,Math.max(diagnostics.retryAfterMs??0,rateLimited?60000:5000));
     report({ ...(status !== undefined ? { status } : {}), code, type, message: msg ?? fallback, category });
     const text = [fallback, code ? `错误码：${code}` : '', msg ?? '', diagnostics.requestId ? `请求标识：${diagnostics.requestId}` : ''].filter(Boolean).join(' ');
     return new TranslationError(text, retryable, fatal, diagnostics.retryAfterMs ?? 0, length ? 'content' : retryable ? 'service' : 'none', diagnostics);

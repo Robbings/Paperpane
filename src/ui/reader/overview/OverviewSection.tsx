@@ -1,9 +1,11 @@
+import type { ResearchTextRenderer } from '@/ai/markdown';
 import { useId, useRef, useState, type ReactNode } from 'react';
 import { Button, Icon, IconButton, Markdown, MarkdownInline, Menu, Skeleton } from '@/ui/components';
 import { SourceMarker } from '../SourceMarker';
 import type { OverviewCardDef, OverviewContent, OverviewResultView, OverviewSourceView } from './types';
 
 interface OverviewSectionProps {
+  renderText?: ResearchTextRenderer;
   card: OverviewCardDef;
   result: OverviewResultView;
   collapsed: boolean;
@@ -49,7 +51,7 @@ export function OverviewSection(props: OverviewSectionProps) {
   if (!content) {
     body = running || result.state === 'empty' ? <Skeleton lines={lead ? 2 : skeletonLines(card)} /> : null;
   } else if (content.output === 'markdown') {
-    body = <Markdown text={content.markdown} renderCitation={marker} className={lead ? 'pp-ov-lead' : 'pp-ov-prose'} />;
+    body = props.renderText ? props.renderText(content.markdown,marker,lead ? 'pp-ov-lead' : 'pp-ov-prose') : <Markdown text={content.markdown} renderCitation={marker} className={lead ? 'pp-ov-lead' : 'pp-ov-prose'} />;
   } else if (content.output === 'list' && card.listStyle === 'tags') {
     body = (
       <ul className="pp-ov-tags">
@@ -68,7 +70,7 @@ export function OverviewSection(props: OverviewSectionProps) {
                 <strong className="pp-ov-points__title">{item.title}</strong>：
               </>
             )}
-            <MarkdownInline text={item.text} renderCitation={marker} />
+            {props.renderText ? props.renderText(item.text,marker,undefined,true) : <MarkdownInline text={item.text} renderCitation={marker} />}
           </li>
         ))}
       </ol>
@@ -80,7 +82,7 @@ export function OverviewSection(props: OverviewSectionProps) {
           <div key={field.label}>
             <dt>{field.label}</dt>
             <dd>
-              <MarkdownInline text={field.value} renderCitation={marker} />
+              {props.renderText ? props.renderText(field.value,marker,undefined,true) : <MarkdownInline text={field.value} renderCitation={marker} />}
             </dd>
           </div>
         ))}
