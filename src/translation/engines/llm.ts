@@ -1,5 +1,5 @@
 import type { TranslationEngine } from '../engine';
-import { streamTranslationText, type Connection } from '../provider';
+import { createModelClient, type Connection } from '@/ai/model-client';
 import { decodeTranslations } from '../output';
 import { TranslationError } from '../errors';
 export const PROMPT_VERSION = 'sentence-markdown-math-3';
@@ -12,16 +12,19 @@ You MAY reconstruct damaged mathematical notation from the surrounding definitio
 ${custom}`;
 }
 export function createLlmEngine(connection: Connection): TranslationEngine {
-  return { id: connection.endpoint.protocol, async translate(input, onOutput) {
+  const client = createModelClient(connection);
+  return { id: 'llm', async translate(input, onOutput) {
     const ids = new Set(input.sentences.map(s => s.id)); let raw = '';
     const custom = connection.view.prompts.find(p => p.feature === 'translate' && p.id === connection.view.features.find(f => f.feature === 'translate')?.activeProfileId)?.text ?? '';
-    await streamTranslationText(connection, [
-      { role: 'system', content: llmInstructions(input.language, custom) + (input.sourceLanguage && input.sourceLanguage !== 'auto' ? `\nSource language: ${input.sourceLanguage}.` : '\nDetect the source language automatically.') },
-      { role: 'user', content: JSON.stringify({ context: input.context.slice(0, 16000), sentences: input.sentences.map(s => ({ id: s.id, text: s.source, extractionWarnings: s.warnings })) }) },
-    ], input.signal, async delta => {
-      raw += delta;
-      await onOutput({ raw: delta, sentences: [...decodeTranslations(raw, ids)].map(([id, value]) => ({ id, ...value })) });
-    }, { sessionId: input.sessionId, onDiagnostics: input.onDiagnostics });
+    await client.translate({
+      system: llmInstructions(input.language, custom) + (input.sourceLanguage && input.sourceLanguage !== 'auto' ? `\nSource language: ${input.sourceLanguage}.` : '\nDetect the source language automatically.'),
+      text: JSON.stringify({ context: input.context.slice(0, 16000), sentences: input.sentences.map(s => ({ id: s.id, text: s.source, extractionWarnings: s.warnings })) }),
+      sessionId: input.sessionId, onDiagnostics: input.onDiagnostics,
+      onText: async delta => {
+        raw += delta;
+        await onOutput({ raw: delta, sentences: [...decodeTranslations(raw, ids)].map(([id, value]) => ({ id, ...value })) });
+      },
+    }, input.signal);
     if (input.sentences.some(s => !decodeTranslations(raw, ids).get(s.id)?.complete))
       throw new TranslationError('模型有漏句或返回格式不完整，将只重试未完成的句子。', true, false, 0, 'content');
   } };

@@ -12,6 +12,7 @@ export interface ReaderState {
   sessionId: Id; document: DocumentRef | null; phase: ReaderPhase; pageCount: number;
   position: ReadingPosition; selection: ReaderSelection | null; menuTarget: ReaderMenuTarget | null;
   tool: ReaderTool; search: ReaderSearchState; outline: readonly ReaderOutlineItem[];
+  outlineStatus?: 'loading' | 'native' | 'generated' | 'empty' | 'failed';
   pageLabels?: readonly string[];
   loadProgress?: number;
   /** Unknown until examined; a scanned page must never be labelled selectable before examination. */

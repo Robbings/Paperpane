@@ -12,7 +12,9 @@ export type TabBlock =
   /** A local PDF (file://) while "Allow access to file URLs" is off. */
   | 'file-access'
   /** Already open in the reader. */
-  | 'in-reader';
+  | 'in-reader'
+  | 'in-paperpane'
+  | 'unavailable';
 
 export interface ActiveTabView {
   tabId: number;
@@ -44,8 +46,12 @@ export interface PopupViewProps {
   /** Open PDFs in the reader as soon as the browser opens them. */
   autoOpenPdf: boolean;
   onAutoOpenPdf: (enabled: boolean) => void;
+  showPdfButtons?: boolean;
+  onShowPdfButtons?: (enabled: boolean) => void;
+  error?: string;
   /** Up to three most recently read papers. */
   recent: readonly RecentPaperView[];
+  recentState?: 'loading' | 'ready' | 'failed';
   onOpenRecent: (id: string) => void;
   onOpenLibrary: () => void;
   /** A local PDF: opens the reader with its file picker (a picker inside the popup would close it). */

@@ -1286,3 +1286,6 @@
 
 /* Keep PDF annotation/link layers beneath passage windows in the same scroll plane. */
 .pp-reader__paper > .pdfViewer, .pp-reader__paper .pp-pdf-surface { isolation: isolate; }
+.pp-thumb__page--live { padding: 0; height: auto; min-height: 130px; overflow: hidden; }
+.pp-thumb__page--live img { display: block; width: 112px; height: auto; }
+.pp-thumb__page--live .pp-thumb__status { background: none; height: auto; width: auto; margin: auto; font-size: 12px; color: #555; }

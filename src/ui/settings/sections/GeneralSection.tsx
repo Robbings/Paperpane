@@ -1,6 +1,7 @@
 import { Button, Segmented, Select, Stepper, Switch } from '@/ui/components';
 import { SettingGroup, SettingRow } from '../SettingRow';
 import { SelectionBarSettings } from './SelectionBarSettings';
+import { BrowserEntrySection } from './BrowserEntrySection';
 import { fontSizeLabel, localeOptions, mathOptions, themeOptions } from '../options';
 import { FONT_SIZE, UI_SCALE, type Preferences, type PreferencesState } from '../types';
 
@@ -50,6 +51,7 @@ export function GeneralSection({ state, onPreference, onRetry }: GeneralSectionP
         </p>
       </SettingGroup>
 
+      <BrowserEntrySection />
       <SelectionBarSettings value={p.selectionBar} onChange={(bar) => onPreference('selectionBar', bar)} />
 
       <SettingGroup title="语言">

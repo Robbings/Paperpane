@@ -204,7 +204,14 @@ export interface StatusSummary {
   /** Only moves on a successful sync. */
   lastSyncedAt: string | null;
   /** "configured" means there is a setup new tasks can use, not that it was just checked. */
-  modelAvailability: 'unconfigured' | 'configured' | 'unavailable';
+  modelAvailability: 'checking' | 'unconfigured' | 'configured' | 'unavailable';
+  modelLabel?: string;
+  modelMessage?: string;
+  settingsState?: 'loading' | 'ready' | 'failed';
+  /** A saved sync configuration alone never implies that a sync engine has run. */
+  syncImplemented?: boolean;
+  syncConfigured?: boolean;
+  syncMessage?: string;
 }
 
 export type SettingsSection = 'general' | 'models' | 'features' | 'sync' | 'advanced' | 'privacy';

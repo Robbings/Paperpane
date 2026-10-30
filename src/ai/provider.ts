@@ -1,34 +1,16 @@
-import { endpointUrl } from "@/data/model-settings";
-import type { Connection } from "@/translation/provider";
+import { endpointUrl, supportsModelOperation } from "./model-configuration";
+import type { Connection } from "./connection";
 import { hasImportOrigin } from "@/document/permissions";
 import { safeDetail, TranslationError } from "@/translation/errors";
 import { modelSlot, coolModel } from "./limit";
 import type { Usage } from "./types";
-export interface ModelInput {
-  role: "user" | "assistant";
-  text: string;
-  images?: string[];
-}
-export interface ModelRequest {
-  /** Cancels queued dispatch without aborting requests that have already started. */
-  queueSignal?: AbortSignal;
-  onDispatch?: () => void;
-  /** Runs inside the model slot, before failure releases it to another request. */
-  onRequestError?: (error: unknown) => void;
-  imageDetail?: 'auto' | 'high' | 'low';
-  outputSchema?: { name: string; schema: Record<string, unknown> };
-  system: string;
-  messages: ModelInput[];
-  sessionId: string;
-  reasoning?: string;
-  onText: (delta: string) => void;
-  onUsage?: (usage: Usage) => void;
-}
+import type { ModelRequest } from "./model-request";
 export async function streamModel(
   c: Connection,
   input: ModelRequest,
   signal: AbortSignal,
 ): Promise<Usage> {
+  if (!supportsModelOperation(c.endpoint.protocol, "generation")) throw new TranslationError("模型接口暂不可用。", false, true);
   const queuedSignal = input.queueSignal ? AbortSignal.any([signal, input.queueSignal]) : signal;
   return modelSlot(c, queuedSignal, async () => {
     try {

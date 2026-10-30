@@ -49,6 +49,7 @@ interface ReaderToolbarProps {
   onToggleTranslation?: () => void;
   /** Return to the library via More, without occupying the narrow toolbar. */
   onBack?: () => void;
+  onOriginalPdf?: () => void;
   /** What 导出 offers; without it the button reports onTool('export'). */
   exports?: readonly ExportOption[];
   onExport?: (id: string) => void;
@@ -94,6 +95,7 @@ export function ReaderToolbar(props: ReaderToolbarProps) {
     {id:'region',label:'框选图片',icon:'region'},
     {id:'open',label:'打开论文',icon:'file'},
     ...(props.onBack?[{id:'back',label:'返回文献库',icon:'chevronLeft'} as MenuEntry]:[]),
+    ...(props.onOriginalPdf?[{id:'original-pdf',label:'返回原 PDF',icon:'openExternal'} as MenuEntry]:[]),
     {id:'export',label:'导出',icon:'export'},
     {kind:'separator',id:'sep-layout'},
     {id:'placement',label:props.placement==='right'?'研究区移到下方':'研究区移到右侧',icon:props.placement==='right'?'dockBottom':'dockRight',disabled:props.placement!=='right'&&!props.canDockRight},
@@ -112,6 +114,7 @@ export function ReaderToolbar(props: ReaderToolbarProps) {
     else if(id==='view')showView();
     else if(id==='settings')showSettings();
     else if(id==='back')props.onBack?.();
+    else if(id==='original-pdf')props.onOriginalPdf?.();
     else if(id==='open')props.onTool('open');
     else if(id==='save'){if(props.saveRef)props.saveRef.current=moreRef.current;props.onSave?.();}
     else if(id==='export'){if(props.exports)window.setTimeout(()=>atMore('export'),0);else props.onTool('export');}

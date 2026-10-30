@@ -1,9 +1,10 @@
+import { supportsModelOperation } from '@/ai/model-configuration';
 import { modelSlot, coolModel } from '@/ai/limit';
 import type { TranslationDiagnostics } from '@/contracts/translation';
-import { TranslationError, safeDetail } from './errors';
-import { ModelSettingsStore, endpointUrl } from '@/data/model-settings';
+import { TranslationError, safeDetail } from '@/translation/errors';
+import { endpointUrl } from './model-configuration';
+import type { Connection } from './connection';
 import { hasImportOrigin } from '@/document/permissions';
-export type Connection = Awaited<ReturnType<ModelSettingsStore['resolveConnection']>>;
 interface ResponseBody { status?: string; output?: { type?: string; content?: { type?: string; text?: string }[] }[] }
 interface RequestContext { sessionId: string; onDiagnostics?: (value: TranslationDiagnostics) => void }
 const responseText = (body: ResponseBody) => body.output?.filter(item => item.type === 'message').flatMap(item => item.content ?? []).filter(content => content.type === 'output_text').map(content => content.text ?? '').join('') ?? '';
@@ -14,7 +15,7 @@ export async function streamTranslationText(connection: Connection, messages: { 
 }
 async function streamTranslationAttempt(connection: Connection, messages: { role: 'system' | 'user'; content: string }[], signal: AbortSignal, onText: (text: string) => Promise<void>, context: RequestContext) {
   const responses = connection.endpoint.protocol === 'openai-responses';
-  if (!responses && connection.endpoint.protocol !== 'openai-chat') throw new TranslationError('当前翻译暂不支持此接口协议。', false, true);
+  if (!supportsModelOperation(connection.endpoint.protocol, 'translation')) throw new TranslationError('当前翻译暂不支持此接口协议。', false, true);
   const url = endpointUrl(connection.endpoint.baseUrl) + (responses ? '/responses' : '/chat/completions');
   if (!await hasImportOrigin(url)) throw new TranslationError('请在模型设置中保存并授予此接口的访问权限。', false, true);
   const timeout = AbortSignal.timeout(connection.view.runtime.timeoutSec * 1000);

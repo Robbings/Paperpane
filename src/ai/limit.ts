@@ -1,5 +1,5 @@
 import { waitForRetry } from "@/translation/queue";
-import type { Connection } from "@/translation/provider";
+import type { Connection } from "./connection";
 /** Cross-tab slots and shared cooldown: translation and research use the same lanes. */
 export async function modelSlot<T>(
   connection: Connection,

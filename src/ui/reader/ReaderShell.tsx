@@ -1,3 +1,4 @@
+import type { ThumbnailRenderer } from './PageThumbnail';
 import { useEffect, useLayoutEffect, useRef, useState, type CSSProperties, type PointerEvent as ReactPointerEvent, type ReactNode } from 'react';
 import {
   GlassSurface,
@@ -64,6 +65,9 @@ interface ReaderShellProps {
   header: DocumentHeaderView;
   outline: readonly OutlineItemView[];
   navigationPending?: boolean;
+  navigationMessage?: string;
+  renderThumbnail?: ThumbnailRenderer;
+  onOutlineNavigate?: (id:string)=>void;
   /** 0-based. */
   pageIndex: number;
   zoomPercent: number;
@@ -88,6 +92,7 @@ interface ReaderShellProps {
   library?: ReaderLibraryProps;
   /** A back button at the start of the toolbar, for a paper opened from the library. */
   onBack?: () => void;
+  onOriginalPdf?: () => void;
   /** What the toolbar's 导出 offers (e.g. the original PDF); without it the button calls onTool('export'). */
   exports?: readonly ExportOption[];
   onExport?: (id: string) => void;
@@ -633,6 +638,9 @@ export function ReaderShell(props: ReaderShellProps) {
         open={sidebarOpen}
         outline={outline}
         navigationPending={props.navigationPending}
+        navigationMessage={props.navigationMessage}
+        renderThumbnail={props.renderThumbnail}
+        onOutlineNavigate={props.onOutlineNavigate}
         pageCount={header.pageCount}
         pageIndex={pageIndex}
         // Floating or docked is decided by room, not by open state, so it
@@ -689,6 +697,7 @@ export function ReaderShell(props: ReaderShellProps) {
         translationOpen={props.translation ? translationOpen : undefined}
         onToggleTranslation={props.translation?.onToggle}
         onBack={props.onBack}
+        onOriginalPdf={props.onOriginalPdf}
         exports={props.exports}
         onExport={props.onExport}
         onTool={props.onTool}

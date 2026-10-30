@@ -42,7 +42,7 @@ import {
   tokenCount,
   sourceLabel,
 } from "./context";
-import { streamModel, type ModelInput } from "./provider";
+import { createModelClient, type ModelInput } from "./model-client";
 import { defaultCards } from "./defaults";
 import { mergeRecords, adoptRecord } from "./merge";
 import { appendClipboardImages } from './attachments';
@@ -785,8 +785,7 @@ export class ResearchService implements ConversationService {
               : ["discuss", "explain"].includes(kind)
                 ? levels[Math.floor(levels.length / 2)]
                 : undefined);
-        const usage = await streamModel(
-          c,
+        const usage = await createModelClient(c).generate(
           {
             system: prefix + "\nPAPER EVIDENCE:\n" + ctx.text,
             messages,
@@ -1060,8 +1059,7 @@ export class ResearchService implements ConversationService {
       if (!(await this.flush()))
         throw new Error(this.error ?? "生成尝试未保存");
       try {
-        a.usage = await streamModel(
-          c,
+        a.usage = await createModelClient(c).generate(
           {
             sessionId,
             system:
@@ -1164,8 +1162,7 @@ export class ResearchService implements ConversationService {
           if (!(await this.flush()))
             throw new Error(this.error ?? "生成尝试未保存");
           try {
-            attempt.usage = await streamModel(
-              c,
+            attempt.usage = await createModelClient(c).generate(
               {
                 sessionId,
                 system:

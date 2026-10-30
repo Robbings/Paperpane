@@ -55,6 +55,14 @@ export class LibraryDatabase extends PaperDatabase {
       return row(item, doc);
     });
   }
+  async getItemForDocument(documentId: string): Promise<LibraryRow | undefined> {
+    return this.run('readonly', async tx => {
+      const item = await req(tx.objectStore(LIBRARY).index('byDocument').get(documentId)) as LibraryItem | undefined;
+      if (!item || item.deletedAt) return;
+      const doc = await req(tx.objectStore('documents').get(documentId)) as StoredDocument | undefined;
+      return row(item, doc);
+    });
+  }
   async saveBibliography(ref: DocumentRef, bibliography: PdfBibliography): Promise<void> {
     await this.run('readwrite', async tx => {
       const document = required(await req(tx.objectStore('documents').get(ref.documentId))) as StoredDocument;

@@ -11,6 +11,12 @@
     "pnpm": "11.25.0"
   },
   "scripts": {
+    "test": "node --experimental-strip-types --test tests/*.test.mjs",
+    "test:reader-features": "node tests/reader-features-extension.mjs",
+    "test:extension": "node tests/arxiv-extension.mjs",
+    "test:pdf-extension": "node tests/pdf-extension.mjs",
+    "test:popup-extension": "node tests/popup-extension.mjs",
+    "test:sources-extension": "node tests/sources-extension.mjs",
     "dev": "wxt -b chrome --mv3",
     "dev:edge": "wxt -b edge --mv3",
     "build": "wxt build -b chrome --mv3",
@@ -37,6 +43,7 @@
     "jsonschema": "1.5.0",
     "katex": "0.16.47",
     "onnxruntime-web": "1.30.0",
+    "pdf-lib": "1.17.1",
     "pdfjs-dist": "6.4.299",
     "react": "19.3.1",
     "react-dom": "19.3.1",
