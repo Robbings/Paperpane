@@ -3,7 +3,7 @@ import { useUiScale } from '@/ui/use-ui-scale';
 import { createPortal } from 'react-dom';
 import { IconButton } from '@/ui/components';
 import type { NoteLayout } from '../types';
-import { floatingLeft, floatingMargin, useFloatingCanvas } from './floating-canvas';
+import { floatingLeft, floatingMargin, floatingPaperBounds, useFloatingCanvas } from './floating-canvas';
 import '../notes/notes.css';
 import './passage-window.css';
 
@@ -57,7 +57,7 @@ export function PassageWindow(props:Props){
   const layoutScale=(props.zoomPercent??100)/(props.layout?.zoom??props.zoomPercent??100);
   const offset=props.layout?{x:props.layout.dx*layoutScale,y:props.layout.dy*layoutScale}:localOffset;
   const size=props.layout??localSize;
-  const [bounds,setBounds]=useState({width:container.clientWidth,height:container.clientHeight});
+  const [bounds,setBounds]=useState({left:0,width:container.clientWidth,height:container.clientHeight});
   const [,tick]=useState(0);
   const panel=useRef<HTMLElement>(null),initialized=useRef(false),frame=useRef(0);
   const gesture=useRef<{kind:'move'|'resize';size:{width:number;height:number};id:number;target:HTMLElement;x:number;y:number;px:number;py:number;scrollX:number;scrollY:number;inset:number;start:Point;moved:boolean}|null>(null);
@@ -69,9 +69,11 @@ export function PassageWindow(props:Props){
     latest.current.props.onLayoutChange?.({dx:nextOffset.x,dy:nextOffset.y,width:nextSize.width,height:nextSize.height??props.initialHeight??180,zoom:latest.current.props.zoomPercent??100});
   };
   const width=collapsed?undefined:Math.min(size.width*uiScale,Math.max(140,container.clientWidth-24));
-  const logicalLeft=floatingLeft(container,anchor.x+offset.x),top=anchor.y+offset.y;
-  const canvas=useFloatingCanvas(container,initialized.current?logicalLeft:null);
-  const left=logicalLeft+canvas.inset,actualWidth=panel.current?.offsetWidth??width??130*uiScale;
+  const paper=floatingPaperBounds(container);
+  const actualWidth=collapsed?(panel.current?.offsetWidth??130*uiScale):width!;
+  const logicalLeft=floatingLeft(container,anchor.x+offset.x,actualWidth,paper.left),top=anchor.y+offset.y;
+  const canvas=useFloatingCanvas(container,initialized.current?logicalLeft:null,initialized.current?logicalLeft+actualWidth:null);
+  const left=logicalLeft+canvas.inset;
   const active=hovered||focused;
 
   useLayoutEffect(()=>{
@@ -96,12 +98,9 @@ export function PassageWindow(props:Props){
       // A restored card may already be under a stationary pointer: there is no
       // fresh pointerenter event after reload. Recover hover along with geometry.
       setHovered(panel.current?.matches(':hover')??false);
-      // Match comment notes: bound the outer margin so the paper cannot leave the viewport.
-      const pages=[...container.querySelectorAll<HTMLElement>('.page, [data-page-index]')];
-      const right=Math.max(container.clientWidth,...pages.map(p=>p.getBoundingClientRect().right-box.left+container.scrollLeft-canvas.readInset()));
-      const bottom=Math.max(container.clientHeight,...pages.map(p=>p.getBoundingClientRect().bottom-box.top+container.scrollTop));
-      const next={width:right+floatingMargin(container),height:bottom+300};
-      setBounds(old=>old.width===next.width&&old.height===next.height?old:next);tick(n=>n+1);
+      const paper=floatingPaperBounds(container,canvas.readInset());
+      const next={left:paper.left,width:paper.right,height:paper.bottom+300};
+      setBounds(old=>old.left===next.left&&old.width===next.width&&old.height===next.height?old:next);tick(n=>n+1);
     };
     measure();const stop=props.subscribeGeometry(measure),observer=new ResizeObserver(measure);
     observer.observe(container);if(container.firstElementChild)observer.observe(container.firstElementChild);
@@ -126,7 +125,7 @@ export function PassageWindow(props:Props){
     if(g?.moved)latest.current.props.onLayoutCommit?.();
     if(reveal&&g?.moved&&g.kind==='move'){
       const s=latest.current,p=panel.current;
-      const l=floatingLeft(container,s.anchor.x+s.offset.x)+canvas.readInset(),r=l+(p?.offsetWidth??360);
+      const l=floatingLeft(container,s.anchor.x+s.offset.x,p?.offsetWidth??360,s.bounds.left)+canvas.readInset(),r=l+(p?.offsetWidth??360);
       if(r>container.scrollLeft+container.clientWidth-16)container.scrollLeft=r-container.clientWidth+16;
       else if(l<container.scrollLeft+16)container.scrollLeft=Math.max(0,l-16);
     }
@@ -147,7 +146,8 @@ export function PassageWindow(props:Props){
       changeLayout(s.offset,{width:clamp((g.size.width+dx)/uiScale,220,Math.min(520,(container.clientWidth-24)/uiScale)),height:clamp((g.size.height+dy)/uiScale,140,Math.min(520,(container.clientHeight-48)/uiScale))});
       return;
     }
-    changeLayout({x:clamp(g.start.x+dx,12-floatingMargin(container),s.bounds.width-(panel.current?.offsetWidth??360))-s.anchor.x,y:clamp(g.start.y+dy,0,s.bounds.height-(panel.current?.offsetHeight??140))-s.anchor.y});
+    const cardWidth=panel.current?.offsetWidth??360,margin=floatingMargin(container,cardWidth);
+    changeLayout({x:clamp(g.start.x+dx,s.bounds.left+12-margin,s.bounds.width+margin-cardWidth)-s.anchor.x,y:clamp(g.start.y+dy,0,s.bounds.height-(panel.current?.offsetHeight??140))-s.anchor.y});
   };
   const pan=()=>{
     const g=gesture.current;if(!g)return;
@@ -182,7 +182,7 @@ export function PassageWindow(props:Props){
   }
   return <>
     {createPortal(<div className="pp-notes-layer pp-passage-window-layer" data-pp-overlay="" style={{zIndex:props.stackOrder??3}}>
-      {dragging&&<div aria-hidden="true" style={{position:'absolute',width:bounds.width+canvas.inset,height:bounds.height,pointerEvents:'none'}}/>}
+      {dragging&&<div aria-hidden="true" style={{position:'absolute',width:bounds.width+floatingMargin(container,actualWidth)+canvas.inset,height:bounds.height,pointerEvents:'none'}}/>}
       {line&&<svg className="pp-passage-window__connector" aria-hidden="true" width={Math.max(container.clientWidth,left+actualWidth)} height={Math.max(container.clientHeight,top+(panel.current?.offsetHeight??140))}>
         <g transform={`translate(${container.scrollLeft-box.left-container.clientLeft} ${container.scrollTop-box.top-container.clientTop})`}>
           {rects.map((r,i)=><rect key={i} x={r.left-2} y={r.top-1} width={r.width+4} height={r.height+2} rx={3} className="pp-note-connector__mark"/>)}

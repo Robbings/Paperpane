@@ -3,7 +3,7 @@ import { useEffect, useLayoutEffect, useRef, useState, type CSSProperties, type 
 import { createPortal } from 'react-dom';
 import { Icon, IconButton } from '@/ui/components';
 import type { AnnotationView, NoteLayout, ViewRect } from '../types';
-import { floatingLeft, floatingMargin, useFloatingCanvas } from '../windows/floating-canvas';
+import { floatingLeft, floatingMargin, floatingPaperBounds, useFloatingCanvas } from '../windows/floating-canvas';
 
 export type { NoteLayout };
 import './notes.css';
@@ -64,11 +64,16 @@ export function CommentNotes(props: CommentNotesProps) {
   // Observers and subscriptions call measure later: read the latest props, not the ones they closed over.
   const latest = useRef(props);
   latest.current = props;
-  const lefts = notes.flatMap(note => {
+  const paper = container ? floatingPaperBounds(container) : {left:0,right:0,bottom:0};
+  const cardWidth = (note: NoteLayout) => elements.current.get(note.id)?.getBoundingClientRect().width
+    ?? (note.collapsed ? NOTE_SIZE.width : note.width) * (props.uiScale ?? 1) * props.zoomPercent / (note.zoom ?? 100);
+  const extents = notes.flatMap(note => {
     const anchor = anchors.get(note.id);
-    return container && note.open && anchor ? [floatingLeft(container, anchor.x + note.dx * props.zoomPercent / (note.zoom ?? 100))] : [];
+    if (!container || !note.open || !anchor) return [];
+    const width = cardWidth(note), left = floatingLeft(container, anchor.x + note.dx * props.zoomPercent / (note.zoom ?? 100), width, paper.left);
+    return [{left,right:left+width}];
   });
-  const canvas = useFloatingCanvas(container, lefts.length ? Math.min(...lefts) : null);
+  const canvas = useFloatingCanvas(container, extents.length ? Math.min(...extents.map(card => card.left)) : null, extents.length ? Math.max(...extents.map(card => card.right)) : null);
 
   // Where each open note's passage starts, in the paper's own coordinates. A passage on
   // a page that is not rendered keeps its last known place until it renders.
@@ -135,13 +140,9 @@ export function CommentNotes(props: CommentNotesProps) {
     connector = { x1: start.x, y1: start.y, x2: target.x, y2: target.y };
   }
 
-  // Reserve a bounded outer margin beside the PDF. Derive it from pages,
-  // never scrollWidth (which includes notes and would grow on each drag).
-  const viewport = container.getBoundingClientRect();
-  const pages = [...container.querySelectorAll<HTMLElement>('.page, [data-page-index]')];
-  const pageRight = Math.max(container.clientWidth, ...pages.map(page=>page.getBoundingClientRect().right-viewport.left+container.scrollLeft-canvas.readInset()));
-  const pageBottom = Math.max(container.clientHeight, ...pages.map(page=>page.getBoundingClientRect().bottom-viewport.top+container.scrollTop));
-  const bounds = { width: pageRight + floatingMargin(container), height: pageBottom + 300 };
+  // Existing page gutters count toward the card's room; only add space beyond the actual PDF.
+  const bounds = { left: paper.left, width: paper.right, height: paper.bottom + 300 };
+  const margin = floatingMargin(container, Math.max(0, ...notes.filter(note => note.open).map(cardWidth)));
 
   return (
     <>
@@ -157,7 +158,7 @@ export function CommentNotes(props: CommentNotesProps) {
       {createPortal(
         // Inside the scroll container, so notes move with the paper. Runtimes ignore pointer events from here.
         <div className="pp-notes-layer" data-pp-overlay="">
-          {dragging && <div aria-hidden="true" style={{position:'absolute',width:bounds.width+canvas.inset,height:bounds.height,pointerEvents:'none'}}/>}
+          {dragging && <div aria-hidden="true" style={{position:'absolute',width:bounds.width+margin+canvas.inset,height:bounds.height,pointerEvents:'none'}}/>}
           {notes.map((note) => {
             const annotation = props.annotations.find((a) => a.id === note.id);
             const anchor = anchors.get(note.id);
@@ -201,7 +202,7 @@ interface CommentNoteProps {
   /** The passage's top-left on the paper. */
   anchor: { x: number; y: number };
   /** The paper's scrollable size: notes stay inside it. */
-  bounds: { width: number; height: number };
+  bounds: { left: number; width: number; height: number };
   container: HTMLElement;
   scale: number;
   uiScale: number;
@@ -231,7 +232,8 @@ function CommentNote({ onDragging, note, anchor, bounds, container, scale, uiSca
     setDraft(annotation.note ?? '');
   }, [annotation.note]);
 
-  const left = floatingLeft(container, anchor.x + note.dx * scale) + canvas.inset;
+  const renderedWidth = element.current?.getBoundingClientRect().width ?? note.width * scale * uiScale;
+  const left = floatingLeft(container, anchor.x + note.dx * scale, renderedWidth, bounds.left) + canvas.inset;
   const top = anchor.y + note.dy * scale;
   const width = note.collapsed ? undefined : note.width * uiScale;
   const height = (note.collapsed ? PILL_HEIGHT : note.height) * uiScale;
@@ -241,7 +243,7 @@ function CommentNote({ onDragging, note, anchor, bounds, container, scale, uiSca
     if(g?.target.hasPointerCapture(g.pointerId))g.target.releasePointerCapture(g.pointerId);
     if(expand && g?.moved && g.kind==='move') {
       const {note,anchor,scale,uiScale}=current.current;
-      const left=floatingLeft(container,anchor.x+note.dx*scale)+canvas.readInset(), right=left+(element.current?.getBoundingClientRect().width??note.width*scale*uiScale);
+      const left=floatingLeft(container,anchor.x+note.dx*scale,g.width,current.current.bounds.left)+canvas.readInset(), right=left+(element.current?.getBoundingClientRect().width??note.width*scale*uiScale);
       if(right>container.scrollLeft+container.clientWidth-16)container.scrollLeft=right-container.clientWidth+16;
       else if(left<container.scrollLeft+16)container.scrollLeft=Math.max(0,left-16);
     }
@@ -261,7 +263,7 @@ function CommentNote({ onDragging, note, anchor, bounds, container, scale, uiSca
     if(Math.abs(dx)+Math.abs(dy)>3)g.moved=true;
     if(!g.moved)return;
     if(g.kind==='move')onChange({...latest,
-      dx:(clamp(g.startLeft+dx,12-floatingMargin(container),bounds.width-g.width)-anchor.x)/scale,
+      dx:(clamp(g.startLeft+dx,bounds.left+12-floatingMargin(container,g.width),bounds.width+floatingMargin(container,g.width)-g.width)-anchor.x)/scale,
       dy:(clamp(anchor.y+g.start.dy*scale+dy,0,bounds.height-g.height)-anchor.y)/scale,
     });
     else onChange({...latest,width:clamp(g.start.width+dx/scale/uiScale,NOTE_SIZE.minWidth,NOTE_SIZE.maxWidth),height:clamp(g.start.height+dy/scale/uiScale,NOTE_SIZE.minHeight,NOTE_SIZE.maxHeight)});
