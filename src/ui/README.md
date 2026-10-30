@@ -168,7 +168,7 @@ toast.show({ message: '翻译失败：请求超时', tone: 'error', action: { la
 
 - **两类设置**：
   - 偏好 `Preferences`（主题、界面语言、回答语言、正文字号、深色减光、公式复制格式）：每项改了立即生效，调用 `onPreference(key, value)`，由逻辑层单字段保存并同步到其他标签页；保存失败时 `PreferencesState.local = 'failed'`，界面提示并可重试。
-  - 配置 `SettingsView`（模型服务、模型、默认模型、功能路由、提示词、运行参数、同步）：设置页编辑一份草稿，所有节共用，切换节不会丢；底部保存条整体调用 `onSave(draft, baseRevision)`，按 `SaveSettingsResult` 显示成功、需要修改（`problems` 的 `path` 对应到字段）、冲突（保留草稿，用户选择载入最新或覆盖）、失败。
+  - 配置 `SettingsView`（模型服务、模型、默认模型、功能路由、提示词、运行参数、同步）：设置页编辑一份草稿，所有节共用，切换节不会丢；保存条整体调用 `onSave(draft, baseRevision)`（模型二级页把同一组件放在顶部玻璃操作栏，其余页面继续使用底部保存条），按 `SaveSettingsResult` 显示成功、需要修改（`problems` 的 `path` 对应到字段）、冲突（保留草稿，用户选择载入最新或覆盖）、失败。
 - **密钥**：快照只有 `hasKey` / `hasPassword`；草稿里用 `SecretEdit`（keep / clear / replace）。`toDraft(view)` 把快照转成草稿，所有密钥初始为 keep。
 - **外观的应用**：`applyAppearance()`（`src/ui/theme.ts`）设置主题、`--pp-read-scale` 和页面减光。正文字号只作用于批注、笔记、概览和回答正文（`--pp-text-read*`），不缩放工具栏，也不改变 PDF 缩放。
 - **节**：`SettingsSection` = general / models / features / sync / advanced / privacy；设置页地址的 `#models` 等直达对应一节。目前完成了通用和高级，其余几节下一步做。

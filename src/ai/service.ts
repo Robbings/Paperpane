@@ -1,3 +1,4 @@
+import { contextLimit, reasoningValues, outputLimit } from './model-capabilities';
 import { Validator } from "jsonschema";
 import {
   failure,
@@ -49,7 +50,7 @@ import { appendClipboardImages } from './attachments';
 const outputBudget = (
   c: Awaited<ReturnType<ModelSettingsStore["resolveConnection"]>>,
   window: number,
-) => c.view.runtime.maxOutputTokens ?? Math.min(8192, Math.floor(window / 4));
+) => outputLimit(c.model,c.view.runtime.maxOutputTokens,window);
 const at = () => new Date().toISOString(),
   id = () => crypto.randomUUID();
 const saved = { local: "saved" as const, sync: "unconfigured" as const };
@@ -134,8 +135,8 @@ export class ResearchService implements ConversationService {
     };
     this.listeners.forEach((f) => f());
   }
-  models(): ModelOption[] {
-    return (this.view?.models ?? []).map((m) => {
+  models(includeHidden = false): ModelOption[] {
+    return (this.view?.models ?? []).filter(m=>includeHidden || m.showInDiscussion!==false || this.view?.defaultModelId===m.id || this.view?.features.some(f=>f.modelId===m.id) || this.record.sessions.some(s=>!s.deletedAt&&s.modelId===m.id)).map((m) => {
       const e = this.view!.endpoints.find((e) => e.id === m.endpointId)!;
       return {
         id: m.id,
@@ -145,12 +146,7 @@ export class ResearchService implements ConversationService {
         endpointOrigin: new URL(e.baseUrl).origin,
         capabilities: {
           vision: m.vision,
-          reasoningLevels:
-            m.reasoning.kind === "effort"
-              ? m.reasoning.values
-              : m.reasoning.kind === "budget"
-                ? m.reasoning.presets.map(String)
-                : [],
+          reasoningLevels: reasoningValues(m),
         },
       };
     });
@@ -573,10 +569,10 @@ export class ResearchService implements ConversationService {
     modelId: string,
   ): ReturnType<ConversationService["changeModel"]> {
     const s = this.session(sid),
-      target = this.models().find((m) => m.id === modelId);
+      target = this.models(true).find((m) => m.id === modelId);
     if (!target) return failure("NOT_FOUND", "模型不存在");
     if (this.controllers.has(sid)) return failure("BUSY", "请先停止生成");
-    const old = this.models().find((m) => m.id === s.modelId);
+    const old = this.models(true).find((m) => m.id === s.modelId);
     if (
       old?.providerId !== target.providerId &&
       (s.messages.length || s.draft.text.trim() || s.draft.attachments.length)
@@ -700,7 +696,7 @@ export class ResearchService implements ConversationService {
       messages = await this.compactHistory(
         c,
         messages,
-        windowOverride ?? c.model.contextWindow ?? 256000,
+        windowOverride ?? contextLimit(c.model),
         sessionId,
         signal,
         attempts,
@@ -733,8 +729,8 @@ export class ResearchService implements ConversationService {
           this.paper,
           messages.at(-1)?.text ?? "",
           history,
-          windowOverride ?? c.model.contextWindow ?? 256000,
-          outputBudget(c, windowOverride ?? c.model.contextWindow ?? 256000),
+          windowOverride ?? contextLimit(c.model),
+          outputBudget(c, windowOverride ?? contextLimit(c.model)),
         );
       ctx.manifest.historyMessages = messages.length;
       const a: ResearchAttempt = {
@@ -770,21 +766,7 @@ export class ResearchService implements ConversationService {
         const route = c.view.features.find(
           (f) => f.feature === (kind === "suggest" ? "discuss" : kind),
         );
-        const levels =
-          c.model.reasoning.kind === "effort"
-            ? c.model.reasoning.values
-            : c.model.reasoning.kind === "budget"
-              ? c.model.reasoning.presets.map(String)
-              : [];
-        const thinking =
-          reasoning ??
-          (route?.reasoning.kind === "effort"
-            ? route.reasoning.value
-            : route?.reasoning.kind === "budget"
-              ? String(route.reasoning.tokens)
-              : ["discuss", "explain"].includes(kind)
-                ? levels[Math.floor(levels.length / 2)]
-                : undefined);
+        const thinking = reasoning ?? (route?.reasoning.kind === 'effort' ? route.reasoning.value : route?.reasoning.kind === 'budget' ? String(route.reasoning.tokens) : c.model.defaultReasoning);
         const usage = await createModelClient(c).generate(
           {
             system: prefix + "\nPAPER EVIDENCE:\n" + ctx.text,
@@ -823,7 +805,7 @@ export class ResearchService implements ConversationService {
           )
         ) {
           windowOverride = Math.floor(
-            (windowOverride ?? c.model.contextWindow ?? 256000) / 2,
+            (windowOverride ?? contextLimit(c.model)) / 2,
           );
           continue;
         }
@@ -852,7 +834,7 @@ export class ResearchService implements ConversationService {
     if (choice?.cancelled || this.disposed || this.leaving) controller.abort();
     const modelId = choice?.modelId ?? s.modelId,
       reasoning = choice?.reasoning ?? s.reasoning;
-    const model = this.models().find((m) => m.id === modelId),
+    const model = this.models(true).find((m) => m.id === modelId),
       m: ResearchMessage = {
         id: mid,
         parentId,
@@ -1374,7 +1356,7 @@ export class ResearchService implements ConversationService {
                   pageLabel: `第 ${c.anchor.pages[0]!.pageIndex + 1} 页`,
                 }),
               ),
-              model: this.models().find((m) => m.id === modelId)?.displayName,
+              model: this.models(true).find((m) => m.id === modelId)?.displayName,
               generatedAt: at(),
             };
           }
