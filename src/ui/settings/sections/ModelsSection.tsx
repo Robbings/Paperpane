@@ -1,25 +1,868 @@
-import { Button, Select, TextField, Switch } from '@/ui/components';
-import { SettingGroup, SettingRow } from '../SettingRow';
-import type { SettingsDraft } from '../types';
-/** Existing design components only; saved secrets are represented by a presence bit. */
-export function ModelsSection({draft,onChange}:{draft:SettingsDraft;onChange:(draft:SettingsDraft)=>void}){
-  return <>
-    {draft.endpoints.map((e,index)=><SettingGroup key={e.id} title={e.name||`接口 ${index+1}`} description="支持 Responses、Chat Completions、Anthropic 和 Gemini。保存时只授权这个服务的地址。">
-      <SettingRow label="接口名称"><TextField label="接口名称" hideLabel value={e.name} onChange={name=>onChange({...draft,endpoints:draft.endpoints.map(x=>x.id===e.id?{...x,name}:x)})}/></SettingRow>
-      <SettingRow label="接口协议"><Select label="接口协议" options={[{value:'openai-responses',label:'Responses API'},{value:'openai-chat',label:'Chat Completions API'},{value:'anthropic',label:'Anthropic Messages'},{value:'gemini',label:'Gemini'}]} value={e.protocol} onChange={protocol=>onChange({...draft,endpoints:draft.endpoints.map(x=>x.id===e.id?{...x,protocol}:x)})}/></SettingRow>
-      <SettingRow label="接口地址" stacked><TextField label="接口地址" hideLabel value={e.baseUrl} placeholder="https://api.example.com/v1" onChange={baseUrl=>onChange({...draft,endpoints:draft.endpoints.map(x=>x.id===e.id?{...x,baseUrl}:x)})}/></SettingRow>
-      <SettingRow label="API 密钥" description={e.hadKey&&e.key.kind==='keep'?'已设置，留空保持原密钥。':'仅保存在本机，不会回填显示。'}><TextField label="API 密钥" hideLabel type="password" autoComplete="new-password" value={e.key.kind==='replace'?e.key.value:''} onChange={value=>onChange({...draft,endpoints:draft.endpoints.map(x=>x.id===e.id?{...x,key:value?{kind:'replace',value}:{kind:'keep'}}:x)})}/><Button size="sm" variant="quiet" onClick={()=>onChange({...draft,endpoints:draft.endpoints.map(x=>x.id===e.id?{...x,key:{kind:'clear'}}:x)})}>清除密钥</Button></SettingRow>
-      {draft.models.filter(m=>m.endpointId===e.id).map(m=><SettingRow key={m.id} label="模型 ID" description="填写服务商提供的实际模型名称。"><TextField label="模型 ID" hideLabel value={m.modelId} onChange={modelId=>onChange({...draft,models:draft.models.map(x=>x.id===m.id?{...x,modelId,label:modelId}:x)})}/><Button variant="quiet" size="sm" onClick={()=>onChange({...draft,models:draft.models.filter(x=>x.id!==m.id),defaultModelId:draft.defaultModelId===m.id?null:draft.defaultModelId,features:draft.features.map(f=>f.modelId===m.id?{...f,modelId:null}:f)})}>移除</Button></SettingRow>)}
-      {draft.models.filter(m=>m.endpointId===e.id).map(m=><SettingGroup key={`capacity:${m.id}`} title={m.label||m.modelId}>
-        <SettingRow label="上下文容量（tokens）"><TextField label="上下文容量（tokens）" hideLabel inputMode="numeric" value={String(m.contextWindow??256000)} onChange={text=>onChange({...draft,models:draft.models.map(x=>x.id===m.id?{...x,contextWindow:Number(text)}:x)})}/></SettingRow>
-        <SettingRow label="思考方式"><Select label="思考方式" value={m.reasoning.kind} options={[{value:'none',label:'默认'},{value:'effort',label:'强度'},{value:'budget',label:'Token 预算'}]} onChange={kind=>onChange({...draft,models:draft.models.map(x=>x.id===m.id?{...x,reasoning:kind==='effort'?{kind:'effort',values:['low','medium','high']}:kind==='budget'?{kind:'budget',minTokens:1024,maxTokens:32000,presets:[1024,4096,8192]}:{kind:'none'}}:x)})}/></SettingRow>
-        {m.reasoning.kind==='effort'&&<SettingRow label="可用强度"><TextField label="可用强度" hideLabel value={m.reasoning.values.join(', ')} onChange={value=>onChange({...draft,models:draft.models.map(x=>x.id===m.id?{...x,reasoning:{kind:'effort',values:value.split(',').map(v=>v.trim()).filter(Boolean)}}:x)})}/></SettingRow>}
-        <SettingRow label="支持图片"><Switch label="支持图片" checked={m.vision} onChange={vision=>onChange({...draft,models:draft.models.map(x=>x.id===m.id?{...x,vision}:x)})}/></SettingRow>
-      </SettingGroup>)}
-      <SettingRow label="移除此接口" description="保留已经生成的译文，只移除接口和它的模型。"><Button size="sm" variant="quiet" onClick={()=>{const ids=draft.models.filter(m=>m.endpointId===e.id).map(m=>m.id);onChange({...draft,endpoints:draft.endpoints.filter(x=>x.id!==e.id),models:draft.models.filter(m=>m.endpointId!==e.id),defaultModelId:ids.includes(draft.defaultModelId??'')?null:draft.defaultModelId,features:draft.features.map(f=>f.modelId&&ids.includes(f.modelId)?{...f,modelId:null}:f)});}}>移除接口</Button></SettingRow>
-      <SettingRow label="可用模型"><Button size="sm" onClick={()=>{const id=crypto.randomUUID();onChange({...draft,models:[...draft.models,{id,endpointId:e.id,modelId:'',label:'',vision:false,reasoning:{kind:'none'},showInDiscussion:true}],defaultModelId:draft.defaultModelId??id});}}>添加模型</Button></SettingRow>
-    </SettingGroup>)}
-    <SettingGroup><SettingRow label="模型服务"><Button onClick={()=>onChange({...draft,endpoints:[...draft.endpoints,{id:crypto.randomUUID(),name:'模型接口',protocol:'openai-responses',baseUrl:'',hadKey:false,key:{kind:'keep'}}]})}>添加接口</Button></SettingRow>
-      <SettingRow label="默认模型"><Select label="默认模型" options={draft.models.map(m=>({value:m.id,label:m.label||m.modelId||'未命名模型'}))} value={draft.defaultModelId} onChange={defaultModelId=>onChange({...draft,defaultModelId})}/></SettingRow></SettingGroup>
-  </>;
+import { ModelSelect as Select } from "./models/ModelSelect";
+import { useEffect, useRef, useState, type ReactNode } from "react";
+import {
+  Button,
+  Dialog,
+  EmptyState,
+  GlassSurface,
+  HintLabel,
+  IconButton,
+  Select as FieldSelect,
+  TextField,
+} from "@/ui/components";
+import {
+  presets,
+  protocols,
+  newModel,
+  refreshModel,
+  type CatalogModel,
+} from "@/ai/model-catalog";
+import {
+  readCatalog,
+  updateCatalog,
+  fetchEndpointModels,
+  testConfiguredModel,
+} from "@/runtime/model-settings-actions";
+import type { EndpointDraft, ModelConfigView, SettingsDraft } from "../types";
+import { SettingGroup, SettingRow } from "../SettingRow";
+import { ModelSummary } from "./models/ModelSummary";
+import { ModelEditor } from "./models/ModelEditor";
+import { ProviderPicker } from "./models/ProviderPicker";
+import { ProviderList } from "./models/ProviderList";
+import { ProviderLogo } from "./models/ProviderLogo";
+import { providerBrand } from "@/ai/model-providers";
+import "./models/models.css";
+import "./models/model-detail.css";
+
+const capacity = (n?: number) => (n ? `${Math.round(n / 1000)}K` : "待确认");
+export function ModelsSection({
+  draft,
+  onChange,
+  renderSaveBar,
+  editor,
+  setEditor,
+}: {
+  draft: SettingsDraft;
+  onChange: (v: SettingsDraft) => void;
+  renderSaveBar: (layout: "floating" | "inline") => ReactNode;
+  editor: ModelConfigView | null;
+  setEditor: (model: ModelConfigView | null) => void;
+}) {
+  const [active, setActive] = useState<string | null>(null),
+    [search, setSearch] = useState(""),
+    [adding, setAdding] = useState(false);
+  const [modelQuery, setModelQuery] = useState(""),
+    [capability, setCapability] = useState("all");
+  const [picker, setPicker] = useState(false),
+    [source, setSource] = useState("catalog"),
+    [brand, setBrand] = useState("openai"),
+    [query, setQuery] = useState("");
+  const [catalog, setCatalog] = useState(readCatalog),
+    [discovered, setDiscovered] = useState<CatalogModel[]>([]),
+    [chosen, setChosen] = useState<string[]>([]);
+  const [message, setMessage] = useState(""),
+    [error, setError] = useState(""),
+    [busy, setBusy] = useState(false);
+  const [testId, setTestId] = useState<string | null>(null),
+    [mode, setMode] = useState<"text" | "image" | "structured">("text");
+  const [manualId, setManualId] = useState(""),
+    [manualName, setManualName] = useState(""),
+    [showKey, setShowKey] = useState(false);
+  const [removing, setRemoving] = useState<{
+    endpoint?: string;
+    model?: string;
+  } | null>(null);
+  const operation = useRef<AbortController | null>(null),
+    endpoint = draft.endpoints.find((e) => e.id === active),
+    models = draft.models.filter((m) => m.endpointId === active);
+  const signature = JSON.stringify([active, draft.endpoints, draft.models]);
+  useEffect(() => {
+    operation.current?.abort();
+    setBusy(false);
+    setMessage("");
+    setError("");
+    return () => operation.current?.abort();
+  }, [signature]);
+  useEffect(() => {
+    setDiscovered([]);
+    setPicker(false);
+    setEditor(null);
+    setShowKey(false);
+  }, [
+    active,
+    endpoint?.baseUrl,
+    endpoint?.protocol,
+    JSON.stringify(endpoint?.key),
+  ]);
+  const patch = (v: Partial<EndpointDraft>) =>
+    onChange({
+      ...draft,
+      endpoints: draft.endpoints.map((e) =>
+        e.id === active ? { ...e, ...v } : e,
+      ),
+    });
+  function cancel() {
+    operation.current?.abort();
+    setBusy(false);
+  }
+  async function run<T>(
+    job: (s: AbortSignal) => Promise<T>,
+    done: (v: T) => void,
+  ) {
+    cancel();
+    const c = new AbortController();
+    operation.current = c;
+    setBusy(true);
+    setMessage("");
+    setError("");
+    try {
+      const v = await job(c.signal);
+      if (!c.signal.aborted) done(v);
+    } catch (e) {
+      if (!c.signal.aborted)
+        setError(e instanceof Error ? e.message : "操作失败。");
+    } finally {
+      if (operation.current === c) setBusy(false);
+    }
+  }
+  function addEndpoint(p: (typeof presets)[number]) {
+    const id = crypto.randomUUID();
+    onChange({
+      ...draft,
+      endpoints: [
+        ...draft.endpoints,
+        {
+          id,
+          name: p.name,
+          presetId: p.id,
+          protocol: p.protocol,
+          baseUrl: p.url,
+          hadKey: false,
+          key: { kind: "keep" },
+        },
+      ],
+    });
+    setAdding(false);
+    setActive(id);
+  }
+  function copyEndpoint() {
+    if (!endpoint) return;
+    const id = crypto.randomUUID();
+    onChange({
+      ...draft,
+      endpoints: [
+        ...draft.endpoints,
+        {
+          ...endpoint,
+          id,
+          name: endpoint.name + " · 副本",
+          hadKey: false,
+          key: { kind: "clear" },
+        },
+      ],
+      models: [
+        ...draft.models,
+        ...models.map((m) => ({
+          ...m,
+          id: crypto.randomUUID(),
+          endpointId: id,
+        })),
+      ],
+    });
+    setActive(id);
+  }
+  function refreshCatalog() {
+    void run(updateCatalog, (v) => {
+      setCatalog(v);
+      onChange({
+        ...draft,
+        models: draft.models.map((m) => {
+          const item = v.models.find(
+            (x) =>
+              x.provider === m.catalogRef?.provider &&
+              x.modelId === m.catalogRef?.modelId &&
+              x.protocol ===
+                (m.protocolOverride ??
+                  draft.endpoints.find((e) => e.id === m.endpointId)?.protocol),
+          );
+          return item ? refreshModel(m, item, v.updatedAt) : m;
+        }),
+      });
+      setMessage("目录已更新，已有模型的手动设置保持不变。");
+    });
+  }
+  function openPicker() {
+    setCapability("all");
+    setSource("catalog");
+    setBrand(
+      presets.find((p) => p.id === endpoint?.presetId)?.provider || "openai",
+    );
+    setQuery("");
+    setChosen([]);
+    setPicker(true);
+  }
+  const identity = (m: CatalogModel) =>
+    `${m.provider}|${m.modelId}|${m.protocol ?? endpoint?.protocol}`;
+  const already = (m: CatalogModel) =>
+    models.some(
+      (x) =>
+        x.modelId === m.modelId &&
+        (x.protocolOverride ?? endpoint?.protocol) ===
+          (m.protocol ?? endpoint?.protocol),
+    );
+  function addItems(items: CatalogModel[]) {
+    if (!endpoint) return;
+    const added = items
+      .filter((m) => !already(m))
+      .map((m) => newModel(endpoint.id, m, catalog.updatedAt));
+    onChange({
+      ...draft,
+      models: [...draft.models, ...added],
+      defaultModelId: draft.defaultModelId ?? added[0]?.id ?? null,
+    });
+    setPicker(false);
+  }
+  function remove() {
+    if (!removing) return;
+    const ids = removing.endpoint
+      ? draft.models
+          .filter((m) => m.endpointId === removing.endpoint)
+          .map((m) => m.id)
+      : [removing.model!];
+    onChange({
+      ...draft,
+      endpoints: draft.endpoints.filter((e) => e.id !== removing.endpoint),
+      models: draft.models.filter((m) => !ids.includes(m.id)),
+      defaultModelId: ids.includes(draft.defaultModelId ?? "")
+        ? null
+        : draft.defaultModelId,
+      features: draft.features.map((f) =>
+        ids.includes(f.modelId ?? "") ? { ...f, modelId: null } : f,
+      ),
+    });
+    if (removing.endpoint) setActive(null);
+    setRemoving(null);
+  }
+  const rawItems =
+    source === "endpoint"
+      ? discovered
+      : catalog.models.filter(
+          (m) =>
+            m.provider === brand &&
+            !["deprecated", "retired"].includes(m.status ?? ""),
+        );
+  const items = rawItems.filter(
+    (m) =>
+      (m.label + " " + m.modelId).toLowerCase().includes(query.toLowerCase()) &&
+      (capability === "all" ||
+        (capability === "vision" && m.vision === true) ||
+        (capability === "reasoning" &&
+          !["none", "unknown"].includes(m.reasoning.kind))),
+  );
+  const notice = (
+    <div className="pp-model-notice" aria-live="polite">
+      {busy && (
+        <p>
+          正在处理…{" "}
+          <Button
+            size="sm"
+            variant="quiet"
+            onClick={() => {
+              cancel();
+              setMessage("已取消。");
+            }}
+          >
+            取消
+          </Button>
+        </p>
+      )}
+      {message && <p>{message}</p>}
+      {error && <p role="alert">{error}</p>}
+    </div>
+  );
+  return (
+    <div className={`pp-model-settings${endpoint ? " pp-model-detail" : ""}`}>
+      {!endpoint ? (
+        <>
+          <div className="pp-model-heading">
+            <div>
+              <h1>模型服务</h1>
+            </div>
+            <Button
+              variant="primary"
+              icon="plus"
+              onClick={() => setAdding(true)}
+            >
+              添加供应商
+            </Button>
+          </div>
+          <div className="pp-provider-toolbar">
+            <TextField
+              icon="search"
+              clearable
+              label="搜索供应商"
+              hideLabel
+              placeholder="搜索名称或地址"
+              value={search}
+              onChange={setSearch}
+            />
+            <span>
+              {draft.endpoints.length} 个服务 · {draft.models.length} 个模型
+            </span>
+          </div>
+          <ProviderList
+            endpoints={draft.endpoints}
+            models={draft.models}
+            defaultModelId={draft.defaultModelId}
+            query={search}
+            onSelect={setActive}
+          />
+          {!draft.endpoints.length && (
+            <div className="pp-model-empty pp-provider-empty">
+              <div className="pp-provider-empty__logos">
+                {["openai", "anthropic", "google", "deepseek"].map((brand) => (
+                  <ProviderLogo key={brand} brand={brand} size="lg" />
+                ))}
+              </div>
+              <h3>尚未添加供应商</h3>
+              <Button
+                variant="quiet"
+                icon="plus"
+                onClick={() => setAdding(true)}
+              >
+                添加第一个模型服务
+              </Button>
+            </div>
+          )}
+          <div className="pp-model-default">
+            <HintLabel hint="未单独指定模型的功能会使用此模型。">
+              默认模型
+            </HintLabel>
+            <FieldSelect
+              label="默认模型"
+              value={draft.defaultModelId ?? ""}
+              options={[
+                { value: "", label: "自动选择可用模型" },
+                ...draft.models.map((m) => ({
+                  value: m.id,
+                  label: `${draft.endpoints.find((e) => e.id === m.endpointId)?.name} / ${m.label || m.modelId}`,
+                })),
+              ]}
+              onChange={(id) =>
+                onChange({ ...draft, defaultModelId: id || null })
+              }
+            />
+          </div>
+          {renderSaveBar("floating")}
+        </>
+      ) : (
+        <>
+          <GlassSurface
+            as="header"
+            tone="bar"
+            radius="float"
+            className="pp-model-detail-toolbar"
+            aria-label="供应商操作"
+          >
+            <div className="pp-model-detail-identity">
+              <IconButton
+                icon="chevronLeft"
+                label="返回模型服务"
+                size="md"
+                onClick={() => setActive(null)}
+              />
+              <ProviderLogo
+                brand={providerBrand(endpoint.presetId)?.id}
+                size="sm"
+              />
+              <h1>{endpoint.name || "未命名服务"}</h1>
+            </div>
+            <div className="pp-model-detail-actions">
+              <IconButton
+                icon="copy"
+                label="复制配置"
+                size="md"
+                onClick={copyEndpoint}
+              />
+              <IconButton
+                icon="trash"
+                label="移除此供应商"
+                size="md"
+                className="pp-model-remove"
+                onClick={() => setRemoving({ endpoint: endpoint.id })}
+              />
+              {renderSaveBar("inline")}
+            </div>
+          </GlassSurface>
+          <div className="pp-model-detail-content">
+            <SettingGroup title="连接">
+              <SettingRow
+                label="服务名称"
+                hint="用于区分不同供应商、账户或端点，不影响模型请求。"
+              >
+                <TextField
+                  label="服务名称"
+                  hideLabel
+                  value={endpoint.name}
+                  onChange={(name) => patch({ name })}
+                />
+              </SettingRow>
+              <SettingRow
+                label="API 格式"
+                hint="选择服务商支持的接口格式。Anthropic、Gemini 原生格式支持讨论、解释和概览；翻译仍需 OpenAI 兼容格式。"
+              >
+                <FieldSelect
+                  label="API 格式"
+                  value={endpoint.protocol}
+                  options={protocols}
+                  onChange={(protocol) => patch({ protocol })}
+                  block
+                />
+              </SettingRow>
+              <SettingRow
+                label="API 地址"
+                hint={`填写基础地址，请求会追加 ${endpoint.protocol === "anthropic" ? "/messages" : endpoint.protocol === "gemini" ? "/models/模型ID:streamGenerateContent" : endpoint.protocol === "openai-responses" ? "/responses" : "/chat/completions"}。修改地址后需重新填写密钥。`}
+              >
+                <TextField
+                  label="API 基础地址"
+                  hideLabel
+                  value={endpoint.baseUrl}
+                  onChange={(baseUrl) => patch({ baseUrl })}
+                  placeholder="https://api.example.com/v1"
+                />
+              </SettingRow>
+              <SettingRow
+                label="API 密钥"
+                hint="密钥仅保存在本机，不回填已保存的值。留空保留原密钥；清除后需保存生效。"
+              >
+                <div className="pp-model-detail-key">
+                  <TextField
+                    label="API 密钥"
+                    hideLabel
+                    type={showKey ? "text" : "password"}
+                    autoComplete="new-password"
+                    value={
+                      endpoint.key.kind === "replace" ? endpoint.key.value : ""
+                    }
+                    placeholder={
+                      endpoint.key.kind === "clear"
+                        ? "保存后清除密钥"
+                        : endpoint.hadKey && endpoint.key.kind === "keep"
+                          ? "已设置，留空保持原密钥"
+                          : "填写 API Key"
+                    }
+                    onChange={(value) =>
+                      patch({
+                        key: value
+                          ? { kind: "replace", value }
+                          : { kind: "keep" },
+                      })
+                    }
+                  />
+                  <IconButton
+                    icon="lock"
+                    label={showKey ? "隐藏新密钥" : "显示新密钥"}
+                    size="md"
+                    active={showKey}
+                    onClick={() => setShowKey(!showKey)}
+                  />
+                  <IconButton
+                    icon="close"
+                    label="清除密钥"
+                    size="md"
+                    onClick={() => patch({ key: { kind: "clear" } })}
+                  />
+                </div>
+              </SettingRow>
+            </SettingGroup>
+            <SettingGroup
+              title="模型"
+              hint={`models.dev 目录 · ${catalog.updatedAt.slice(0, 10)}。目录是能力参考，不代表账号可以调用；可通过模型右侧的测试操作确认。`}
+              actions={
+                <div className="pp-model-actions">
+                  <span className="pp-model-detail-count">{models.length}</span>
+                  <IconButton
+                    icon="sync"
+                    label="更新目录"
+                    size="md"
+                    disabled={busy}
+                    onClick={refreshCatalog}
+                  />
+                  <IconButton
+                    icon="plus"
+                    label="添加模型"
+                    size="md"
+                    onClick={openPicker}
+                  />
+                </div>
+              }
+            >
+              {!!models.length && (
+                <div className="pp-model-detail-search">
+                  <TextField
+                    label="搜索已添加模型"
+                    hideLabel
+                    icon="search"
+                    clearable
+                    placeholder="搜索模型"
+                    value={modelQuery}
+                    onChange={setModelQuery}
+                  />
+                </div>
+              )}
+              <div className="pp-model-list">
+                {models
+                  .filter((m) =>
+                    (m.label + " " + m.modelId)
+                      .toLowerCase()
+                      .includes(modelQuery.toLowerCase()),
+                  )
+                  .map((m) => (
+                    <div className="pp-model-row" key={m.id}>
+                      <div className="pp-model-grow">
+                        <strong>{m.label || m.modelId}</strong>
+                        {m.label !== m.modelId && <small>{m.modelId}</small>}
+                      </div>
+                      <ModelSummary model={m} protocol={endpoint.protocol} />
+                      <div className="pp-model-actions">
+                        <IconButton
+                          icon="edit"
+                          label="编辑"
+                          size="md"
+                          onClick={() => setEditor(structuredClone(m))}
+                        />
+                        <IconButton
+                          icon="send"
+                          label="测试"
+                          size="md"
+                          onClick={() => {
+                            setTestId(m.id);
+                            setMode("text");
+                          }}
+                        />
+                        <IconButton
+                          icon="trash"
+                          label="移除"
+                          size="md"
+                          className="pp-model-remove"
+                          onClick={() => setRemoving({ model: m.id })}
+                        />
+                      </div>
+                    </div>
+                  ))}
+              </div>
+              {!models.length && (
+                <EmptyState icon="model" title="尚未添加模型" />
+              )}
+              {!!models.length &&
+                !models.some((m) =>
+                  (m.label + " " + m.modelId)
+                    .toLowerCase()
+                    .includes(modelQuery.toLowerCase()),
+                ) && <EmptyState icon="search" title="没有匹配的模型" />}
+            </SettingGroup>
+          </div>
+        </>
+      )}
+      {!picker && !testId && notice}
+      {adding && (
+        <ProviderPicker
+          onClose={() => setAdding(false)}
+          onSelect={addEndpoint}
+        />
+      )}
+      <Dialog
+        open={picker && !!endpoint}
+        onClose={() => {
+          cancel();
+          setPicker(false);
+        }}
+        title="添加模型"
+        description={`添加到 ${endpoint?.name ?? ""}。目录提供能力参考，模型列表不能保证账号可调用。`}
+        size="lg"
+        footer={
+          <>
+            <Button
+              variant="quiet"
+              onClick={() => {
+                cancel();
+                setPicker(false);
+              }}
+            >
+              取消
+            </Button>
+            {source === "manual" ? (
+              <Button
+                disabled={!manualId.trim()}
+                onClick={() => {
+                  if (models.some((m) => m.modelId === manualId.trim())) {
+                    setError("该模型已经添加。");
+                    return;
+                  }
+                  addItems([
+                    {
+                      provider: "",
+                      modelId: manualId.trim(),
+                      label: manualName.trim() || manualId.trim(),
+                      reasoning: { kind: "unknown" },
+                    },
+                  ]);
+                  setManualId("");
+                  setManualName("");
+                }}
+              >
+                添加到草稿
+              </Button>
+            ) : (
+              <Button
+                disabled={!chosen.length}
+                onClick={() =>
+                  addItems(rawItems.filter((m) => chosen.includes(identity(m))))
+                }
+              >
+                添加 {chosen.length} 个模型
+              </Button>
+            )}
+          </>
+        }
+      >
+        <div className="pp-model-tabs" role="tablist" aria-label="模型来源">
+          {[
+            ["catalog", "常用模型"],
+            ["endpoint", "此端点模型"],
+            ["manual", "手动添加"],
+          ].map(([id, label]) => (
+            <button
+              role="tab"
+              aria-selected={source === id}
+              key={id}
+              onClick={() => {
+                setSource(id!);
+                setChosen([]);
+                setQuery("");
+                setError("");
+              }}
+            >
+              {label}
+            </button>
+          ))}
+        </div>
+        {source === "manual" ? (
+          <div className="pp-model-fields">
+            <TextField
+              label="请求模型 ID"
+              value={manualId}
+              onChange={setManualId}
+            />
+            <TextField
+              label="显示名称"
+              value={manualName}
+              onChange={setManualName}
+            />
+          </div>
+        ) : (
+          <>
+            <div className="pp-model-picker-tools">
+              <Select
+                label="能力筛选"
+                value={capability}
+                options={[
+                  { value: "all", label: "全部模型" },
+                  { value: "vision", label: "支持图片" },
+                  { value: "reasoning", label: "支持思考" },
+                ]}
+                onChange={setCapability}
+              />
+              {source === "catalog" ? (
+                <Select
+                  label="模型厂商"
+                  value={brand}
+                  options={[
+                    ...new Map(
+                      presets
+                        .filter((p) => p.provider)
+                        .map((p) => [
+                          p.provider,
+                          {
+                            value: p.provider,
+                            label:
+                              p.provider === "alibaba"
+                                ? "Qwen / Alibaba"
+                                : p.name,
+                          },
+                        ]),
+                    ).values(),
+                  ]}
+                  onChange={(v) => {
+                    setBrand(v);
+                    setChosen([]);
+                  }}
+                />
+              ) : (
+                <Button
+                  disabled={busy}
+                  onClick={() =>
+                    endpoint &&
+                    run(
+                      (s) => fetchEndpointModels(endpoint, catalog, s),
+                      (v) => {
+                        setDiscovered(v);
+                        setMessage(`端点返回 ${v.length} 个模型。`);
+                      },
+                    )
+                  }
+                >
+                  获取模型列表
+                </Button>
+              )}
+              <TextField
+                label="搜索模型"
+                hideLabel
+                value={query}
+                onChange={setQuery}
+                placeholder="搜索名称或 ID"
+              />
+            </div>
+            <div className="pp-model-candidates">
+              {items.map((m) => (
+                <label key={identity(m)} className="pp-model-candidate">
+                  <input
+                    type="checkbox"
+                    disabled={already(m)}
+                    checked={already(m) || chosen.includes(identity(m))}
+                    onChange={(e) =>
+                      setChosen(
+                        e.target.checked
+                          ? [...chosen, identity(m)]
+                          : chosen.filter((x) => x !== identity(m)),
+                      )
+                    }
+                  />
+                  <span className="pp-model-grow">
+                    <strong>{m.label}</strong>
+                    <small>{m.modelId}</small>
+                    <span className="pp-model-badges">
+                      <span>
+                        {protocols.find((p) => p.value === m.protocol)?.label ??
+                          "跟随端点"}
+                      </span>
+                      <span>
+                        {capacity(m.contextWindow ?? m.inputLimit)} 上下文
+                      </span>
+                      {m.vision && <span>图片</span>}
+                    </span>
+                  </span>
+                  <small>
+                    {already(m) ? "已添加" : m.status === "beta" ? "预览" : ""}
+                  </small>
+                </label>
+              ))}
+            </div>
+            {!items.length && (
+              <p className="pp-model-caption">
+                {source === "endpoint" && !discovered.length
+                  ? "点击获取，或者从常用目录添加。"
+                  : "没有匹配的模型，可尝试其他关键词或手动添加。"}
+              </p>
+            )}
+          </>
+        )}
+        {picker && notice}
+      </Dialog>
+      {editor && (
+        <ModelEditor
+          model={editor}
+          endpointProtocol={endpoint?.protocol ?? "openai-chat"}
+          onClose={() => setEditor(null)}
+          onSave={(m) => {
+            onChange({
+              ...draft,
+              models: draft.models.map((x) => (x.id === m.id ? m : x)),
+            });
+            setEditor(null);
+          }}
+          suggestion={catalog.models.find(
+            (m) =>
+              m.provider === editor.catalogRef?.provider &&
+              m.modelId === editor.catalogRef?.modelId,
+          )}
+          catalogDate={catalog.updatedAt}
+        />
+      )}
+      <Dialog
+        open={!!testId}
+        onClose={() => {
+          cancel();
+          setTestId(null);
+        }}
+        title="测试模型"
+        description="向当前草稿配置的端点发起一次模型请求，可能计费。使用测试内容，不发送论文。"
+        footer={
+          <>
+            <Button
+              variant="quiet"
+              onClick={() => {
+                cancel();
+                setTestId(null);
+              }}
+            >
+              关闭
+            </Button>
+            <Button
+              disabled={busy || !testId}
+              onClick={() =>
+                testId &&
+                run(
+                  (s) =>
+                    testConfiguredModel(
+                      structuredClone(draft),
+                      testId,
+                      mode,
+                      s,
+                    ),
+                  (v) =>
+                    setMessage(
+                      `${mode === "text" ? "文本" : mode === "image" ? "图片" : "结构化输出"}测试通过 · ${Math.round(v.usage.elapsedMs)} ms · ${new Date(v.at).toLocaleTimeString()}`,
+                    ),
+                )
+              }
+            >
+              发送测试请求
+            </Button>
+          </>
+        }
+      >
+        <Select
+          label="测试内容"
+          value={mode}
+          options={[
+            { value: "text", label: "文字响应" },
+            { value: "image", label: "图片识别（红色测试图）" },
+            { value: "structured", label: "结构化输出" },
+          ]}
+          onChange={(v) => {
+            cancel();
+            setMode(v);
+            setMessage("");
+            setError("");
+          }}
+        />
+        {testId && notice}
+      </Dialog>
+      <Dialog
+        open={!!removing}
+        onClose={() => setRemoving(null)}
+        title="移除模型配置"
+        description="保存后移除。依赖此配置的默认模型和功能路由将回到自动选择；旧会话保留原模型记录，继续使用前需重新选择模型。"
+        footer={
+          <>
+            <Button variant="quiet" onClick={() => setRemoving(null)}>
+              取消
+            </Button>
+            <Button onClick={remove}>确认移除</Button>
+          </>
+        }
+      />
+    </div>
+  );
 }

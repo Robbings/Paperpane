@@ -11,7 +11,6 @@ export default defineConfig({
     permissions: ['unlimitedStorage', 'clipboardWrite', 'storage', 'webRequest', 'scripting', 'tabs'],
     content_security_policy: {extension_pages: "script-src 'self' 'wasm-unsafe-eval'; object-src 'self';"},
     host_permissions: ['https://*/*', 'http://*/*'],
-    optional_host_permissions: ['https://*/*', 'http://*/*'],
   },
   vite: () => ({worker: {format: 'es'}}),
   // Each contributor loads their own output directory in their own browser.

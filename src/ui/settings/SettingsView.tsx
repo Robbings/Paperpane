@@ -1,3 +1,4 @@
+import { mergeOnto } from './merge-settings';
 import { ModelsSection } from './sections/ModelsSection';
 import { TranslationSection } from './sections/TranslationSection';
 import { useEffect, useMemo, useRef, useState } from 'react';
@@ -10,6 +11,7 @@ import {
   toDraft,
   type Preferences,
   type PreferencesState,
+  type ModelConfigView,
   type SaveSettingsResult,
   type SettingsDraft,
   type SettingsSection,
@@ -43,49 +45,6 @@ const sections: { id: SettingsSection; label: string; icon: IconName; descriptio
 /** Draft comparison that tells an emptied number field (NaN) apart from "use the default" (null). */
 const fingerprint = (draft: SettingsDraft) => JSON.stringify(draft, (_key, value: unknown) => (typeof value === 'number' && Number.isNaN(value) ? 'NaN' : value));
 
-type Json = unknown;
-const same = (a: Json, b: Json) => JSON.stringify(a) === JSON.stringify(b);
-const isPlain = (v: Json): v is Record<string, Json> => typeof v === 'object' && v !== null && !Array.isArray(v);
-/** Lists whose items carry an identity merge item by item. */
-const itemKey = (v: Json) => (isPlain(v) ? ((v.id ?? v.feature) as string | undefined) : undefined);
-
-/**
- * Three-way merge after a conflict: starting from what this page loaded (base),
- * keep every field the other window changed (latest) and every field this page
- * changed (mine). A field both changed to different values is a conflict: this
- * page's value is used and the path is reported, so the reader decides knowingly.
- */
-function merge3(base: Json, latest: Json, mine: Json, path: string, conflicts: string[]): Json {
-  if (same(mine, base)) return latest;
-  if (same(latest, base) || same(mine, latest)) return mine;
-  if (isPlain(base) && isPlain(latest) && isPlain(mine)) {
-    const out: Record<string, Json> = {};
-    for (const key of new Set([...Object.keys(latest), ...Object.keys(mine)])) {
-      const value = merge3(base[key], latest[key], mine[key], path ? `${path}.${key}` : key, conflicts);
-      if (value !== undefined) out[key] = value;
-    }
-    return out;
-  }
-  if (Array.isArray(base) && Array.isArray(latest) && Array.isArray(mine) && [...base, ...latest, ...mine].every((v) => itemKey(v) !== undefined)) {
-    const find = (list: Json[], key: string) => list.find((v) => itemKey(v) === key);
-    const keys = [...new Set([...latest, ...mine].map((v) => itemKey(v)!))];
-    const out: Json[] = [];
-    for (const key of keys) {
-      const value = merge3(find(base, key), find(latest, key), find(mine, key), `${path}.${key}`, conflicts);
-      if (value !== undefined) out.push(value);
-    }
-    return out;
-  }
-  conflicts.push(path);
-  return mine;
-}
-
-function mergeOnto(latest: SettingsSnapshot, base: SettingsSnapshot, draft: SettingsDraft): { merged: SettingsDraft; conflicts: string[] } {
-  const conflicts: string[] = [];
-  const merged = merge3(toDraft(base), toDraft(latest), draft, '', conflicts) as SettingsDraft;
-  return { merged, conflicts };
-}
-
 const fieldNames: Record<string, string> = {
   'runtime.timeoutSec': '超时',
   'runtime.concurrency': '同时进行的请求',
@@ -101,6 +60,10 @@ export function SettingsView(props: SettingsViewProps) {
   const { section, settings } = props;
   const [draft, setDraft] = useState<SettingsDraft>(() => toDraft(settings));
   const [base, setBase] = useState(settings);
+  // A model drawer has its own draft. Keep its opening revision until it is
+  // completed/cancelled so that cross-window writes still go through the CAS
+  // and three-way merge below, even before the drawer calls edit().
+  const [modelEditor, setModelEditor] = useState<ModelConfigView | null>(null);
   const [bar, setBar] = useState<SaveBarState | null>(null);
   const [problems, setProblems] = useState<ReadonlyMap<string, string>>(new Map());
   // A conflict's newer settings, kept until the reader chooses what to do.
@@ -115,11 +78,15 @@ export function SettingsView(props: SettingsViewProps) {
   // an untouched draft simply follows; a draft with changes stays, and saving will ask.
   useEffect(() => {
     if (settings.revision === base.revision) return;
-    if (!dirty) {
+    if (!dirty && !modelEditor) {
       setDraft(toDraft(settings));
       setBase(settings);
     }
-  }, [settings]); // only when the snapshot changes
+  }, [settings, modelEditor]); // closing an untouched drawer catches up too
+
+  useEffect(() => {
+    if (section !== 'models') setModelEditor(null);
+  }, [section]);
 
   // The bar shows while there are changes; "已保存" lingers briefly after saving.
   useEffect(() => {
@@ -179,6 +146,33 @@ export function SettingsView(props: SettingsViewProps) {
 
   const current = sections.find((item) => item.id === section)!;
 
+  const renderSaveBar = (layout: "floating" | "inline") => (
+    <SaveBar
+      state={bar}
+      layout={layout}
+      onSave={() => void save(base.revision)}
+      onDiscard={discard}
+      onReload={() => {
+        const next = latest.current ?? settings;
+        latest.current = null;
+        setBase(next);
+        setDraft(toDraft(next));
+        setProblems(new Map());
+        setBar(null);
+      }}
+      onOverwrite={() => {
+        const next = latest.current;
+        if (!next) return;
+        const { merged } = mergeOnto(next, base, draftNow.current);
+        latest.current = null;
+        setBase(next);
+        setDraft(merged);
+        void save(next.revision, merged);
+      }}
+    />
+  );
+
+
   return (
     <div className="pp-settings">
       <GlassSurface as="aside" tone="panel" radius="panel" className="pp-settings__nav" aria-label="设置分类">
@@ -203,14 +197,14 @@ export function SettingsView(props: SettingsViewProps) {
       <main className="pp-settings__main">
         <ScrollArea className="pp-settings__scroll" viewportClassName="pp-settings__viewport">
           <div className="pp-settings__content">
-            <header className="pp-settings__head">
+            {section !== 'models' && <header className="pp-settings__head">
               <h1>{current.label}</h1>
               <p>{current.description}</p>
-            </header>
+            </header>}
             {section === 'general' ? (
               <GeneralSection state={props.preferences} onPreference={props.onPreference} onRetry={props.onRetryPreferences} />
             ) : section === 'models' ? (
-              <ModelsSection draft={draft} onChange={edit} />
+              <ModelsSection draft={draft} onChange={edit} renderSaveBar={renderSaveBar} editor={modelEditor} setEditor={setModelEditor} />
             ) : section === 'features' ? (
               <TranslationSection draft={draft} onChange={edit} preferences={props.preferences.preferences} onPreference={props.onPreference} />
             ) : section === 'advanced' ? (
@@ -222,30 +216,7 @@ export function SettingsView(props: SettingsViewProps) {
             )}
           </div>
         </ScrollArea>
-        {bar && (
-          <SaveBar
-            state={bar}
-            onSave={() => void save(base.revision)}
-            onDiscard={discard}
-            onReload={() => {
-              const next = latest.current ?? settings;
-              latest.current = null;
-              setBase(next);
-              setDraft(toDraft(next));
-              setProblems(new Map());
-              setBar(null);
-            }}
-            onOverwrite={() => {
-              const next = latest.current;
-              if (!next) return;
-              const { merged } = mergeOnto(next, base, draftNow.current);
-              latest.current = null;
-              setBase(next);
-              setDraft(merged);
-              void save(next.revision, merged);
-            }}
-          />
-        )}
+        {section !== 'models' && renderSaveBar('floating')}
       </main>
     </div>
   );

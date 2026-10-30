@@ -1,3 +1,4 @@
+import { chatRequestOptions } from './model-providers';
 import { supportsModelOperation } from '@/ai/model-configuration';
 import { modelSlot, coolModel } from '@/ai/limit';
 import type { TranslationDiagnostics } from '@/contracts/translation';
@@ -5,6 +6,7 @@ import { TranslationError, safeDetail } from '@/translation/errors';
 import { endpointUrl } from './model-configuration';
 import type { Connection } from './connection';
 import { hasImportOrigin } from '@/document/permissions';
+import { outputLimit, reasoningBody } from './model-capabilities';
 interface ResponseBody { status?: string; output?: { type?: string; content?: { type?: string; text?: string }[] }[] }
 interface RequestContext { sessionId: string; onDiagnostics?: (value: TranslationDiagnostics) => void }
 const responseText = (body: ResponseBody) => body.output?.filter(item => item.type === 'message').flatMap(item => item.content ?? []).filter(content => content.type === 'output_text').map(content => content.text ?? '').join('') ?? '';
@@ -50,15 +52,17 @@ async function streamTranslationAttempt(connection: Connection, messages: { role
     const text = [fallback, code ? `错误码：${code}` : '', msg ?? '', diagnostics.requestId ? `请求标识：${diagnostics.requestId}` : ''].filter(Boolean).join(' ');
     return new TranslationError(text, retryable, fatal, diagnostics.retryAfterMs ?? 0, length ? 'content' : retryable ? 'service' : 'none', diagnostics);
   };
-  const limit = connection.view.runtime.maxOutputTokens;
+  const limit = outputLimit(connection.model,connection.view.runtime.maxOutputTokens);
+  if(connection.model.reasoning.kind==='budget'&&connection.model.defaultReasoning&&Number(connection.model.defaultReasoning)>=limit)throw new TranslationError('思考预算必须小于本次最大输出。',false,true);
+  const thinking=reasoningBody(connection.endpoint.protocol,connection.model,connection.model.defaultReasoning,connection.endpoint.presetId);
   const body = responses ? {
     model: connection.model.modelId, stream: true, store: false,
     // Task UUID stays stable across chunks, concurrent requests, pause/resume and retries.
     prompt_cache_key: context.sessionId,
     instructions: messages.filter(m => m.role === 'system').map(m => m.content).join('\n'),
     input: messages.filter(m => m.role === 'user').map(m => ({ role: 'user', content: [{ type: 'input_text', text: m.content }] })),
-    ...(limit ? { max_output_tokens: limit } : {}),
-  } : { model: connection.model.modelId, messages, stream: true, metadata: { session_id: context.sessionId }, ...(limit ? { max_completion_tokens: limit } : {}) };
+    max_output_tokens: limit, ...thinking,
+  } : { model: connection.model.modelId, messages, stream: true, ...thinking, ...chatRequestOptions(connection.endpoint.presetId, limit, context.sessionId) };
   const response = await transport(() => fetch(url, { method: 'POST', credentials: 'omit', redirect: 'error', signal: combined, headers: { 'Content-Type': 'application/json', ...(connection.key ? { Authorization: `Bearer ${connection.key}` } : {}) }, body: JSON.stringify(body) }));
   const header = response.headers.get('retry-after');
   const retryAfter = header ? (/^\d+(\.\d+)?$/.test(header) ? Number(header) * 1000 : Date.parse(header) - Date.now()) : 0;

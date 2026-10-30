@@ -1,3 +1,5 @@
+import { chatRequestOptions } from './model-providers';
+import { reasoningBody, outputLimit } from './model-capabilities';
 import { endpointUrl, supportsModelOperation } from "./model-configuration";
 import type { Connection } from "./connection";
 import { hasImportOrigin } from "@/document/permissions";
@@ -18,11 +20,7 @@ export async function streamModel(
       base = endpointUrl(c.endpoint.baseUrl),
       started = performance.now();
     let first: number | undefined;
-    const max =
-        c.view.runtime.maxOutputTokens ??
-        (c.model.reasoning.kind === "budget" && input.reasoning
-          ? Number(input.reasoning) + 4096
-          : Math.min(8192, Math.floor((c.model.contextWindow ?? 256000) / 4))),
+    const max = outputLimit(c.model,c.view.runtime.maxOutputTokens),
       usage: Usage = { elapsedMs: 0 };
     const notify = () => {
       usage.elapsedMs = Math.round(performance.now() - started);
@@ -35,8 +33,9 @@ export async function streamModel(
       input.onText(s);
       notify();
     };
-    const effort = input.reasoning,
+    const effort = input.reasoning ?? c.model.defaultReasoning,
       headers: Record<string, string> = { "Content-Type": "application/json" };
+    if(c.model.reasoning.kind==='budget'&&effort&&Number(effort)>=max)throw new Error('思考预算必须小于本次最大输出，请调整模型预算或全局输出上限。');
     let url: string, body: unknown;
     const dataImage = (image: string) => {
       const m = image.match(/^data:([^;]+);base64,(.*)$/s);
@@ -53,8 +52,8 @@ export async function streamModel(
         prompt_cache_key: input.sessionId,
         instructions: input.system,
         ...(input.outputSchema ? {text:{format:{type:'json_schema',strict:true,...input.outputSchema}}}:{}),
-        ...(c.view.runtime.maxOutputTokens ? { max_output_tokens: max } : {}),
-        ...(effort ? { reasoning: { effort } } : {}),
+        max_output_tokens: max,
+        ...reasoningBody(protocol,c.model,effort,c.endpoint.presetId),
         input: input.messages.map((m) => ({
           role: m.role,
           content: [
@@ -76,13 +75,9 @@ export async function streamModel(
       body = {
         model: c.model.modelId,
         stream: true,
-        stream_options: { include_usage: true },
         ...(input.outputSchema ? {response_format:{type:'json_schema',json_schema:{strict:true,...input.outputSchema}}}:{}),
-        ...(c.view.runtime.maxOutputTokens
-          ? { max_completion_tokens: max }
-          : {}),
-        ...(effort ? { reasoning_effort: effort } : {}),
-        metadata: { session_id: input.sessionId },
+        ...chatRequestOptions(c.endpoint.presetId, max, input.sessionId),
+        ...reasoningBody(protocol,c.model,effort,c.endpoint.presetId),
         messages: [
           { role: "system", content: input.system },
           ...input.messages.map((m) => ({
@@ -109,18 +104,8 @@ export async function streamModel(
         stream: true,
         max_tokens: max,
         system: input.system,
-        ...(c.model.reasoning.kind === "effort" && effort
-          ? { thinking: { type: "adaptive" } }
-          : {}),
+        ...reasoningBody(protocol,c.model,effort,c.endpoint.presetId),
         ...((input.outputSchema || (c.model.reasoning.kind==='effort'&&effort)) ? {output_config:{...(c.model.reasoning.kind==='effort'&&effort?{effort}:{}),...(input.outputSchema?{format:{type:'json_schema',schema:input.outputSchema.schema}}:{})}}:{}),
-        ...(c.model.reasoning.kind === "budget" && effort && Number(effort) > 0
-          ? {
-              thinking: {
-                type: "enabled",
-                budget_tokens: Math.min(Number(effort), max - 1),
-              },
-            }
-          : {}),
         messages: input.messages.map((m) => ({
           role: m.role,
           content: [
@@ -144,15 +129,8 @@ export async function streamModel(
         systemInstruction: { parts: [{ text: input.system }] },
         generationConfig: {
           ...(input.outputSchema?{responseFormat:{text:{mimeType:'APPLICATION_JSON',schema:input.outputSchema.schema}}}:{}),
-          ...(c.view.runtime.maxOutputTokens ? { maxOutputTokens: max } : {}),
-          ...(effort
-            ? {
-                thinkingConfig:
-                  c.model.reasoning.kind === "budget"
-                    ? { thinkingBudget: Number(effort) }
-                    : { thinkingLevel: effort },
-              }
-            : {}),
+          maxOutputTokens: max,
+          ...reasoningBody(protocol,c.model,effort,c.endpoint.presetId),
         },
         contents: input.messages.map((m) => ({
           role: m.role === "assistant" ? "model" : "user",

@@ -10,7 +10,7 @@ export function paperContext(
   paper: ExtractedPaper,
   question: string,
   historyText: string,
-  window = 256000,
+  window = 8192,
   output = 8192,
 ): { text: string; manifest: ContextManifest } {
   // Count actual BPE tokens; a 256k model must not be treated like an 8k model.

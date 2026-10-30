@@ -1,5 +1,7 @@
 import { endpointUrl, isModelProtocol, resolveConfiguredModel } from '@/ai/model-configuration';
 export { endpointUrl } from '@/ai/model-configuration';
+import { modelProblems } from '@/ai/model-capabilities';
+import type { EndpointDraft } from '@/ui/settings/types';
 import { PaperDatabase } from './database';
 import type { SettingsView, SettingsDraft, SaveSettingsResult } from '@/ui/settings/types';
 import { runtimeProblems } from '@/ui/settings/sections/AdvancedSection';
@@ -15,7 +17,9 @@ export class ModelSettingsStore extends PaperDatabase {
     for(const [i,e] of draft.endpoints.entries()){try{endpointUrl(e.baseUrl);}catch(error){problems.push({path:`endpoints.${i}.baseUrl`,message:(error as Error).message});}if(!isModelProtocol(e.protocol))problems.push({path:`endpoints.${i}.protocol`,message:'请选择支持的接口协议。'});}
     if(new Set(draft.endpoints.map(e=>e.id)).size!==draft.endpoints.length||new Set(draft.models.map(m=>m.id)).size!==draft.models.length)problems.push({path:'models',message:'模型或接口标识重复。'});
     for(const m of draft.models)if(!m.modelId.trim()||!draft.endpoints.some(e=>e.id===m.endpointId))problems.push({path:'models',message:'请填写模型 ID 并选择对应接口。'});
-    for(const m of draft.models)if(m.contextWindow!==undefined&&(!Number.isInteger(m.contextWindow)||m.contextWindow<8192||m.contextWindow>10000000))problems.push({path:'models',message:'模型上下文容量须为 8192–10000000 tokens。'});
+    for(const m of draft.models){for(const message of modelProblems(m))problems.push({path:'models',message});if(m.protocolOverride&&!isModelProtocol(m.protocolOverride))problems.push({path:'models',message:'模型协议无效。'});}
+    const identities=draft.models.map(m=>[m.endpointId,m.modelId.trim(),m.protocolOverride??draft.endpoints.find(e=>e.id===m.endpointId)?.protocol].join('\u0000'));
+    if(new Set(identities).size!==identities.length)problems.push({path:'models',message:'同一端点和协议下的模型 ID 重复。'});
     for(const id of [draft.defaultModelId,...draft.features.map(f=>f.modelId)])if(id&&!draft.models.some(m=>m.id===id))problems.push({path:'models',message:'默认或翻译模型不存在。'});
     if(problems.length)return {ok:false,reason:'invalid',problems};
     const db=await this.open();const tx=db.transaction('meta','readwrite',{durability:'strict'});
@@ -37,6 +41,13 @@ export class ModelSettingsStore extends PaperDatabase {
       };
       tx.oncomplete=()=>resolve(result);tx.onabort=()=>resolve({ok:false,reason:'save-failed',message:'模型设置没有保存，请检查本机存储空间。'});
     });
+  }
+  /** Used only by discovery/test services; never include credentials in a view. */
+  async resolveDraftEndpoint(endpoint:EndpointDraft){
+    const baseUrl=endpointUrl(endpoint.baseUrl), record=await this.record(),previous=record.view.endpoints.find(e=>e.id===endpoint.id);
+    if(endpoint.key.kind==='keep'&&previous&&endpointUrl(previous.baseUrl)!==baseUrl&&record.keys[endpoint.id])throw new Error('接口地址已改变，请重新填写密钥。');
+    const key=endpoint.key.kind==='replace'?endpoint.key.value.trim():endpoint.key.kind==='clear'?'':record.keys[endpoint.id]??'';
+    return {endpoint:{...endpoint,baseUrl},key};
   }
   /** For request logic only; never expose this return value through a UI snapshot. */
   async resolveConnection(modelId?:string, feature: import('@/ui/settings/types').FeatureId = 'translate'){
