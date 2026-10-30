@@ -1,3 +1,4 @@
+import { MarkdownEditor } from '@/ui/markdown/MarkdownEditor';
 import { useEffect, useLayoutEffect, useRef, useState, type CSSProperties, type PointerEvent as ReactPointerEvent } from 'react';
 import { createPortal } from 'react-dom';
 import { Icon, IconButton } from '@/ui/components';
@@ -36,7 +37,7 @@ const clamp = (value: number, min: number, max: number) => Math.min(Math.max(val
 /** A note's title: the first line of its comment, like a note app; else the start of its passage. */
 export function noteTitle(annotation: AnnotationView): string {
   const first = annotation.note?.split('\n').find((line) => line.trim())?.trim();
-  if (first) return first;
+  if (first) return first.replace(/^#{1,6}\s+/, '').replace(/!\[([^\]]*)\]\([^)]+\)/g,'$1').replace(/\*\*|__/g,'');
   const quote = annotation.quote?.trim();
   return quote ? (quote.length > 24 ? `${quote.slice(0, 24)}…` : quote) : `第 ${annotation.pageIndex + 1} 页的评论`;
 }
@@ -223,11 +224,11 @@ function CommentNote({ onDragging, note, anchor, bounds, container, scale, uiSca
   const frame = useRef(0);
   const current = useRef({note,anchor,bounds,scale,uiScale,onChange});
   current.current = {note,anchor,bounds,scale,uiScale,onChange};
-  const textRef = useRef<HTMLTextAreaElement>(null);
+
 
   // Take outside changes (e.g. edited in the annotation list) unless typing here.
   useEffect(() => {
-    if (document.activeElement !== textRef.current) setDraft(annotation.note ?? '');
+    setDraft(annotation.note ?? '');
   }, [annotation.note]);
 
   const left = floatingLeft(container, anchor.x + note.dx * scale) + canvas.inset;
@@ -337,22 +338,8 @@ function CommentNote({ onDragging, note, anchor, bounds, container, scale, uiSca
               onClick={onClose}
             />
           </header>
-          <textarea
-            ref={textRef}
-            className="pp-note__text"
-            aria-label="评论（第一行作为标题）"
-            placeholder={'第一行是标题\n然后写下你的想法…'}
-            value={draft}
-            onChange={(event) => {
-              // Every edit goes to the runtime at once; it batches durable writes and
-              // flushes them, so closing the reader mid-sentence loses nothing.
-              setDraft(event.target.value);
-              onComment(event.target.value);
-            }}
-            onKeyDown={(event) => {
-              if (event.key === 'Escape') onChange({ ...note, collapsed: true });
-            }}
-          />
+          <MarkdownEditor storageKey={'comment:'+note.id} compact label="评论（第一行作为标题）" placeholder="第一行是标题，然后写下你的想法…" value={draft}
+            onChange={value=>{setDraft(value);onComment(value);}} onEscape={()=>onChange({...note,collapsed:true})}/>
           <span className="pp-note__resize" aria-hidden="true" onPointerDown={begin('resize')} onPointerMove={move} onPointerUp={end} onPointerCancel={end} onLostPointerCapture={()=>finish()} />
         </>
       )}
