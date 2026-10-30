@@ -12,6 +12,7 @@
   },
   "scripts": {
     "test": "node --experimental-strip-types --test tests/*.test.mjs",
+    "test:reader-features": "node tests/reader-features-extension.mjs",
     "test:extension": "node tests/arxiv-extension.mjs",
     "test:pdf-extension": "node tests/pdf-extension.mjs",
     "test:popup-extension": "node tests/popup-extension.mjs",
@@ -39,6 +40,7 @@
     "@tiptap/starter-kit": "3.32.0",
     "dompurify": "3.4.17",
     "katex": "0.16.47",
+    "pdf-lib": "1.17.1",
     "pdfjs-dist": "6.4.299",
     "react": "19.3.1",
     "react-dom": "19.3.1",

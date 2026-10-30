@@ -1,3 +1,4 @@
+import { nativeOutline, generatedOutline, type NavigationItem } from './navigation';
 import { TextLayer, AnnotationEditorType, GlobalWorkerOptions, PasswordResponses, getDocument, type PDFDocumentLoadingTask, type PDFDocumentProxy } from 'pdfjs-dist';
 import { mergeHighlightRects } from 'pdfjs-dist/build/paperpane-highlight-geometry.mjs';
 import workerUrl from 'pdfjs-dist/build/pdf.worker.min.mjs?url';
@@ -31,6 +32,7 @@ export class PdfjsReader implements ReaderService, AnchorService {
   private task?: PDFDocumentLoadingTask;
   private pdf?: PDFDocumentProxy;
   private highlights?: SavedHighlights;
+  private navigation: NavigationItem[] = [];
   private annotations: readonly Annotation[] = [];
   private find: PDFFindController;
   private password?: { id: string; submit: (value: string) => void };
@@ -140,6 +142,7 @@ export class PdfjsReader implements ReaderService, AnchorService {
   private invalidate(page: boolean) { this.locateFlash?.paint(); this.revision++; if (page) this.projections.page.forEach(fn=>fn()); this.projections.viewport.forEach(fn=>fn()); }
   subscribeProjection(space: ProjectionSpace, listener: () => void) { this.projections[space].add(listener); return () => this.projections[space].delete(listener); }
   async open(blob: Blob, ref: DocumentRef): Promise<void> {
+    this.navigation = [];
     this.locateFlash.clear();
     this.sessionLifecycle.abort(); this.sessionLifecycle = new AbortController();
     const sessionId = crypto.randomUUID(); const previous = this.task; this.task = undefined;
@@ -162,7 +165,45 @@ export class PdfjsReader implements ReaderService, AnchorService {
       this.viewer.currentScaleValue = 'page-width';
       this.publish({ phase: 'ready', pageCount: pdf.numPages, passwordRequest: undefined, loadProgress: 1 });
       this.invalidate(true);
+      void this.loadNavigation(pdf,sessionId,this.sessionLifecycle.signal);
     } catch { if (!this.disposed && this.snapshot.data.sessionId === sessionId) this.publish({ phase: 'failed', error: { code: 'CORRUPT_FILE', message: '无法打开这份 PDF，请换一份文件重试。', recovery: ['choose-file'] } }); }
+  }
+  private async loadNavigation(pdf: PDFDocumentProxy, sessionId: string, signal: AbortSignal) {
+    this.publish({outlineStatus:'loading'});
+    const current=()=>!this.disposed&&!signal.aborted&&this.snapshot.data.sessionId===sessionId;
+    try {
+      const native=await nativeOutline(pdf,signal).catch(()=>{signal.throwIfAborted();return [];});
+      if(!current())return;
+      if(native.length){this.navigation=native;this.publish({outline:native,outlineStatus:'native'});return;}
+      const paper=await extractPaper(pdf,this.snapshot.data.document!,signal,()=>{});
+      if(!current())return;
+      this.navigation=generatedOutline(paper.sentences);
+      this.publish({outline:this.navigation,outlineStatus:this.navigation.length?'generated':'empty'});
+    } catch { if(current())this.publish({outlineStatus:'failed'}); }
+  }
+  async navigateOutline(id: string) {
+    const item=this.navigation.find(n=>n.id===id);
+    if(!this.ready().ok||!item||item.pageIndex===undefined)return;
+    const session=this.snapshot.data.sessionId;
+    if(item.destination)await this.links.goToDestination(item.destination);
+    else {
+      const page=await this.pdf!.getPage(item.pageIndex+1);
+      if(!this.navigation.includes(item))return;
+      this.viewer.scrollPageIntoView({pageNumber:item.pageIndex+1,destArray:[null,{name:'XYZ'},null,item.top===undefined?null:item.top+page.view[1]!,null],allowNegativeOffset:false});
+    }
+    await new Promise<void>(resolve=>requestAnimationFrame(()=>resolve()));
+    if(session===this.snapshot.data.sessionId&&!this.disposed)this.container.scrollTop=Math.max(0,this.container.scrollTop-64);
+  }
+  async thumbnail(pageIndex: number, signal: AbortSignal): Promise<string> {
+    const pdf=this.pdf,session=this.snapshot.data.sessionId;
+    if(!pdf||!this.ready().ok)throw new Error('论文尚未就绪');
+    const page=await pdf.getPage(pageIndex+1);signal.throwIfAborted();
+    const base=page.getViewport({scale:1}),viewport=page.getViewport({scale:224/base.width});
+    const canvas=document.createElement('canvas');canvas.width=Math.ceil(viewport.width);canvas.height=Math.ceil(viewport.height);
+    const task=page.render({canvas,viewport});
+    const abort=()=>task.cancel();signal.addEventListener('abort',abort,{once:true});
+    try{await task.promise;signal.throwIfAborted();if(session!==this.snapshot.data.sessionId)throw new Error('阅读会话已改变');return canvas.toDataURL('image/png');}
+    finally{signal.removeEventListener('abort',abort);canvas.width=canvas.height=0;}
   }
   submitPassword(requestId: string, password: string): Result<void> { if (!this.password || this.password.id !== requestId) return failure('STALE_CONFIRMATION', '密码请求已过期'); const submit = this.password.submit; this.password = undefined; this.publish({ phase: 'loading', passwordRequest: undefined }); submit(password); return success(undefined); }
   private ready(): Result<void> { return !this.disposed && this.snapshot.data.phase === 'ready' ? success(undefined) : failure('BUSY', '论文尚未就绪'); }

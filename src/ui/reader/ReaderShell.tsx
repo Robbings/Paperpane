@@ -1,3 +1,4 @@
+import type { ThumbnailRenderer } from './PageThumbnail';
 import { useEffect, useLayoutEffect, useRef, useState, type CSSProperties, type PointerEvent as ReactPointerEvent, type ReactNode } from 'react';
 import {
   GlassSurface,
@@ -64,6 +65,9 @@ interface ReaderShellProps {
   header: DocumentHeaderView;
   outline: readonly OutlineItemView[];
   navigationPending?: boolean;
+  navigationMessage?: string;
+  renderThumbnail?: ThumbnailRenderer;
+  onOutlineNavigate?: (id:string)=>void;
   /** 0-based. */
   pageIndex: number;
   zoomPercent: number;
@@ -604,6 +608,9 @@ export function ReaderShell(props: ReaderShellProps) {
         open={sidebarOpen}
         outline={outline}
         navigationPending={props.navigationPending}
+        navigationMessage={props.navigationMessage}
+        renderThumbnail={props.renderThumbnail}
+        onOutlineNavigate={props.onOutlineNavigate}
         pageCount={header.pageCount}
         pageIndex={pageIndex}
         // Floating or docked is decided by room, not by open state, so it

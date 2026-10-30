@@ -1258,3 +1258,7 @@
 .pp-tr-resize[data-dir='nw'] { top: -4px; left: -4px; cursor: nwse-resize; }
 .pp-tr-resize[data-dir='se'] { bottom: -4px; right: -4px; cursor: nwse-resize; }
 .pp-tr-resize[data-dir='sw'] { bottom: -4px; left: -4px; cursor: nesw-resize; }
+
+.pp-thumb__page--live { padding: 0; height: auto; min-height: 130px; overflow: hidden; }
+.pp-thumb__page--live img { display: block; width: 112px; height: auto; }
+.pp-thumb__page--live .pp-thumb__status { background: none; height: auto; width: auto; margin: auto; font-size: 12px; color: #555; }

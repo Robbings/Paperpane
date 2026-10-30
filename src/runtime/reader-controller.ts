@@ -217,11 +217,39 @@ export class ReaderController {
     if (action === 'copy') void navigator.clipboard.writeText(text).catch(() => this.report('复制失败，请使用系统复制快捷键。'));
     else this.report('翻译、解释和问答将在后续接入，目前没有发送模型请求。');
   }
-  async exportAnnotations(copy = false) {
-    const result = await this.annotations?.export('markdown'); if (!result) return;
+  private exporting = false;
+  async exportPdf(print = false) {
+    if(this.exporting||!this.document||!this.annotations)return;
+    if(this.annotations.getSnapshot().state!=='ready'){this.report('批注尚未读取完成或读取失败，请稍候或重新打开论文后重试。');return;}
+    const win=print?window.open('about:blank','_blank'):null;
+    if(print&&!win){this.report('请允许打开打印窗口后重试。');return;}
+    if(win)win.document.body.textContent='正在准备带标注的打印页面，可关闭窗口取消。';
+    this.exporting=true;
+    const document=this.document,annotations=this.annotations;
+    try {
+      await annotations.flush();
+      const saved=annotations.getSnapshot().data;
+      if(saved.hasDrafts||saved.error)throw new Error('请先保存批注，再导出或打印。');
+      const rows=saved.items.filter(r=>!r.deletedAt);
+      const original=await this.db.readFile(document);
+      const {annotatedPdf}=await import('@/document/reader/export-pdf');
+      const bytes=await annotatedPdf(new Uint8Array(await original.arrayBuffer()),rows);
+      if(print&&win){
+        if(win.closed)return;
+        const {printAnnotatedPdf}=await import('@/document/reader/print-pdf');
+        await printAnnotatedPdf(win,bytes,rows,document.title);
+      } else {
+        const url=URL.createObjectURL(new Blob([new Uint8Array(bytes)],{type:'application/pdf'}));
+        const a=window.document.createElement('a');a.href=url;a.download=`${document.title}-带标注.pdf`;a.click();setTimeout(()=>URL.revokeObjectURL(url),30000);
+      }
+    } catch(error){if(win&&!win.closed)win.close();this.report(error instanceof Error?error.message:'PDF 导出失败，请重试。');}
+    finally{this.exporting=false;}
+  }
+  async exportAnnotations(copy = false, format: 'markdown' | 'csv' = 'markdown') {
+    const result = await this.annotations?.export(format); if (!result) return;
     if (!result.ok) { this.report(result.error.message); return; }
     if (copy) { await navigator.clipboard.writeText(result.value.text).catch(() => this.report('复制失败')); return; }
-    const url = URL.createObjectURL(new Blob([result.value.text], {type:result.value.mimeType}));
+    const url = URL.createObjectURL(new Blob([...(format==='csv'?['\uFEFF']:[]),result.value.text], {type:result.value.mimeType+';charset=utf-8'}));
     const a=document.createElement('a'); a.href=url; a.download=result.value.filename; a.click(); setTimeout(()=>URL.revokeObjectURL(url),1000);
   }
   async dispose() {
