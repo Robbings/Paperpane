@@ -1,3 +1,5 @@
+import { cancelMarkdownUploads } from '@/domain/notes/assets';
+import { NotesEditorPanel } from '@/ui/markdown/NotesEditorPanel';
 import { useResearch } from './use-research';
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { ReaderShell } from '@/ui/reader/ReaderShell';
@@ -78,8 +80,8 @@ export function LiveReaderPage() {
     onAnnotationAction:(id,action)=>{const row=owner?.item(id);if(row){if(action==='explain'||action==='ask')void research.selected({anchor:row.anchor,text:row.quote},action);else if(action==='translate'&&owner?.translateSelection)owner.translateSelection(row.anchor,row.quote);else owner?.textAction(row.quote,action);}},
     onAnnotationColor:(id,color)=>owner?.colorAnnotation(id,color),
     onAnnotationComment:(id,comment)=>owner?.annotations?.edit(id,{comment}),
-    onAnnotationCommentDelete:async id=>owner?.annotations?.deleteComment(id)??null,
-    onAnnotationDelete:async id=>{const ok=await owner?.annotations?.deleteCurrent(id)??false;if(ok)owner?.reader.dismissMenu();return ok;},
+    onAnnotationCommentDelete:async id=>{cancelMarkdownUploads('comment:'+id);return owner?.annotations?.deleteComment(id)??null;},
+    onAnnotationDelete:async id=>{cancelMarkdownUploads('comment:'+id);const ok=await owner?.annotations?.deleteCurrent(id)??false;if(ok)owner?.reader.dismissMenu();return ok;},
     onAnnotationRestore:async id=>{await owner?.annotations?.restoreDeleted(id);},
     annotationRects:id=>{const row=owner?.item(id);return row ? owner?.rects(row.anchor)??null : null;},
     subscribeGeometry:listener=>owner?.reader.subscribeProjection('viewport',listener)??(()=>{}),
@@ -99,7 +101,7 @@ export function LiveReaderPage() {
       annotationStatus={{local,sync:'unconfigured'}}
       notes={{value:'',onChange:()=>report('整篇笔记将在后续接入。'),local:'unmodified',sync:'unconfigured'}}
       panelRequest={research.panelRequest}
-      panels={{...research.panels,notes:unavailable,cite:unavailable}}
+      panels={{...research.panels,notes:owner?.notes?<NotesEditorPanel key={owner.notes.document.documentId+owner.notes.document.fileVersion} session={owner.notes}/>:unavailable,cite:unavailable}}
       document={<>
         {external ? <EmptyState icon="file" title={external.phase==='failed'?'论文导入失败':external.phase==='permission'?'允许读取论文':`正在从 ${new URL(external.url).hostname} 导入论文`}
           description={external.error??'PDF 将保存到本机文献库，下载完成后自动打开。'}

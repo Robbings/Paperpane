@@ -1,0 +1,181 @@
+/* Editor only. The reader's panels, glass note shells and geometry remain their owners. */
+.pp-markdown-editor {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  min-height: 90px;
+  height: 100%;
+  min-width: 0;
+  color: var(--pp-text);
+  font: inherit;
+}
+.pp-markdown-editor > div:first-child {
+  min-height: 0;
+  flex: 1;
+}
+.pp-markdown-editor .vditor {
+  border: 0 !important;
+  border-radius: 0;
+  background: transparent !important;
+  height: 100% !important;
+  --panel-background-color: var(--pp-glass-float-solid);
+  --textarea-background-color: transparent;
+  --text-color: var(--pp-text);
+  --border-color: var(--pp-hairline);
+}
+.pp-markdown-editor .vditor-toolbar {
+  padding: 2px 6px !important;
+  border: 0 !important;
+  border-bottom: 0.5px solid var(--pp-hairline) !important;
+  background: transparent !important;
+  min-height: 28px;
+}
+.pp-markdown-editor .vditor-toolbar__item {
+  padding: 0 2px !important;
+}
+.pp-markdown-editor .vditor-toolbar svg {
+  width: 13px;
+  height: 13px;
+  color: var(--pp-text-2);
+}
+.pp-markdown-editor .vditor-ir,
+.pp-markdown-editor .vditor-ir .vditor-reset {
+  background: transparent !important;
+  color: var(--pp-text) !important;
+}
+.pp-markdown-editor .vditor-reset {
+  font-family: var(--pp-font-ui) !important;
+  font-size: var(--pp-text-read) !important;
+  line-height: 1.8 !important;
+  padding: 14px 16px 60px !important;
+  min-height: 60px !important;
+  max-width: none !important;
+  caret-color: var(--pp-text);
+}
+.pp-markdown-editor .vditor-reset :is(h1, h2, h3, h4) {
+  font-family: var(--pp-font-ui) !important;
+  color: var(--pp-text) !important;
+  border: 0 !important;
+  margin: 14px 0 8px !important;
+  font-size: 1.15em !important;
+  font-weight: 600;
+}
+.pp-markdown-editor .vditor-reset h1 {
+  font-size: 1.35em !important;
+}
+.pp-markdown-editor .vditor-reset p {
+  margin: 0 0 0.6em !important;
+}
+.pp-markdown-editor .vditor-reset table {
+  font-size: 0.9em;
+}
+.pp-markdown-editor .vditor-reset img,
+.pp-markdown-view img {
+  max-width: 100%;
+  height: auto;
+  border-radius: 6px;
+}
+.pp-markdown-editor .vditor-reset .katex-display,
+.pp-markdown-view .katex-display {
+  overflow-x: auto;
+  overflow-y: hidden;
+}
+.pp-markdown-editor .vditor-reset blockquote,
+.pp-markdown-view blockquote {
+  border-left: 2px solid var(--pp-hairline-strong);
+  color: var(--pp-text-2);
+  padding-left: 10px;
+  margin: 8px 0;
+}
+.pp-markdown-editor .vditor-ir__marker {
+  color: var(--pp-text-3);
+}
+.pp-markdown-editor[data-compact="true"] {
+  min-height: 65px;
+}
+.pp-markdown-editor[data-compact="true"] .vditor-reset {
+  padding: 8px 12px 20px !important;
+  font-size: var(--pp-text-read) !important;
+}
+.pp-markdown-editor[data-compact="true"] .vditor-toolbar {
+  display: none !important;
+}
+.pp-markdown-editor[data-compact="true"]:focus-within .vditor-toolbar {
+  display: block !important;
+}
+.pp-markdown-editor__loading {
+  position: absolute;
+  inset: 12px;
+  font-size: 12px;
+  color: var(--pp-text-3);
+  pointer-events: none;
+}
+.pp-markdown-editor__error {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 6px 10px;
+  color: var(--pp-danger);
+  font-size: 12px;
+  flex-shrink: 0;
+}
+.pp-markdown-view {
+  font: inherit;
+  line-height: 1.8;
+  overflow-wrap: anywhere;
+}
+.pp-markdown-view :is(p, ul, ol, pre, table) {
+  margin: 5px 0;
+}
+.pp-markdown-view :is(h1, h2, h3) {
+  font-size: 1em;
+  font-weight: 600;
+  margin: 6px 0;
+}
+.pp-markdown-view table {
+  border-collapse: collapse;
+  display: block;
+  max-width: 100%;
+  overflow: auto;
+}
+.pp-markdown-view :is(td, th) {
+  padding: 3px 7px;
+  border: 1px solid var(--pp-hairline);
+}
+.pp-markdown-view pre {
+  white-space: pre-wrap;
+}
+.pp-markdown-view a {
+  color: var(--pp-accent);
+}
+.pp-markdown-view__missing {
+  color: var(--pp-text-3);
+  font-size: 0.9em;
+}
+.pp-note > .pp-markdown-editor {
+  flex: 1;
+  min-height: 0;
+  overflow: hidden;
+}
+.pp-note .pp-markdown-editor .vditor-ir {
+  overflow: auto;
+}
+.pp-note .pp-markdown-editor .vditor-reset {
+  font-size: var(--pp-text-read) !important;
+}
+
+.pp-markdown-editor
+  .vditor-ir
+  .vditor-reset
+  > :is(h1, h2, h3, h4, h5, h6):before {
+  display: none !important;
+}
+.pp-note > .pp-markdown-editor {
+  background: var(--pp-reading-surface);
+}
+
+.pp-markdown-editor .vditor-toolbar__item > .vditor-tooltipped {
+  width: 24px;
+  height: 28px;
+  padding: 6px 4px;
+}

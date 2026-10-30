@@ -1,5 +1,7 @@
-import { useState, type CSSProperties } from 'react';
-import { Button, Menu, IconButton, SaveStatus, TextArea, Tooltip, Segmented, highlightColors, type HighlightColor, type LocalSaveState, type SyncState } from '@/ui/components';
+import { MarkdownEditor } from '@/ui/markdown/MarkdownEditor';
+import { MarkdownView } from '@/ui/markdown/MarkdownView';
+import { useRef, useState, type CSSProperties } from 'react';
+import { Button, Menu, IconButton, SaveStatus, Tooltip, Segmented, highlightColors, type HighlightColor, type LocalSaveState, type SyncState } from '@/ui/components';
 import type { AnnotationView } from '../types';
 import { PanelBody } from './PanelBody';
 import { PanelHeader } from './PanelHeader';
@@ -119,10 +121,10 @@ function AnnotationItem({ item, onLocate, onColor, onComment, onDelete, onRemove
   const [picking, setPicking] = useState(false);
   const [deletion, setDeletion] = useState<{x:number;y:number}|null>(null);
   const [editing, setEditing] = useState<string | null>(null);
+  const editSession=useRef({original:'',active:false,cancelled:false});const currentEdit=editSession.current;
 
   const save = () => {
-    if (editing !== null && editing.trim() !== (item.note ?? '').trim()) onComment(editing.trim());
-    setEditing(null);
+    currentEdit.active=false;setEditing(null);
   };
 
   return (
@@ -133,27 +135,16 @@ function AnnotationItem({ item, onLocate, onColor, onComment, onDelete, onRemove
           {item.kind === 'highlight' ? '高亮' : '页面评论'} · 第 {item.pageIndex + 1} 页
         </span>
         {item.quote && <span className="pp-annotation__quote">{item.quote}</span>}
-        {item.note && editing === null && <span className="pp-annotation__note">{item.note}</span>}
+        {item.note && editing === null && <div className="pp-annotation__note"><MarkdownView value={item.note}/></div>}
       </button>
 
       {editing !== null && (
         <div className="pp-annotation__edit">
-          <TextArea
-            label="评论"
-            hideLabel
-            value={editing}
-            onChange={setEditing}
-            rows={2}
-            maxRows={8}
-            autoFocus
-            placeholder="写下你的想法…"
-            onKeyDown={(event) => {
-              if (event.key === 'Escape') setEditing(null);
-              if (event.key === 'Enter' && (event.metaKey || event.ctrlKey)) save();
-            }}
-          />
+          <MarkdownEditor storageKey={'comment:'+item.id} compact label="评论" value={editing} autoFocus placeholder="写下你的想法…"
+            onChange={value=>{if(currentEdit.cancelled)return;if(currentEdit.active)setEditing(value);onComment(value);}}
+            onSave={save} onEscape={()=>{currentEdit.active=false;currentEdit.cancelled=true;onComment(currentEdit.original);setEditing(null);}}/>
           <div className="pp-annotation__edit-bar">
-            <Button size="sm" variant="quiet" onClick={() => setEditing(null)}>
+            <Button size="sm" variant="quiet" onClick={() => {currentEdit.active=false;currentEdit.cancelled=true;onComment(currentEdit.original);setEditing(null);}}>
               取消
             </Button>
             <Button size="sm" variant="primary" onClick={save}>
@@ -192,7 +183,7 @@ function AnnotationItem({ item, onLocate, onColor, onComment, onDelete, onRemove
                 </button>
               </Tooltip>
             )}
-            <IconButton icon="edit" label={item.note ? '编辑评论' : '添加评论'} size="md" shape="pill" onClick={() => setEditing(item.note ?? '')} />
+            <IconButton icon="edit" label={item.note ? '编辑评论' : '添加评论'} size="md" shape="pill" onClick={() => {editSession.current={original:item.note??'',active:true,cancelled:false};setEditing(item.note??'');}} />
             <IconButton icon="trash" label={item.note ? '删除选项' : '删除高亮'} size="md" shape="pill" onClick={event=>{
               if (!item.note) { onDelete(); return; }
               const box=event.currentTarget.getBoundingClientRect();setDeletion({x:box.right,y:box.bottom});

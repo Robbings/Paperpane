@@ -759,7 +759,7 @@ export function ReaderShell(props: ReaderShellProps) {
                     onExport={() => props.onTool('export-annotations')}
                   />
                 ) : id === 'notes' ? (
-                  <NotesPanel value={notes.value} onChange={notes.onChange} local={notes.local} sync={notes.sync} simulated={notes.simulated} />
+                  props.panels?.notes ?? <NotesPanel value={notes.value} onChange={notes.onChange} local={notes.local} sync={notes.sync} simulated={notes.simulated} />
                 ) : (
                   (props.panels?.[id] ?? <PlaceholderPanel title={label} icon={icon} description={placeholderText[id] ?? ''} />)
                 )}
