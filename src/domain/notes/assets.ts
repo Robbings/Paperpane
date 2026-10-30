@@ -1,34 +1,24 @@
 import { PaperDatabase } from "@/data/database";
+import { MarkdownUploadTasks } from "./upload-tasks";
 const db = new PaperDatabase();
 const references = new Map<string, string>();
 export const assetHash = (url: string) =>
   /^paperpane-asset:([a-f0-9]{64})$/.exec(url)?.[1] ?? references.get(url);
 export const assetPattern = /paperpane-asset:([a-f0-9]{64})/g;
 export const markdownWork = {
-  pending: new Set<Promise<unknown>>(),
-  failures: new Map<string, () => Promise<unknown>>(),
+  uploads: new MarkdownUploadTasks(),
   values: new Map<string, string>(),
-  discarders: new Map<string, () => void>(),
-  epochs: new Map<string, number>(),
   get unsaved() {
-    return this.pending.size > 0 || this.failures.size > 0;
+    return this.uploads.unsaved;
   },
   async prepareToLeave() {
-    await Promise.allSettled([...this.pending]);
-    if (!this.failures.size) this.values.clear();
-    return !this.failures.size;
+    const saved = await this.uploads.settle();
+    if (saved) this.values.clear();
+    return saved;
   },
 };
 export function cancelMarkdownUploads(key: string) {
-  markdownWork.epochs.set(key, (markdownWork.epochs.get(key) ?? 0) + 1);
-  markdownWork.discarders.get(key)?.();
-  markdownWork.discarders.delete(key);
-  markdownWork.failures.delete(key);
-}
-export function trackMarkdownWork<T>(job: Promise<T>) {
-  markdownWork.pending.add(job);
-  void job.finally(() => markdownWork.pending.delete(job)).catch(() => {});
-  return job;
+  markdownWork.uploads.cancelOwner(key);
 }
 export class MarkdownAssets {
   private urls = new Map<string, string>();

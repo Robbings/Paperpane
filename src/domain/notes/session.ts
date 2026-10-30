@@ -101,7 +101,10 @@ export class NoteSession implements NoteService {
       this.ready = true;
       this.publish();
     } catch (e) {
-      this.ready = false;
+      if (this.closed || epoch !== this.epoch) return;
+      // Once loaded, a failed background read must not turn retry-save into
+      // initial-load recovery, which would replace the local draft with old text.
+      if (this.ready) return;
       this.state.save = {
         local: "failed",
         sync: "unconfigured",

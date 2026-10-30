@@ -1,11 +1,10 @@
-import { useEffect, useId, useRef, useState } from "react";
+import { useEffect, useId, useRef, useState, useSyncExternalStore } from "react";
 import type Vditor from "vditor";
 import { IconButton, toast } from "@/ui/components";
 import {
   MarkdownAssets,
   assetHash,
   markdownWork,
-  trackMarkdownWork,
 } from "@/domain/notes/assets";
 import "vditor/dist/index.css";
 import "./markdown-editor.css";
@@ -52,16 +51,16 @@ export function MarkdownEditor(props: Props) {
     echoes = useRef<string[]>([]),
     observedProp = useRef(props.value),
     scope = useRef<MarkdownAssets | undefined>(undefined),
-    jobs = useRef(new Set<Promise<unknown>>()),
-    [error, setError] = useState(() =>
-      markdownWork.failures.has(props.storageKey ?? id)
-        ? "图片尚未保存，可重试或取消本次图片插入。"
-        : "",
-    ),
+    [error, setError] = useState(""),
     [ready, setReady] = useState(false);
   latest.current = props;
   const uploadId = useRef(props.storageKey ?? id),
     text = useRef(props.value);
+  useSyncExternalStore(
+    markdownWork.uploads.subscribe, markdownWork.uploads.getSnapshot,
+  );
+  const failedUpload = markdownWork.uploads.firstFailure(uploadId.current);
+  const visibleError = failedUpload?.error ?? error;
   useEffect(() => {
     alive.current = true;
     let live = true,
@@ -70,6 +69,11 @@ export function MarkdownEditor(props: Props) {
     const assets = new MarkdownAssets();
     scope.current = assets;
     let instance: Vditor | undefined;
+    const taskIds = new Set<string>();
+    const releaseAssets = () => {
+      if (!live && ![...taskIds].some(id => markdownWork.uploads.has(id)))
+        assets.dispose();
+    };
     const repairImages = () => {
       for (const img of instance?.vditor.ir?.element.querySelectorAll("img") ??
         []) {
@@ -96,9 +100,9 @@ export function MarkdownEditor(props: Props) {
       echoes.current = [...echoes.current.slice(-7), value];
       latest.current.onChange(value);
     };
-    const addImages = async (files: File[], epoch: number) => {
+    const addImages = async (files: File[], cancelled: () => boolean) => {
       const saved = await Promise.all(files.map((file) => assets.upload(file)));
-      if ((markdownWork.epochs.get(uploadId.current) ?? 0) !== epoch) return;
+      if (cancelled()) return;
       const canonical = saved
         .map(
           (x, i) =>
@@ -121,7 +125,7 @@ export function MarkdownEditor(props: Props) {
         return;
       }
       const rendered = await assets.hydrate(canonical);
-      if ((markdownWork.epochs.get(uploadId.current) ?? 0) !== epoch) return;
+      if (cancelled()) return;
       if (!live) {
         appendToClosedEditor();
         return;
@@ -130,31 +134,12 @@ export function MarkdownEditor(props: Props) {
       changes();
     };
     const upload = (files: File[]) => {
-      const captured = [...files], epoch = markdownWork.epochs.get(uploadId.current) ?? 0;
-      const retry = async () => {
-        const task = addImages(captured, epoch);
-        jobs.current.add(task);
-        trackMarkdownWork(task);
-        try {
-          await task;
-          markdownWork.failures.delete(uploadId.current);
-          markdownWork.discarders.delete(uploadId.current);
-          if (live) setError("");
-        } catch (e) {
-          if ((markdownWork.epochs.get(uploadId.current) ?? 0) !== epoch) return;
-          markdownWork.failures.set(uploadId.current, retry);
-          markdownWork.discarders.set(uploadId.current, () => {
-            if (!live) assets.dispose();
-          });
-          if (live) setError(e instanceof Error ? e.message : "图片保存失败");
-          throw e;
-        } finally {
-          jobs.current.delete(task);
-          if (!live && !markdownWork.failures.has(uploadId.current))
-            assets.dispose();
-        }
-      };
-      return retry();
+      const captured = [...files];
+      const task = markdownWork.uploads.create(
+        uploadId.current, cancelled => addImages(captured, cancelled), releaseAssets,
+      );
+      taskIds.add(task.id);
+      return task.retry();
     };
     void (async () => {
       try {
@@ -252,9 +237,7 @@ export function MarkdownEditor(props: Props) {
       alive.current = false;
       editor.current = undefined;
       if (initialized) instance?.destroy();
-      void Promise.allSettled([...jobs.current]).then(() => {
-        if (!markdownWork.failures.has(uploadId.current)) assets.dispose();
-      });
+      releaseAssets();
     };
   }, [id]);
   useEffect(() => {
@@ -305,20 +288,19 @@ export function MarkdownEditor(props: Props) {
       onKeyDown={(e) => e.stopPropagation()}
     >
       <div id={id} ref={host} />
-      {!ready && !error && (
+      {!ready && !visibleError && (
         <span className="pp-markdown-editor__loading">载入中…</span>
       )}
-      {error && (
+      {visibleError && (
         <div className="pp-markdown-editor__error" role="status">
-          <span>{error}</span>
+          <span>{visibleError}</span>
           <IconButton
             icon="rotate"
             label="重试图片保存"
             size="md"
             onClick={() => {
-              const job = markdownWork.failures.get(uploadId.current);
-              if (job)
-                void job().catch((e) =>
+              if (failedUpload)
+                void failedUpload.retry().catch((e) =>
                   toast.show({ tone: "error", message: String(e) }),
                 );
             }}
@@ -328,10 +310,8 @@ export function MarkdownEditor(props: Props) {
             label="取消本次图片插入"
             size="md"
             onClick={() => {
-              markdownWork.discarders.get(uploadId.current)?.();
-              markdownWork.discarders.delete(uploadId.current);
-              markdownWork.failures.delete(uploadId.current);
-              setError("");
+              failedUpload?.cancel();
+              if (!failedUpload) setError("");
             }}
           />
         </div>
