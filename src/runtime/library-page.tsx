@@ -1,3 +1,5 @@
+import { ZoteroImportDialog } from '@/ui/library/ZoteroImportDialog';
+import { RestoreBackupDialog } from '@/ui/library/RestoreBackupDialog';
 import { useEffect, useState, useSyncExternalStore } from 'react';
 import { useLocalPreferences } from './use-local-preferences';
 import { LibraryView } from '@/ui/library/LibraryView';
@@ -32,6 +34,8 @@ const pending = (job: LibraryImportJob) => !['completed', 'failed', 'cancelled']
 export function LibraryPage({ owner }: { owner: Runtime }) {
   useLocalPreferences();
   const { service, imports } = owner;
+  const [zotero,setZotero]=useState<{mode:'import'|'export';ids:string[];folderId:string|null}>();
+  const [restoreOpen,setRestoreOpen]=useState(false);
   const snapshot = useSyncExternalStore(service.subscribe, service.getSnapshot);
   const jobs = useSyncExternalStore(imports.subscribe, imports.getSnapshot);
   const [exported, setExported] = useState<{ text: string; format: 'bibtex' | 'apa' | 'csv' }>();
@@ -118,9 +122,14 @@ export function LibraryPage({ owner }: { owner: Runtime }) {
           onRetry: id => { void imports.retry(id).catch(errorToast); },
           onPassword: (id, requestId, password) => { void imports.password(id, requestId, password).catch(errorToast); },
         }}
+        onImportZotero={folderId=>setZotero({mode:'import',ids:[],folderId})}
+        onExportZotero={ids=>setZotero({mode:'export',ids,folderId:null})}
+        onRestoreBackup={()=>setRestoreOpen(true)}
         onExportCitations={(ids, format) => { void exportSelected(ids, format); }}
       />}
     </div>
+    <ZoteroImportDialog open={!!zotero} mode={zotero?.mode??'import'} ids={zotero?.ids??[]} folderId={zotero?.folderId??null} folders={data.folders} onClose={()=>setZotero(undefined)} onDone={()=>void owner.refresh()}/>
+    <RestoreBackupDialog open={restoreOpen} onClose={()=>setRestoreOpen(false)} onDone={()=>void owner.refresh()}/>
     <Dialog open={!!exported} onClose={() => setExported(undefined)} title="引用已生成" description="浏览器未允许写入剪贴板，可下载后复制。"
       footer={<Button onClick={() => { if (exported) downloadFile(new Blob([exported.text], { type: 'text/plain;charset=utf-8' }), `Paperpane-citations.${exported.format === 'bibtex' ? 'bib' : 'txt'}`); }}>下载引用</Button>}>
       <pre style={{ whiteSpace: 'pre-wrap', maxHeight: '40vh', overflow: 'auto' }}>{exported?.text}</pre>

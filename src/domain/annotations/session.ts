@@ -36,7 +36,7 @@ export class AnnotationSession implements AnnotationService {
   private snapshot: Snapshot<SavedAnnotationState>;
   constructor(private db: AnnotationDatabase, readonly document: DocumentRef) {
     this.snapshot = { mode: 'live', state: 'loading', data: { document, items: [], layouts: [], pending: 0, hasDrafts: false } };
-    this.channel.onmessage = event => { if (event.data?.documentId === document.documentId) void this.queue.then(() => this.refresh()); };
+    this.channel.onmessage = event => { if (event.data?.type === 'restored' || event.data?.documentId === document.documentId) void this.queue.then(() => this.refresh()); };
     window.addEventListener('beforeunload', this.beforeUnload);
   }
   getSnapshot = () => this.snapshot;

@@ -31,7 +31,7 @@ try{
   await popup.getByText('当前在纸窗中',{exact:true}).waitFor();
   await popup.getByText('还没有最近阅读记录',{exact:true}).waitFor();
   await popup.getByText('还没有配置模型',{exact:true}).waitFor();
-  await popup.getByText('数据仅保存在本机，尚未接入同步',{exact:true}).waitFor();
+  await popup.getByText('数据仅保存在本机',{exact:true}).waitFor();
   const web=await context.newPage();await web.goto(base+'/links');
   await popup.getByRole('button',{name:'在纸窗中打开',exact:true}).waitFor();
   const created=context.waitForEvent('page');
@@ -68,18 +68,25 @@ try{
   },{chunk:modelUrl,base,kind});}
   await saveModel('configured');await popup.getByText('模型已配置 · Popup test model',{exact:true}).waitFor();
   await saveModel('no-default');await popup.getByText('模型已配置 · Popup test model',{exact:true}).waitFor();
-  await saveModel('sync');await popup.getByText('同步已配置，功能尚未接入',{exact:true}).waitFor();
+  await saveModel('sync');await popup.getByText('数据仅保存在本机',{exact:true}).waitFor();
   await popup.getByText('模型已配置 · Popup test model',{exact:true}).waitFor();
   assert.equal(apiRequests,0,'opening the popup must not send an API health-check or paid request');
   console.log('PASS: committed model settings, model fallback and honest sync capability update live');
 
   await popup.evaluate(()=>{globalThis.__failModelReads=true;const c=new BroadcastChannel('paperpane-model-settings');c.postMessage('changed');c.close();});
-  await popup.getByText('模型配置读取失败',{exact:true}).waitFor();await popup.getByText('同步配置读取失败',{exact:true}).waitFor();
+  await popup.getByText('模型配置读取失败',{exact:true}).waitFor();await popup.getByText('数据仅保存在本机',{exact:true}).waitFor();
   assert.equal(await popup.getByText('还没有配置模型',{exact:true}).count(),0);
   await popup.evaluate(()=>{globalThis.__failModelReads=false;const c=new BroadcastChannel('paperpane-model-settings');c.postMessage('changed');c.close();});
   await popup.getByText('模型已配置 · Popup test model',{exact:true}).waitFor();
   assert.equal(await popup.getByText('模型设置读取失败。',{exact:true}).count(),0);
   console.log('PASS: read failure is distinct from unconfigured and clears on recovery');
+  const syncState=async phase=>popup.evaluate(async phase=>{const db=await new Promise(ok=>{const r=indexedDB.open('paperpane');r.onsuccess=()=>ok(r.result);});await new Promise(ok=>{const tx=db.transaction('meta','readwrite'),s=tx.objectStore('meta');s.put({key:'transfer-connections',value:{dav:{url:'https://dav.test/',username:'fixture',hasPassword:true,automatic:false,conditional:true}}});s.put({key:'transfer-sync-state',value:{phase,lastSuccess:phase==='success'?new Date().toISOString():undefined}});tx.oncomplete=ok;});db.close();const c=new BroadcastChannel('paperpane-transfer');c.postMessage('changed');c.close();},phase);
+  await syncState('running');await popup.getByText('同步中…',{exact:true}).waitFor();
+  await syncState('success');await popup.getByText(/^已同步 · /).waitFor();
+  await syncState('failed');await popup.getByText('同步失败',{exact:true}).waitFor();
+  await popup.getByText('模型已配置 · Popup test model',{exact:true}).waitFor();
+  console.log('PASS: actual persisted sync running/success/failure update independently of model status');
+
 
   await popup.evaluate(()=>{
     const send=chrome.runtime.sendMessage.bind(chrome.runtime);

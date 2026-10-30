@@ -474,3 +474,11 @@
   color: var(--pp-text-2);
   font-size: var(--pp-text-sm);
 }
+
+.pp-transfer-fields { display:grid; grid-template-columns:1fr 1fr; gap:16px; }
+.pp-transfer-compare { display:grid; grid-template-columns:1fr 1fr; gap:16px; }
+.pp-transfer-compare section { min-width:0; }
+.pp-transfer-compare pre { white-space:pre-wrap; overflow-wrap:anywhere; max-height:320px; overflow:auto; font-size:12px; }
+@media(max-width:600px){.pp-transfer-fields,.pp-transfer-compare{grid-template-columns:1fr}}
+
+.pp-transfer-actions{display:flex;gap:8px;padding:12px 0;}

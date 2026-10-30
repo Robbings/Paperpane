@@ -104,7 +104,7 @@ export class ResearchService implements ConversationService {
     this.preferences = preferences;
     this.key = `ai-v1:${ref.documentId}:${ref.fileVersion}`;
     this.channel.onmessage = (event) => {
-      if (event.data?.key === this.key) void this.reload();
+      if (event.data?.type === 'restored' || event.data?.key === this.key) void this.reload();
     };
   }
   subscribe = (f: () => void) => {

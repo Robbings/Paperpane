@@ -1,3 +1,6 @@
+import { ZoteroSection } from './sections/ZoteroSection';
+import { SyncSection } from './sections/SyncSection';
+import { BackupSection } from './sections/BackupSection';
 import { ModelsSection } from './sections/ModelsSection';
 import { TranslationSection } from './sections/TranslationSection';
 import { useEffect, useMemo, useRef, useState } from 'react';
@@ -213,6 +216,8 @@ export function SettingsView(props: SettingsViewProps) {
               <ModelsSection draft={draft} onChange={edit} />
             ) : section === 'features' ? (
               <TranslationSection draft={draft} onChange={edit} preferences={props.preferences.preferences} onPreference={props.onPreference} />
+            ) : section === 'sync' ? (
+              <><SyncSection/><BackupSection/><ZoteroSection/></>
             ) : section === 'advanced' ? (
               <AdvancedSection runtime={draft.runtime} onChange={(runtime) => edit({ ...draft, runtime })} problems={problems} />
             ) : (

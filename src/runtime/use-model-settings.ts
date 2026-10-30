@@ -1,3 +1,4 @@
+import { useSync } from './use-sync';
 import { useEffect, useRef, useState } from 'react';
 import { ModelSettingsStore, emptySettings } from '@/data/model-settings';
 import { requestImportOrigin } from '@/document/permissions';
@@ -29,6 +30,7 @@ export function useModelSettings(){
     catch{return {ok:false,reason:'invalid',problems:[{path:'endpoints',message:'请检查模型接口地址。'}]};}
     const session=owner.current,db=new ModelSettingsStore();try{const result=await db.save(draft,revision);if(result.ok){if(session?.active){++session.epoch;setSettings(result.value);setError(undefined);setPhase('ready');}const c=new BroadcastChannel('paperpane-model-settings');c.postMessage('saved');c.close();}return result;}catch{return {ok:false,reason:'save-failed',message:'配置保存失败。'};}finally{await db.close();}
   };
-  const status=deriveSettingsStatus(settings,phase);
+  const sync=useSync();
+  const status={...deriveSettingsStatus(settings,phase),...sync.status};
   return {settings,save,status,error,loading:phase==='loading'};
 }
