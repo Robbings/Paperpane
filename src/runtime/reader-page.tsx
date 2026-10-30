@@ -19,7 +19,10 @@ export function LiveReaderPage() {
   const [owner,setOwner] = useState<ReaderController>();
   const [,redraw] = useState(0);
   const [password,setPassword] = useState('');
-  const [openFiles,setOpenFiles] = useState(() => ['file', 'import'].includes(new URLSearchParams(location.search).get('open') ?? ''));
+  const [openFiles,setOpenFiles] = useState(() => {
+    const params = new URLSearchParams(location.search);
+    return params.get('open') === 'import' || (params.get('open') === 'file' && !params.get('documentId') && !params.get('item') && !params.has('import'));
+  });
   useEffect(() => {
     const url = new URL(location.href);
     if (url.searchParams.get('open') === 'import') { url.searchParams.delete('open'); history.replaceState(null, '', url); }

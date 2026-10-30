@@ -73,8 +73,9 @@ export class ReaderController {
     if (this.started) return;
     this.started = true;
     const params = new URLSearchParams(location.search);
+    const id = params.get('documentId') ?? params.get('item');
     try { const original = params.get('originalPdf'); if (original) this.originalPdfUrl = pdfSourceUrl(original); } catch { /* Ignore an invalid source hint. */ }
-    if (params.get('open') === 'file') return;
+    if (params.get('open') === 'file' && !id && !params.has('import')) return;
     const external = params.get('import');
     if (external !== null) {
       try {
@@ -84,7 +85,6 @@ export class ReaderController {
       } catch (error) { this.report(error instanceof Error ? error.message : '论文链接无效。'); }
       return;
     }
-    const id = params.get('documentId') ?? params.get('item');
     if (id) await this.open(id);
     else { const docs = await this.db.list().catch(() => []); if (!this.disposed && docs[0]) await this.open(docs[0].id); }
   }
@@ -176,7 +176,7 @@ export class ReaderController {
       const annotations = this.annotations;
       this.unsubscribeAnnotations = annotations.subscribe(() => { this.reader.setAnnotations(annotations.getSnapshot().data.items); this.update(); });
       this.restoring = true;
-      const url = new URL(location.href); url.searchParams.delete('item'); url.searchParams.delete('import'); url.searchParams.delete('source'); url.searchParams.set('documentId', doc.id);
+      const url = new URL(location.href); url.searchParams.delete('open'); url.searchParams.delete('item'); url.searchParams.delete('import'); url.searchParams.delete('source'); url.searchParams.set('documentId', doc.id);
       if (this.originalPdfUrl) url.searchParams.set('originalPdf', this.originalPdfUrl); else url.searchParams.delete('originalPdf');
       history.replaceState(null, '', url);
       this.externalImport = undefined;

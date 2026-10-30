@@ -76,6 +76,26 @@ try {
   assert.equal(await fallback.getByRole('button',{name:'返回原 PDF',exact:true}).count(),0);
   console.log('PASS: local fallback does not inherit an unrelated failed source');
 
+  const picker = await context.newPage(); await picker.goto(root+'/reader.html?open=file');
+  await picker.getByRole('dialog',{name:'打开论文',exact:true}).waitFor();
+  assert.equal(await picker.locator('.textLayer span').count(),0,'file picker must not reopen a previous paper');
+  await picker.getByRole('button',{name:'导入本地 PDF',exact:true}).click();
+  await picker.locator('input[type="file"]').setInputFiles({name:'picker.pdf',mimeType:'application/pdf',buffer:pdf});
+  await rendered(picker);
+  assert.equal(new URL(picker.url()).searchParams.has('open'),false,'completed import consumes the one-shot picker flag');
+  const pickedId = new URL(picker.url()).searchParams.get('documentId');
+  await picker.reload(); await rendered(picker);
+  assert.equal(new URL(picker.url()).searchParams.get('documentId'),pickedId);
+  assert.equal(await picker.getByRole('dialog',{name:'打开论文',exact:true}).count(),0);
+  for (const key of ['documentId','item']) {
+    await picker.goto(root+'/reader.html?open=file&'+key+'='+encodeURIComponent(pickedId));
+    await rendered(picker);
+    assert.equal(new URL(picker.url()).searchParams.has('open'),false,'old bookmarked picker URLs reopen their saved paper');
+    assert.equal(await picker.getByRole('dialog',{name:'打开论文',exact:true}).count(),0);
+  }
+  await picker.close();
+  console.log('PASS: file-picker import survives refresh and legacy document links without reopening the picker');
+
   await auto.click();
   await settings.waitForFunction(async()=> (await chrome.storage.local.get('browserEntry')).browserEntry?.autoOpenPdf===true);
   const direct = await context.newPage();
