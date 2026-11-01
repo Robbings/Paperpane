@@ -6,7 +6,9 @@ export async function requestImportOrigin(rawUrl: string): Promise<boolean> {
   // A web preview uses normal CORS. Installed extensions use explicit host grants.
   if (!browser.runtime?.id) return true;
   // Match patterns do not include ports. Only this protocol and hostname are requested.
-  return browser.permissions.request({ origins: [`${url.protocol}//${url.hostname}/*`] });
+  const permissions = { origins: [`${url.protocol}//${url.hostname}/*`] };
+  if (await browser.permissions.contains(permissions)) return true;
+  return browser.permissions.request(permissions);
 }
 export async function hasImportOrigin(rawUrl: string): Promise<boolean> {
   const url = parseSourceUrl(rawUrl);

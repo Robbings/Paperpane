@@ -1,0 +1,12 @@
+import test from 'node:test';
+import assert from 'node:assert/strict';
+import {build} from 'esbuild';
+import {mkdir} from 'node:fs/promises';
+import {resolve} from 'node:path';
+import {pathToFileURL} from 'node:url';
+await mkdir('backups/tests',{recursive:true});
+const output=resolve('backups/tests/extension-permissions.mjs');
+await build({stdin:{contents:"export {default as config} from './wxt.config.ts';export * from './src/document/permissions.ts';",resolveDir:process.cwd()},outfile:output,bundle:true,platform:'node',format:'esm',plugins:[{name:'browser-mock',setup(b){b.onResolve({filter:/^wxt(?:\/browser)?$/},a=>({path:a.path,namespace:'mock'}));b.onLoad({filter:/.*/,namespace:'mock'},a=>({contents:a.path==='wxt'?'export const defineConfig=x=>x':'export const browser={runtime:{id:"test"},permissions:{contains:x=>globalThis.permissionApi.contains(x),request:x=>globalThis.permissionApi.request(x)}}'}));}}]});
+const {config,requestImportOrigin}=await import(pathToFileURL(output));
+test('必需与可选主机权限不重复，并保持网页 PDF 识别所需主机权限',()=>{const m=config.manifest;assert.ok(m.host_permissions.includes('https://*/*'));assert.ok(m.host_permissions.includes('http://*/*'));assert.deepEqual((m.optional_host_permissions??[]).filter(p=>m.host_permissions.includes(p)),[]);});
+test('已有主机权限不再次请求；未授权时才申请，并传播拒绝结果',async()=>{let requested=0;globalThis.permissionApi={contains:async()=>true,request:async()=>{requested++;return false;}};assert.equal(await requestImportOrigin('https://api.zotero.org/'),true);assert.equal(requested,0);globalThis.permissionApi.contains=async()=>false;assert.equal(await requestImportOrigin('https://api.zotero.org/'),false);assert.equal(requested,1);});

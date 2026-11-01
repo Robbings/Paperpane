@@ -30,6 +30,8 @@ interface LibraryToolbarProps {
   onImport: (kind: ImportKind, files: File[]) => void;
   /** Adds "从网址导入 PDF…" to the import menu. */
   onImportUrl?: () => void;
+  onImportZotero?: () => void;
+  onRestoreBackup?: () => void;
   /** The import queue's button, shown while there are jobs. */
   tasks?: { ref: RefObject<HTMLButtonElement | null>; active: number; failed: number; open: boolean; onToggle: () => void };
   sidebarOpen: boolean;
@@ -73,6 +75,8 @@ export function LibraryToolbar(props: LibraryToolbarProps) {
   const importEntries: MenuEntry[] = [
     { id: 'pdf', label: '导入 PDF 文件…', icon: 'file' },
     ...(props.onImportUrl ? [{ id: 'url', label: '从网址导入 PDF…', icon: 'link' } as MenuEntry] : []),
+    ...(props.onImportZotero?[{id:'zotero',label:'从 Zotero 导入…',icon:'library'} as MenuEntry]:[]),
+    ...(props.onRestoreBackup?[{id:'restore-backup',label:'恢复备份…',icon:'file'} as MenuEntry]:[]),
     { kind: 'separator', id: 'sep-bib' },
     { id: 'csl', label: '导入 CSL JSON 书目…', icon: 'quote' },
     { id: 'bibtex', label: '导入 BibTeX 书目…', icon: 'quote' },
@@ -214,6 +218,8 @@ export function LibraryToolbar(props: LibraryToolbarProps) {
           align="end"
           triggerRef={importRef}
           onSelect={(id) => {
+            if(id==='zotero'){props.onImportZotero?.();return;}
+            if(id==='restore-backup'){props.onRestoreBackup?.();return;}
             if (id === 'url') {
               props.onImportUrl?.();
               return;

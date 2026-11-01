@@ -1081,3 +1081,12 @@ td[data-column='starred'] .pp-lib-cell-center {
   color: var(--pp-text-2);
   font-size: var(--pp-text-sm);
 }
+
+.pp-zotero-picker { display:grid; grid-template-columns:minmax(130px,1fr) minmax(0,2fr); gap:16px; min-height:240px; }
+.pp-zotero-picker aside,.pp-zotero-picker section { min-width:0; max-height:52vh; overflow:auto; }
+.pp-zotero-item { padding:10px 0; border-bottom:1px solid var(--pp-hairline); }
+.pp-zotero-item > span { color:var(--pp-text-3); font-size:var(--pp-text-xs); }
+.pp-zotero-pagination { display:flex; align-items:center; gap:8px; padding-top:12px; font-size:var(--pp-text-xs); }
+.pp-zotero-results { max-height:180px; overflow:auto; padding-left:20px; font-size:var(--pp-text-sm); }
+.pp-zotero-results li[data-failed=true] { color:var(--pp-danger,#bf4444); }
+@media(max-width:500px){.pp-zotero-picker{grid-template-columns:1fr}.pp-zotero-picker aside{max-height:150px}}

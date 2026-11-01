@@ -1,0 +1,5 @@
+import test from 'node:test';import assert from 'node:assert/strict';
+import {WebDavClient} from '../src/sync/webdav-client.ts';
+test('WebDAV 请求限定路径和重定向，不向跳转主机泄露凭据',async()=>{let request;const client=new WebDavClient({url:'https://dav.test/root/',username:'用户',password:'密钥'},async(url,options)=>{request={url:String(url),options};return new Response('hello',{headers:{ETag:'"v1"'}})});const result=await client.get('paperpane/manifest.json');assert.equal(result.etag,'"v1"');assert.equal(request.options.redirect,'error');assert.match(request.options.headers.get('Authorization'),/^Basic /);await assert.rejects(()=>client.get('../zotero/file'));});
+test('WebDAV 条件写入显式报告版本冲突',async()=>{const client=new WebDavClient({url:'https://dav.test/',username:'u',password:'p'},async()=>new Response('',{status:412}));await assert.rejects(()=>client.put('paperpane/manifest.json','{}','"old"'),e=>e.status===412);});
+test('不允许凭据写在地址中或非本机明文 HTTP',()=>{assert.throws(()=>new WebDavClient({url:'https://u:p@dav.test/',username:'',password:''}));assert.throws(()=>new WebDavClient({url:'http://dav.test/',username:'',password:''}));});

@@ -1,9 +1,13 @@
 import { DEFAULT_LAYOUT_ENGINE } from './engines';
+import { browser } from 'wxt/browser';
 import type { LayoutRegion } from './types';
 let worker:SharedWorker|undefined;
 const pending=new Map<string,{resolve:(r:LayoutRegion[])=>void;reject:(e:Error)=>void;cleanup:()=>void}>();
 function connection(){if(worker)return worker;
- worker=new SharedWorker(new URL('./inference.worker.ts',import.meta.url),{type:'module',name:'paperpane-layout-v1'});const port=worker.port;
+ // A Vite module URL points at localhost during development. Chrome terminates
+ // an extension renderer for that cross-origin SharedWorker before onerror runs.
+ const url=browser.runtime.getURL('/layout-inference.js');
+ worker=new SharedWorker(url,{type:'module',name:'paperpane-layout-v1'});const port=worker.port;
  port.onmessage=({data})=>{if(data.idle){port.close();worker=undefined;return;}const task=pending.get(data.id);if(task){pending.delete(data.id);task.cleanup();data.error?task.reject(new Error(data.error)):task.resolve(data.regions);}};
  worker.onerror=()=>{for(const task of pending.values()){task.cleanup();task.reject(new Error('版面识别暂不可用，请重新打开论文重试'));}pending.clear();port.close();worker=undefined;};port.start();return worker;
 }

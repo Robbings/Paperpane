@@ -1,10 +1,9 @@
 /// <reference lib="webworker" />
-import wasmUrl from 'onnxruntime-web/ort-wasm-simd-threaded.wasm?url';
-import mjsUrl from 'onnxruntime-web/ort-wasm-simd-threaded.mjs?url';
 import * as ort from 'onnxruntime-web/wasm';
-const scope=self as unknown as SharedWorkerGlobalScope;
-ort.env.wasm.numThreads=1;ort.env.wasm.wasmPaths={mjs:mjsUrl,wasm:wasmUrl};ort.env.logLevel='error';
 import { ENGINES,decodeLayout,type LayoutEngineId } from './engines';
+export function installLayoutWorker(){
+const scope=self as unknown as SharedWorkerGlobalScope;
+ort.env.wasm.numThreads=1;ort.env.wasm.wasmPaths={mjs:new URL('/runtime/ort-wasm-simd-threaded.mjs',self.location.href).href,wasm:new URL('/runtime/ort-wasm-simd-threaded.wasm',self.location.href).href};ort.env.logLevel='error';
 let selected:LayoutEngineId|undefined;
 let session:ort.InferenceSession|undefined,tail=Promise.resolve(),timer:ReturnType<typeof setTimeout>;
 const ports=new Set<MessagePort>(),cancelled=new Set<string>();let tasks=0;
@@ -36,3 +35,5 @@ scope.onconnect=(event:MessageEvent)=>{const port=event.ports[0]!;ports.add(port
   if(!cancelled.has(id))port.postMessage({id,regions});
  }catch(e){port.postMessage({id,error:e instanceof Error?e.message:String(e)});}finally{cancelled.delete(id);tasks--;idle();}});
 };idle();};
+
+}
