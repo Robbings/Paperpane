@@ -215,3 +215,23 @@
     justify-self: end;
   }
 }
+
+/* A model whose capabilities are defaults, not looked up. */
+.pp-model-guessed {
+  margin: 0;
+  padding: 8px 10px;
+  border-radius: var(--pp-radius-control);
+  background: color-mix(in srgb, var(--pp-warn) 12%, transparent);
+  color: var(--pp-text);
+  font-size: var(--pp-text-sm);
+  line-height: var(--pp-leading-body);
+}
+
+.pp-model-guess-tag {
+  padding: 1px 6px;
+  border-radius: var(--pp-radius-pill);
+  background: color-mix(in srgb, var(--pp-warn) 14%, transparent);
+  color: var(--pp-warn);
+  font-size: var(--pp-text-xs);
+  white-space: nowrap;
+}

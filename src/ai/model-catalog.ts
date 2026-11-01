@@ -19,6 +19,8 @@ export interface CatalogModel {
   maxOutputTokens?: number;
   status?: string;
   releaseDate?: string;
+  /** Some facts are defaults, not looked up: the reader should check them. */
+  guessed?: boolean;
 }
 export interface Catalog {
   updatedAt: string;
@@ -50,6 +52,7 @@ export function newModel(
     inputLimit: item.inputLimit,
     maxOutputTokens: item.maxOutputTokens,
     showInDiscussion: true,
+    ...(item.guessed ? { capabilitiesGuessed: true } : {}),
     metadataSource: item.provider ? "catalog" : "endpoint",
     ...(item.provider
       ? {
@@ -155,4 +158,58 @@ export function parseCatalog(data: unknown): Catalog {
   }
   if (!models.length) throw new Error("目录没有可用的文字模型，保留现有目录。");
   return { updatedAt: new Date().toISOString(), models };
+}
+
+/** Context assumed for a model nobody could describe: a common size that suits most current models. */
+export const DEFAULT_CONTEXT_WINDOW = 128_000;
+
+/** "openai/gpt-4o-2024-08-06:free" → "gpt-4o": the part that names the model across hosts. */
+export function normalizeModelId(id: string): string {
+  return id
+    .trim()
+    .toLowerCase()
+    .replace(/^.*\//, "")
+    .replace(/:.*$/, "")
+    .replace(/-(\d{4}-\d{2}-\d{2}|\d{8}|\d{4}|latest)$/, "");
+}
+
+/** Whether the item still misses a fact the reader would otherwise have to fill in. */
+export function missingFacts(item: CatalogModel): boolean {
+  return item.vision === undefined || item.contextWindow === undefined || item.reasoning.kind === "unknown";
+}
+
+/**
+ * The catalog entry for a model id served by any host (relays, proxies). Exact ids
+ * first, then the normalised name. When several match, the smallest context wins:
+ * hosts often offer a model at more than one size, and the smaller one is safe.
+ */
+export function matchCatalog(catalog: Catalog, modelId: string): CatalogModel | undefined {
+  const exact = catalog.models.filter((m) => m.modelId.toLowerCase() === modelId.trim().toLowerCase());
+  const key = normalizeModelId(modelId);
+  const candidates = exact.length ? exact : catalog.models.filter((m) => normalizeModelId(m.modelId) === key);
+  return candidates.sort((a, b) => (a.contextWindow ?? Infinity) - (b.contextWindow ?? Infinity))[0];
+}
+
+/** Fills what is still unknown from another description of the same model, keeping what is known. */
+export function mergeFacts(item: CatalogModel, from: Partial<CatalogModel>): CatalogModel {
+  return {
+    ...item,
+    vision: item.vision ?? from.vision,
+    contextWindow: item.contextWindow ?? from.contextWindow,
+    inputLimit: item.inputLimit ?? from.inputLimit,
+    maxOutputTokens: item.maxOutputTokens ?? from.maxOutputTokens,
+    reasoning: item.reasoning.kind === "unknown" && from.reasoning ? from.reasoning : item.reasoning,
+  };
+}
+
+/** Last resort: automatic thinking, image input on, a common context size; marked for the reader to check. */
+export function withDefaultFacts(item: CatalogModel): CatalogModel {
+  if (!missingFacts(item)) return item;
+  return {
+    ...item,
+    vision: item.vision ?? true,
+    contextWindow: item.contextWindow ?? DEFAULT_CONTEXT_WINDOW,
+    reasoning: item.reasoning.kind === "unknown" ? { kind: "auto" } : item.reasoning,
+    guessed: true,
+  };
 }

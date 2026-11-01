@@ -54,7 +54,7 @@ interface StatusLineProps {
 /** Save, sync and model state in two short lines; shared by the settings page, quick settings and the popup. */
 export function StatusLine({ status, onOpen, inline, className }: StatusLineProps) {
   const lines: { key: SettingsSection; text: string; tone: Tone }[] = [];
-  if (status.local === 'failed') lines.push({ key: 'privacy', text: '有内容没能保存到本机', tone: 'danger' });
+  if (status.local === 'failed') lines.push({ key: 'general', text: '有内容没能保存到本机', tone: 'danger' });
   lines.push({ key: 'sync', ...syncLine(status) }, { key: 'models', ...modelLine(status) });
   return (
     <ul className={className ? `pp-statusline ${className}` : 'pp-statusline'} data-inline={inline ? 'true' : undefined} aria-label="状态">

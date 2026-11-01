@@ -3,7 +3,12 @@ import { requestImportOrigin } from "@/document/permissions";
 import { discoverModels, readJson } from "@/ai/model-discovery";
 import {
   bundledCatalog,
+  matchCatalog,
+  mergeFacts,
+  missingFacts,
+  normalizeModelId,
   parseCatalog,
+  withDefaultFacts,
   presets,
   type Catalog,
   type CatalogModel,
@@ -125,6 +130,7 @@ export async function testConfiguredModel(
         hasKey: hadKey,
       })),
       sync: { ...draft.sync, hasPassword: draft.sync.hadPassword },
+      translationApis: draft.translationApis.map(({ secret, hadSecret, ...api }) => ({ ...api, hasSecret: hadSecret })),
       runtime: {
         ...draft.runtime,
         maxOutputTokens: Math.min(
@@ -196,4 +202,68 @@ function makeTestImage() {
   ctx.fillStyle = "#ff0000";
   ctx.fillRect(0, 0, 64, 64);
   return canvas.toDataURL("image/png");
+}
+
+const routerKey = "paperpane-openrouter-models-v1";
+const ROUTER_URL = "https://openrouter.ai/api/v1/models";
+type RouterFacts = Pick<CatalogModel, "vision" | "contextWindow" | "reasoning">;
+
+/** OpenRouter's public model list (no key): context, image input and thinking support by model. Cached for a day. */
+async function routerFacts(signal: AbortSignal): Promise<Map<string, RouterFacts>> {
+  let rows: unknown;
+  try {
+    const cached = JSON.parse(localStorage.getItem(routerKey) ?? "null");
+    if (cached && Date.now() - cached.at < 86_400_000) rows = cached.rows;
+  } catch {}
+  if (!rows) {
+    if (!(await requestImportOrigin(ROUTER_URL))) throw new Error("未获得模型资料查询的访问权限。");
+    const response = await fetch(ROUTER_URL, { credentials: "omit", redirect: "error", signal: AbortSignal.any([signal, AbortSignal.timeout(20000)]) });
+    rows = ((await readJson(response, 20_000_000)) as { data?: unknown })?.data;
+    if (!Array.isArray(rows)) throw new Error("模型资料格式不正确。");
+    try {
+      localStorage.setItem(routerKey, JSON.stringify({ at: Date.now(), rows }));
+    } catch {}
+  }
+  const facts = new Map<string, RouterFacts>();
+  for (const row of rows as any[]) {
+    if (!row || typeof row.id !== "string") continue;
+    const key = normalizeModelId(row.id);
+    const context = Number.isInteger(row.context_length) && row.context_length > 0 ? row.context_length : undefined;
+    const inputs: unknown[] = Array.isArray(row.architecture?.input_modalities) ? row.architecture.input_modalities : [];
+    const params: unknown[] = Array.isArray(row.supported_parameters) ? row.supported_parameters : [];
+    const next: RouterFacts = {
+      vision: inputs.length ? inputs.includes("image") : undefined,
+      contextWindow: context,
+      reasoning: params.length ? (params.includes("reasoning") ? { kind: "auto" } : { kind: "none" }) : { kind: "unknown" },
+    };
+    const known = facts.get(key);
+    // The same model on several routes: keep the smaller context.
+    if (!known || (next.contextWindow ?? Infinity) < (known.contextWindow ?? Infinity)) facts.set(key, next);
+  }
+  return facts;
+}
+
+/**
+ * Looks up what a model can do before it is added: the models.dev catalog under
+ * any provider, then OpenRouter's public list, then defaults (marked for review).
+ * Lookups that fail fall through to the defaults instead of blocking the add.
+ */
+export async function completeCapabilities(items: CatalogModel[], catalog: Catalog, signal: AbortSignal): Promise<CatalogModel[]> {
+  let completed = items.map((item) => {
+    if (!missingFacts(item)) return item;
+    const match = matchCatalog(catalog, item.modelId);
+    return match ? mergeFacts(item, match) : item;
+  });
+  if (completed.some(missingFacts)) {
+    try {
+      const facts = await routerFacts(signal);
+      completed = completed.map((item) => {
+        const found = missingFacts(item) ? facts.get(normalizeModelId(item.modelId)) : undefined;
+        return found ? mergeFacts(item, found) : item;
+      });
+    } catch (error) {
+      if (signal.aborted) throw error;
+    }
+  }
+  return completed.map(withDefaultFacts);
 }

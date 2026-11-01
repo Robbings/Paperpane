@@ -46,7 +46,7 @@ export function SelectionBarSettings({ value, onChange }: SelectionBarSettingsPr
   const currentLook = looks.find((l) => l.look === value.look) ?? looks[0]!;
 
   return (
-    <SettingGroup title="选中文字后的浮动条" description="选择要显示的内容，拖动调整顺序。改动立即生效。">
+    <SettingGroup title="选中文字后的浮动条" hint="拖动左侧把手调整顺序">
       <div className="pp-set-selbar">
         <div className="pp-set-selbar__preview" aria-hidden="true" inert>
           <SelectionMenu label="预览" actions={actions} look={value.look} layout={visible} />

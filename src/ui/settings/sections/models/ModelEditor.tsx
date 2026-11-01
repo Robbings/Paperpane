@@ -87,6 +87,8 @@ export function ModelEditor({
                 }
                 onSave({
                   ...value,
+                  // Finishing the details counts as checking the defaults.
+                  capabilitiesGuessed: undefined,
                   modelId: value.modelId.trim(),
                   label: value.label.trim() || value.modelId.trim(),
                 });
@@ -98,6 +100,11 @@ export function ModelEditor({
         }
       >
         <div className="pp-model-editor-fields">
+          {value.capabilitiesGuessed && (
+            <p className="pp-model-guessed" role="note">
+              没查到这个模型的资料，图片、思考和上下文是默认值，请按服务商说明核对。
+            </p>
+          )}
           <TextField
             label="显示名称"
             value={value.label}
@@ -143,7 +150,7 @@ export function ModelEditor({
             <TextField
               label="可用思考档位"
               value={value.reasoning.values.join(", ")}
-              description="按服务商支持的值填写，用逗号分隔。"
+              placeholder="low, medium, high"
               onChange={(v) =>
                 edit({
                   reasoning: {
@@ -215,15 +222,8 @@ export function ModelEditor({
           {numeric("contextWindow", "上下文容量（tokens）")}
           {numeric("inputLimit", "输入上限（tokens）")}
           {numeric("maxOutputTokens", "最大输出（tokens）")}
-          {!value.contextWindow && (
-            <p className="pp-model-caption">
-              容量未知时，暂按 8K
-              预算组织内容，可能使用检索或分块。请按服务商资料确认。
-            </p>
-          )}
           <Switch
             label="在讨论模型选择器中显示"
-            description="默认模型及已被会话使用的模型会继续显示，避免中断现有会话。"
             checked={value.showInDiscussion}
             onChange={(showInDiscussion) => edit({ showInDiscussion })}
           />
@@ -287,7 +287,6 @@ export function ModelEditor({
                 恢复目录建议
               </Button>
             )}
-            <p>手动修改优先于目录更新；“完成”更新页面草稿，保存后生效。</p>
           </div>
           {error && <p role="alert">{error}</p>}
         </div>

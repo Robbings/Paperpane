@@ -31,6 +31,7 @@ function valid<K extends keyof Preferences>(key: K, value: unknown): value is Pr
       return typeof value === 'number' && Number.isInteger(value) && value >= FONT_SIZE.min && value <= FONT_SIZE.max;
     case 'mathDelimiter':
       return value === 'brackets' || value === 'dollars' || value === 'none';
+    case 'autoTranslate': return value === 'off' || value === 'on-add' || value === 'on-open';
     case 'selectionBar': {
       if (typeof value !== 'object' || value === null) return false;
       const bar = value as { order?: unknown; hidden?: unknown; look?: unknown };

@@ -53,6 +53,8 @@ export interface Preferences {
   mathDelimiter: 'brackets' | 'dollars' | 'none';
   /** The bar over selected text and highlights: what it shows, in what order, and how. */
   selectionBar: SelectionBarPrefs;
+  /** When a paper is translated without being asked: never, when it is added to the library, or whenever it is opened. */
+  autoTranslate: 'off' | 'on-add' | 'on-open';
 }
 
 export interface PreferencesState {
@@ -78,6 +80,7 @@ export const DEFAULT_PREFERENCES: Preferences = {
   translationFontSize: null,
   mathDelimiter: 'brackets',
   selectionBar: DEFAULT_SELECTION_BAR,
+  autoTranslate: 'off',
 };
 
 export const UI_SCALE = { min: 80, max: 150, default: 100, step: 10 } as const;
@@ -132,10 +135,12 @@ export interface ModelConfigView {
   vision: boolean;
   reasoning: ReasoningCapability;
   showInDiscussion: boolean;
+  /** Capabilities could not be looked up and are defaults: the reader should check them. */
+  capabilitiesGuessed?: boolean;
 }
 
 /** AI features. "ai-highlight" is the AI's own marking, not the toolbar's highlight-on-select tool. */
-export type FeatureId = 'translate' | 'explain' | 'discuss' | 'overview' | 'ai-highlight' | 'cite';
+export type FeatureId = 'translate' | 'explain' | 'discuss' | 'overview' | 'vision' | 'ai-highlight' | 'cite';
 
 export interface FeatureRouteView {
   feature: FeatureId;
@@ -163,7 +168,49 @@ export interface RuntimeConfig {
   maxOutputTokens: number | null;
   /** LLM translation only. Missing values use conservative defaults. */
   translation?: { batchSentences: number; batchCharacters: number; requestsPerMinute: number };
+  /** Machine translation APIs. Missing values use the defaults in MACHINE_TRANSLATION_DEFAULTS. */
+  machineTranslation?: MachineTranslationConfig;
 }
+
+export interface MachineTranslationConfig {
+  /** Requests at once, 1–12. */
+  concurrency: number;
+  /** Per translation task, including retries. */
+  requestsPerMinute: number;
+  /** Characters per request; each service also has its own ceiling. */
+  maxCharacters: number;
+  /** Formulas, citation numbers and URLs are kept out of the text sent and put back afterwards. */
+  protectSpans: boolean;
+  /** Use a glossary when the service supports one (DeepL, Google Cloud, Microsoft). */
+  useGlossary: boolean;
+}
+
+export const MACHINE_TRANSLATION_DEFAULTS: MachineTranslationConfig = {
+  concurrency: 3,
+  requestsPerMinute: 60,
+  maxCharacters: 4500,
+  protectSpans: true,
+  useGlossary: true,
+};
+
+/** A machine translation service (not a language model). Credentials are never read back. */
+export interface TranslationApiView {
+  id: string;
+  /** Which service; its fields and limits come from the machine translation catalog. */
+  kind: string;
+  name: string;
+  /** Non-secret options by field key, e.g. region or plan. */
+  options: Readonly<Record<string, string>>;
+  hasSecret: boolean;
+}
+export interface TranslationApiDraft extends Omit<TranslationApiView, 'hasSecret'> {
+  hadSecret: boolean;
+  /** replace carries all secret fields of the service as JSON. */
+  secret: SecretEdit;
+}
+
+/** What translates papers: a language model (the translate route's model), or a machine translation API. */
+export type TranslationEngineChoice = { kind: 'llm' } | { kind: 'machine'; apiId: string };
 
 export interface SyncConfigView {
   enabled: boolean;
@@ -186,12 +233,15 @@ export interface SettingsView {
   prompts: readonly PromptProfileView[];
   runtime: RuntimeConfig;
   sync: SyncConfigView;
+  translationApis?: readonly TranslationApiView[];
+  translationEngine?: TranslationEngineChoice;
 }
 
 /** What the settings page edits: the snapshot with secrets as edits. */
-export interface SettingsDraft extends Omit<SettingsView, 'revision' | 'endpoints' | 'sync'> {
+export interface SettingsDraft extends Omit<SettingsView, 'revision' | 'endpoints' | 'sync' | 'translationApis'> {
   endpoints: EndpointDraft[];
   sync: SyncConfigDraft;
+  translationApis: TranslationApiDraft[];
 }
 
 export interface SettingsProblem {
@@ -224,15 +274,24 @@ export interface StatusSummary {
   syncMessage?: string;
 }
 
-export type SettingsSection = 'general' | 'models' | 'features' | 'sync' | 'advanced' | 'privacy';
+export type SettingsSection = 'general' | 'models' | 'translation' | 'sync';
+
+/** Old addresses (#features, #advanced, #privacy) land on the section that took them over. */
+export function sectionFromHash(hash: string): SettingsSection {
+  const id = hash.replace(/^#/, '');
+  if (id === 'features') return 'translation';
+  if (id === 'advanced') return 'models';
+  return id === 'general' || id === 'models' || id === 'translation' || id === 'sync' ? id : 'general';
+}
 
 /** Turns a saved snapshot into an editable draft: every secret starts as "keep". */
 export function toDraft(view: SettingsView): SettingsDraft {
-  const { revision: _revision, endpoints, sync, ...rest } = view;
+  const { revision: _revision, endpoints, sync, translationApis, ...rest } = view;
   const { hasPassword, ...syncRest } = sync;
   return {
     ...rest,
     endpoints: endpoints.map(({ hasKey, ...endpoint }) => ({ ...endpoint, hadKey: hasKey, key: { kind: 'keep' } })),
+    translationApis: (translationApis ?? []).map(({ hasSecret, ...api }) => ({ ...api, hadSecret: hasSecret, secret: { kind: 'keep' } })),
     sync: { ...syncRest, hadPassword: hasPassword, password: { kind: 'keep' } },
   };
 }
