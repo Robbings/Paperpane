@@ -23,6 +23,28 @@ export class ZoteroClient {
     const params=new URLSearchParams({limit:'50',start:String(Math.max(0,query.start??0)),sort:'title',direction:'asc'});if(query.text)params.set('q',query.text);
     const path=query.collection?`/collections/${query.collection}/items/top`:'/items/top';const r=await this.request(this.prefix()+path+'?'+params,{},signal),items=await r.json();if(!Array.isArray(items))throw new Error('Zotero 列表响应无效');return {items,total:Number(r.headers.get('Total-Results'))||items.length};
   }
+  /** Select every matching paper across pages, publishing selection only after completion. */
+  async allItems(query:{collection?:string;text?:string}={},signal?:AbortSignal,onProgress?:(count:number,total:number)=>void):Promise<ZoteroItem[]>{
+    const values=new Map<string,ZoteroItem>();
+    for(let start=0;start<100000;start+=50){
+      signal?.throwIfAborted();const page=await this.items({...query,start},signal);
+      for(const row of page.items)if(!['note','annotation'].includes(row.data.itemType))values.set(row.key,row);
+      onProgress?.(values.size,page.total);
+      if(start+page.items.length>=page.total||page.items.length<50)return [...values.values()];
+    }
+    throw new Error('文献数量过多，请按分类分批选择');
+  }
+  async itemsByKeys(keys:readonly string[],signal?:AbortSignal):Promise<ZoteroItem[]>{
+    const unique=[...new Set(keys)],rows:ZoteroItem[]=[];
+    if(unique.some(key=>!/^[A-Z0-9]{8}$/.test(key)))throw new Error('条目标识无效');
+    for(let start=0;start<unique.length;start+=50){
+      signal?.throwIfAborted();
+      const params=new URLSearchParams({itemKey:unique.slice(start,start+50).join(','),limit:'100'});
+      const page=await (await this.request(`${this.prefix()}/items?${params}`,{},signal)).json();
+      if(!Array.isArray(page))throw new Error('Zotero 列表响应无效');rows.push(...page);
+    }
+    return rows;
+  }
   async item(key:string,signal?:AbortSignal):Promise<ZoteroItem>{if(!/^[A-Z0-9]{8}$/.test(key))throw new Error('条目标识无效');return (await this.request(`${this.prefix()}/items/${key}`,{},signal)).json();}
   async children(key:string,signal?:AbortSignal):Promise<ZoteroItem[]>{if(!/^[A-Z0-9]{8}$/.test(key))throw new Error('条目标识无效');const result:ZoteroItem[]=[];for(let start=0;start<10000;start+=100){const r=await this.request(`${this.prefix()}/items/${key}/children?limit=100&start=${start}`,{},signal),page=await r.json();if(!Array.isArray(page))throw new Error('Zotero 附件响应无效');result.push(...page);if(page.length<100)return result;}throw new Error('附件数量过多');}
   async save(data:ZoteroData,signal?:AbortSignal):Promise<ZoteroItem>{

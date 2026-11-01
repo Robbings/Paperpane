@@ -1,0 +1,7 @@
+
+.pp-zotero-destination { display: grid; gap: 8px; margin-block: 12px; }
+.pp-zotero-selection { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; margin-block: 12px; }
+.pp-zotero-hint, .pp-zotero-discovery-item small { color: var(--pp-text-3); font-size: 12px; overflow-wrap: anywhere; }
+.pp-zotero-discovery-list { max-height: 380px; overflow: auto; }
+.pp-zotero-discovery-list h4 { margin: 16px 0 8px; }
+.pp-zotero-discovery-item { display: grid; gap: 5px; padding: 10px 4px; border-bottom: 1px solid var(--pp-hairline); }

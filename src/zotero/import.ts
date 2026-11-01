@@ -1,6 +1,7 @@
 import { zoteroBibliography } from './bibliography';
 import { mergeEntities } from '@/sync/merge';
 import { ZoteroClient, ZoteroError } from './client';
+import type { ImportDestination } from './catalog';
 import type { ZoteroItem } from './types';
 import { ZoteroMappings, type ZoteroLink } from '@/data/zotero-mappings';
 import { AnnotationDatabase } from '@/data/annotation-database';
@@ -15,7 +16,7 @@ import { pdfViews } from './pdf-geometry';
 import { md5 } from './md5';
 import { zoteroArchive } from './webdav-discovery';
 export interface ZoteroTransferItemResult {key:string;title:string;ok:boolean;message:string;warnings:string[]}
-export async function importZotero(client:ZoteroClient,items:readonly ZoteroItem[],folderId:string|null,signal:AbortSignal,onResult:(value:ZoteroTransferItemResult)=>void,askPassword?:(incorrect:boolean)=>Promise<string|null>,onlyAttachments?:ReadonlySet<string>){
+export async function importZotero(client:ZoteroClient,items:readonly ZoteroItem[],folderId:string|null,signal:AbortSignal,onResult:(value:ZoteroTransferItemResult)=>void,askPassword?:(incorrect:boolean)=>Promise<string|null>,onlyAttachments?:ReadonlySet<string>,destination:ImportDestination={kind:'folder',folderId}){
   const db=new ZoteroMappings(),annotations=new AnnotationDatabase(),connections=new ConnectionStore();
   async function metadata(id:string,item:ZoteroItem):Promise<ZoteroLink>{
     const local=await db.rawItem(id);if(!local)throw new Error('没有找到本机文献');
@@ -51,7 +52,7 @@ export async function importZotero(client:ZoteroClient,items:readonly ZoteroItem
       if(!pdfs.length){
         const bibliographyKey=`zotero:${client.userId}:${item.key}`;
         await db.importBibliography([{...zoteroBibliography(item.data),source:'web',bibliographyKey}],folderId);
-        const local=await db.imported(bibliographyKey);if(local){const link=await metadata(local.id,item);await notes(local.id,children.filter(c=>c.data.itemType==='note'),link,warnings);await db.saveLink(client.userId,local.id,link);}
+        const local=await db.imported(bibliographyKey);if(local){await db.fileImported(local.id,client.userId,item.data.collections??[],destination);const link=await metadata(local.id,item);await notes(local.id,children.filter(c=>c.data.itemType==='note'),link,warnings);await db.saveLink(client.userId,local.id,link);}
         warnings.push('未找到 PDF，已导入书目');
       }
       for(const attachment of pdfs){
@@ -60,6 +61,7 @@ export async function importZotero(client:ZoteroClient,items:readonly ZoteroItem
         catch(e){if(!(e instanceof ZoteroError)||![404,409].includes(e.status))throw e;const dav=await connections.dav();if(!dav)throw e;blob=await zoteroArchive(new WebDavClient(dav),attachment.key,attachment.data.filename,signal);if(attachment.data.md5&&md5(new Uint8Array(await blob.arrayBuffer()))!==attachment.data.md5)throw new Error('WebDAV 附件版本与 Zotero 不一致');}
         const doc=await importPdfBlob(db,blob,attachment.data.filename??'Zotero.pdf',folderId,signal,askPassword),ref={documentId:doc.id,fileVersion:doc.fileVersion};
         const local=await db.getItemForDocument(doc.id);if(!local)throw new Error('导入后未找到文献记录');
+        await db.fileImported(local.id,client.userId,item.data.collections??[],destination);
         const previous=await db.link(client.userId,local.id),link=await metadata(local.id,item);
         link.attachmentKey=attachment.key;link.attachmentVersion=attachment.version;link.fileHash=doc.file.sha256;link.uploaded=true;
         await db.saveLink(client.userId,local.id,link);

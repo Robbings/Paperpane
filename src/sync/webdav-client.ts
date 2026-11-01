@@ -18,7 +18,7 @@ export class WebDavClient {
     if(!response.ok)throw new DavError(response.status,response.status===412?'远程内容已更新，请重新同步':response.status===401||response.status===403?'WebDAV 认证失败或没有权限':response.status===507?'WebDAV 存储空间不足':`WebDAV 请求失败（${response.status}）`);
     return response;
   }
-  async get(path:string,signal?:AbortSignal){const r=await this.request('GET',path,{},undefined,signal);return {response:r,etag:r.headers.get('ETag')};}
+  async get(path:string,signal?:AbortSignal,range?:string){const r=await this.request('GET',path,range?{Range:range}:{},undefined,signal);return {response:r,etag:r.headers.get('ETag')};}
   async put(path:string,body:BodyInit,etag?:string|null,signal?:AbortSignal){const headers:Record<string,string>={};if(etag===null)headers['If-None-Match']='*';else if(etag)headers['If-Match']=etag;const r=await this.request('PUT',path,headers,body,signal);return r.headers.get('ETag');}
   async mkdir(path:string,signal?:AbortSignal){try{await this.request('MKCOL',path,{},undefined,signal);}catch(e){if(!(e instanceof DavError)||![405,301].includes(e.status))throw e;}}
   async remove(path:string,signal?:AbortSignal){try{await this.request('DELETE',path,{},undefined,signal);}catch(e){if(!(e instanceof DavError)||e.status!==404)throw e;}}
