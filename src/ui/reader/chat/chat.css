@@ -746,14 +746,6 @@
   outline: none;
 }
 
-.pp-chat-disclosure {
-  margin: 0;
-  padding-left: 1.2em;
-  color: var(--pp-text-2);
-  font-size: var(--pp-text-md);
-  line-height: 1.7;
-}
-
 /* AI transcript controls share the existing button and hover tools. */
 .pp-composer__latest { flex-shrink:0; white-space:nowrap; }
 .pp-composer textarea { scrollbar-width:none; }

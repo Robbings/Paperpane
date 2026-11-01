@@ -4,6 +4,7 @@ import { createPortal } from 'react-dom';
 import { IconButton } from '@/ui/components';
 import type { NoteLayout } from '../types';
 import { floatingLeft, floatingMargin, floatingPaperBounds, useFloatingCanvas } from './floating-canvas';
+import { keyboardFocus } from '../notes/CommentNotes';
 import '../notes/notes.css';
 import './passage-window.css';
 
@@ -13,10 +14,10 @@ interface Point { x:number; y:number }
 export type PassageWindowLayout = Pick<NoteLayout,'dx'|'dy'|'width'|'height'|'zoom'>;
 interface Props {
   layout?:PassageWindowLayout;
+  /** The PDF zoom. Without it the window follows the measured paper width instead. */
   zoomPercent?:number;
   onLayoutChange?:(layout:PassageWindowLayout)=>void;
   onLayoutCommit?:()=>void;
-  clampOnResize?:boolean;
   initialOffset?:{x:number;y:number};
   stackOrder?:number;
   onActivate?:()=>void;
@@ -43,7 +44,14 @@ const clamp=(n:number,min:number,max:number)=>Math.max(min,Math.min(n,Math.max(m
 const nearest=(r:PassageRect,x:number,y:number)=>({x:clamp(x,r.left,r.left+r.width),y:clamp(y,r.top,r.top+r.height)});
 const same=(a:Point,b:Point)=>a.x===b.x&&a.y===b.y;
 
-/** Shared passage window for translation/explanation. Uses comment-note visuals and drag/pan behavior. */
+/**
+ * Shared passage window for translation/explanation. Uses comment-note visuals and drag/pan behavior.
+ *
+ * Like comment notes it belongs to the paper: its offset from the passage and its size are kept in
+ * the paper's units at the zoom it was placed at, and it is drawn scaled by (zoom now / that zoom),
+ * so zooming, docking the translation pane or resizing the window never moves it relative to the
+ * passage. The interface scale sets its design size; the reading font size only changes its text.
+ */
 export function PassageWindow(props:Props){
   const {container}=props;
   const uiScale=useUiScale();
@@ -52,26 +60,30 @@ export function PassageWindow(props:Props){
   const collapsed=props.collapsed??internalCollapsed;
   const setCollapsed=(value:boolean)=>{setInternalCollapsed(value);props.onCollapsedChange?.(value);};
   const [anchor,setAnchor]=useState<Point>({x:container.scrollLeft+24,y:container.scrollTop+80});
-  const [localOffset,setLocalOffset]=useState<Point>({x:0,y:0});
-  const [localSize,setLocalSize]=useState<{width:number;height?:number}>({width:360,height:props.initialHeight});
-  const layoutScale=(props.zoomPercent??100)/(props.layout?.zoom??props.zoomPercent??100);
-  const offset=props.layout?{x:props.layout.dx*layoutScale,y:props.layout.dy*layoutScale}:localOffset;
-  const size=props.layout??localSize;
+  const [localLayout,setLocalLayout]=useState<{dx:number;dy:number;width:number;height?:number}>({dx:0,dy:0,width:360,height:props.initialHeight});
   const [bounds,setBounds]=useState({left:0,width:container.clientWidth,height:container.clientHeight});
   const [,tick]=useState(0);
-  const panel=useRef<HTMLElement>(null),initialized=useRef(false),frame=useRef(0);
+  const panel=useRef<HTMLElement>(null),initialized=useRef(false),frame=useRef(0),placedAt=useRef<number|undefined>(undefined);
   const gesture=useRef<{kind:'move'|'resize';size:{width:number;height:number};id:number;target:HTMLElement;x:number;y:number;px:number;py:number;scrollX:number;scrollY:number;inset:number;start:Point;moved:boolean}|null>(null);
-  const lastViewport=useRef({width:container.clientWidth,height:container.clientHeight});
-  const latest=useRef({props,anchor,offset,size,bounds,collapsed});latest.current={props,anchor,offset,size,bounds,collapsed};
-  const changeLayout=(nextOffset:Point,nextSize=latest.current.size)=>{
-    setLocalOffset(nextOffset);setLocalSize(nextSize);
-    latest.current.offset=nextOffset;latest.current.size=nextSize;
-    latest.current.props.onLayoutChange?.({dx:nextOffset.x,dy:nextOffset.y,width:nextSize.width,height:nextSize.height??props.initialHeight??180,zoom:latest.current.props.zoomPercent??100});
-  };
-  const width=collapsed?undefined:Math.min(size.width*uiScale,Math.max(140,container.clientWidth-24));
   const paper=floatingPaperBounds(container);
-  const actualWidth=collapsed?(panel.current?.offsetWidth??130*uiScale):width!;
-  const logicalLeft=floatingLeft(container,anchor.x+offset.x,actualWidth,paper.left),top=anchor.y+offset.y;
+  // Anything proportional to the paper's size works as a zoom: only its ratio to the placing zoom is used.
+  const zoom=props.zoomPercent??Math.max(1,paper.right-paper.left);
+  const saved=props.layout&&props.zoomPercent!==undefined?props.layout.zoom:undefined;
+  const layout={...(props.layout??localLayout),zoom:saved??(placedAt.current??=zoom)};
+  const scale=layout.zoom>0&&zoom>0?zoom/layout.zoom:1;
+  const offset={x:layout.dx*scale,y:layout.dy*scale};
+  const size:{width:number;height?:number}={width:layout.width,height:layout.height};
+  const latest=useRef({props,anchor,offset,size,bounds,collapsed,scale,layout,paper});latest.current={props,anchor,offset,size,bounds,collapsed,scale,layout,paper};
+  /** Offsets arrive in screen pixels at the current zoom and are kept in the layout's own zoom. */
+  const changeLayout=(nextOffset:Point,nextSize:{width:number;height?:number}=latest.current.size)=>{
+    const {scale,layout}=latest.current,next={dx:nextOffset.x/scale,dy:nextOffset.y/scale,width:nextSize.width,height:nextSize.height};
+    setLocalLayout(next);latest.current.offset=nextOffset;latest.current.size=nextSize;
+    latest.current.props.onLayoutChange?.({...next,height:next.height??props.initialHeight??180,zoom:layout.zoom});
+  };
+  // Sizes below are layout pixels inside the card, which is drawn scaled by `scale` from its top-left.
+  const width=collapsed?undefined:Math.min(size.width*uiScale,Math.max(140,(container.clientWidth-24)/scale));
+  const actualWidth=(collapsed?(panel.current?.offsetWidth??130*uiScale):width!)*scale;
+  const logicalLeft=floatingLeft(paper,anchor.x+offset.x,actualWidth),top=anchor.y+offset.y;
   const canvas=useFloatingCanvas(container,initialized.current?logicalLeft:null,initialized.current?logicalLeft+actualWidth:null);
   const left=logicalLeft+canvas.inset;
   const active=hovered||focused;
@@ -79,8 +91,6 @@ export function PassageWindow(props:Props){
   useLayoutEffect(()=>{
     const measure=()=>{
       const current=latest.current,box=container.getBoundingClientRect(),point=current.props.anchorPoint();
-      const resized=lastViewport.current.width!==container.clientWidth||lastViewport.current.height!==container.clientHeight;
-      lastViewport.current={width:container.clientWidth,height:container.clientHeight};
       if(point){
         const next={x:point.x-box.left-container.clientLeft+container.scrollLeft-canvas.readInset(),y:point.y-box.top-container.clientTop+container.scrollTop};
         setAnchor(old=>same(old,next)?old:next);
@@ -90,9 +100,6 @@ export function PassageWindow(props:Props){
             const w=Math.min(360*uiScale,container.clientWidth-24);
             changeLayout({x:clamp(next.x+(props.initialOffset?.x??0),container.scrollLeft-canvas.readInset()+12,container.scrollLeft-canvas.readInset()+container.clientWidth-w-12)-next.x,y:clamp(next.y+(props.initialOffset?.y??0),container.scrollTop+64,container.scrollTop+container.clientHeight-(props.initialHeight===undefined?180:props.initialHeight*uiScale+12))-next.y});
           }
-        }else if(current.props.clampOnResize&&resized&&!gesture.current){
-          const w=Math.min(panel.current?.offsetWidth??360,container.clientWidth-24),h=Math.min(panel.current?.offsetHeight??460,container.clientHeight-48);
-          changeLayout({x:clamp(next.x+current.offset.x,container.scrollLeft-canvas.readInset()+12,container.scrollLeft-canvas.readInset()+container.clientWidth-w-12)-next.x,y:clamp(next.y+current.offset.y,container.scrollTop+12,container.scrollTop+container.clientHeight-h-12)-next.y});
         }
       }
       // A restored card may already be under a stationary pointer: there is no
@@ -124,8 +131,8 @@ export function PassageWindow(props:Props){
     if(g?.target.hasPointerCapture(g.id))g.target.releasePointerCapture(g.id);
     if(g?.moved)latest.current.props.onLayoutCommit?.();
     if(reveal&&g?.moved&&g.kind==='move'){
-      const s=latest.current,p=panel.current;
-      const l=floatingLeft(container,s.anchor.x+s.offset.x,p?.offsetWidth??360,s.bounds.left)+canvas.readInset(),r=l+(p?.offsetWidth??360);
+      const s=latest.current,w=(panel.current?.offsetWidth??360)*s.scale;
+      const l=floatingLeft(s.paper,s.anchor.x+s.offset.x,w)+canvas.readInset(),r=l+w;
       if(r>container.scrollLeft+container.clientWidth-16)container.scrollLeft=r-container.clientWidth+16;
       else if(l<container.scrollLeft+16)container.scrollLeft=Math.max(0,l-16);
     }
@@ -143,11 +150,13 @@ export function PassageWindow(props:Props){
     if(Math.abs(dx)+Math.abs(dy)>3)g.moved=true;
     if(!g.moved)return;
     if(g.kind==='resize'){
-      changeLayout(s.offset,{width:clamp((g.size.width+dx)/uiScale,220,Math.min(520,(container.clientWidth-24)/uiScale)),height:clamp((g.size.height+dy)/uiScale,140,Math.min(520,(container.clientHeight-48)/uiScale))});
+      // The pointer moves in screen pixels; the size is kept in design units before both scales.
+      const k=uiScale*s.scale;
+      changeLayout(s.offset,{width:clamp((g.size.width+dx)/k,220,Math.min(520,(container.clientWidth-24)/k)),height:clamp((g.size.height+dy)/k,140,Math.min(520,(container.clientHeight-48)/k))});
       return;
     }
-    const cardWidth=panel.current?.offsetWidth??360,margin=floatingMargin(container,cardWidth);
-    changeLayout({x:clamp(g.start.x+dx,s.bounds.left+12-margin,s.bounds.width+margin-cardWidth)-s.anchor.x,y:clamp(g.start.y+dy,0,s.bounds.height-(panel.current?.offsetHeight??140))-s.anchor.y});
+    const cardWidth=(panel.current?.offsetWidth??360)*s.scale,margin=floatingMargin(s.paper,cardWidth);
+    changeLayout({x:clamp(g.start.x+dx,s.bounds.left+12-margin,s.bounds.width+margin-cardWidth)-s.anchor.x,y:clamp(g.start.y+dy,0,s.bounds.height-(panel.current?.offsetHeight??140)*s.scale)-s.anchor.y});
   };
   const pan=()=>{
     const g=gesture.current;if(!g)return;
@@ -161,7 +170,7 @@ export function PassageWindow(props:Props){
   const begin=(kind:'move'|'resize')=>(event:ReactPointerEvent<HTMLElement>)=>{
       if(event.button!==0||!event.isPrimary||(event.target as Element).closest('button'))return;
       event.preventDefault();event.stopPropagation();finish();event.currentTarget.setPointerCapture(event.pointerId);
-      gesture.current={kind,size:{width:panel.current?.offsetWidth??360,height:panel.current?.offsetHeight??140},id:event.pointerId,target:event.currentTarget,x:event.clientX,y:event.clientY,px:event.clientX,py:event.clientY,scrollX:container.scrollLeft,scrollY:container.scrollTop,inset:canvas.readInset(),start:{x:logicalLeft,y:top},moved:false};
+      gesture.current={kind,size:{width:(panel.current?.offsetWidth??360)*scale,height:(panel.current?.offsetHeight??140)*scale},id:event.pointerId,target:event.currentTarget,x:event.clientX,y:event.clientY,px:event.clientX,py:event.clientY,scrollX:container.scrollLeft,scrollY:container.scrollTop,inset:canvas.readInset(),start:{x:logicalLeft,y:top},moved:false};
       setDragging(true);if(kind==='move')frame.current=requestAnimationFrame(pan);
   };
   const drag={
@@ -182,18 +191,18 @@ export function PassageWindow(props:Props){
   }
   return <>
     {createPortal(<div className="pp-notes-layer pp-passage-window-layer" data-pp-overlay="" style={{zIndex:props.stackOrder??3}}>
-      {dragging&&<div aria-hidden="true" style={{position:'absolute',width:bounds.width+floatingMargin(container,actualWidth)+canvas.inset,height:bounds.height,pointerEvents:'none'}}/>}
-      {line&&<svg className="pp-passage-window__connector" aria-hidden="true" width={Math.max(container.clientWidth,left+actualWidth)} height={Math.max(container.clientHeight,top+(panel.current?.offsetHeight??140))}>
+      {dragging&&<div aria-hidden="true" style={{position:'absolute',width:bounds.width+floatingMargin(paper,actualWidth)+canvas.inset,height:bounds.height,pointerEvents:'none'}}/>}
+      {line&&<svg className="pp-passage-window__connector" aria-hidden="true" width={Math.max(container.clientWidth,left+actualWidth)} height={Math.max(container.clientHeight,top+(panel.current?.offsetHeight??140)*scale)}>
         <g transform={`translate(${container.scrollLeft-box.left-container.clientLeft} ${container.scrollTop-box.top-container.clientTop})`}>
           {rects.map((r,i)=><rect key={i} x={r.left-2} y={r.top-1} width={r.width+4} height={r.height+2} rx={3} className="pp-note-connector__mark"/>)}
           <line {...line} className="pp-note-connector__line"/><circle cx={line.x2} cy={line.y2} r={2.5} className="pp-note-connector__end"/>
         </g>
       </svg>}
       <section ref={panel} className={`pp-glass pp-note pp-passage-window${collapsed?' pp-note--pill':''}`} data-tone="float" data-collapsed={collapsed} aria-label={props.label}
-        style={{left,top,width,maxWidth:collapsed?Math.min(260*uiScale,Math.max(100,container.clientWidth-24)):undefined,height:collapsed?34*uiScale:size.height===undefined?undefined:size.height*uiScale,maxHeight:Math.max(140,container.clientHeight-48),visibility:initialized.current?undefined:'hidden'}}
+        style={{left,top,width,maxWidth:collapsed?Math.min(260*uiScale,Math.max(100,(container.clientWidth-24)/scale)):undefined,height:collapsed?34*uiScale:size.height===undefined?undefined:size.height*uiScale,maxHeight:Math.max(140,(container.clientHeight-48)/scale),transform:scale===1?undefined:`scale(${scale})`,transformOrigin:'top left',visibility:initialized.current?undefined:'hidden'}}
         onPointerDownCapture={props.onActivate}
         onPointerEnter={()=>setHovered(true)} onPointerLeave={()=>setHovered(false)}
-        onFocusCapture={()=>setFocused(true)}
+        onFocusCapture={event=>setFocused(keyboardFocus(event.target))}
         onBlurCapture={event=>{if(!event.currentTarget.contains(event.relatedTarget))setFocused(false);}}>
         {collapsed?<div className="pp-note__pill" {...drag}>{props.collapsedIcon??props.icon}<span className="pp-note__pill-title">{props.collapsedTitle}</span>
           <IconButton icon="openExternal" label={`展开${props.label}`} size="md" shape="pill" onClick={()=>setCollapsed(false)}/>

@@ -110,10 +110,10 @@ export function TranslationPane(props: TranslationPaneProps) {
     };
     if (s.kind === 'formula') {
       return (
-        <Tooltip key={s.id} label="公式不翻译，点按查看原文" labelsChild>
+        <Tooltip key={s.id} label="公式、图表不翻译，点按在论文中查看" labelsChild>
           <button type="button" className="pp-tr__chip" {...shared}>
-            <Icon name="explain" size={13} />
-            {s.text}
+            <Icon name="region" size={13} />
+            查看原文
           </button>
         </Tooltip>
       );
@@ -185,7 +185,14 @@ export function TranslationPane(props: TranslationPaneProps) {
           aria-pressed={props.follow}
           onClick={() => props.onFollow(!props.follow)}
         />
-        {props.onRetranslateAll && <IconButton icon="sync" label="重新翻译全文" size="md" shape="pill" disabled={!taskIdle(props.task) || !pages.some(p => p.sentences.some(s => s.kind !== 'formula' && !!s.text))} onClick={props.onRetranslateAll} />}
+        {/* One document action, by state: start, continue, then (all translated) translate again. */}
+        {taskIdle(props.task) && (['paused', 'interrupted', 'failed'].includes(props.task.phase) ? (
+          <Tooltip label="继续翻译全文"><Button size="sm" variant="quiet" icon="translate" className="pp-tr__all" onClick={props.onResume}>继续翻译</Button></Tooltip>
+        ) : pages.some(p => p.state !== 'done') ? (
+          <Tooltip label="翻译全文"><Button size="sm" variant="quiet" icon="translate" className="pp-tr__all" onClick={props.onTranslateAll}>翻译全文</Button></Tooltip>
+        ) : props.onRetranslateAll && pages.some(p => p.sentences.some(s => s.kind !== 'formula' && !!s.text)) && (
+          <IconButton icon="sync" label="重新翻译全文" size="md" shape="pill" onClick={props.onRetranslateAll} />
+        ))}
         {dock && (
           <IconButton
             icon={dock.floating ? 'paneRight' : 'float'}

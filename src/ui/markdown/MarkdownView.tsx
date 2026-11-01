@@ -25,7 +25,7 @@ function AssetImage({ reference, alt }: { reference: string; alt?: string }) {
     };
   }, [reference]);
   return url ? (
-    <img src={url} alt={alt ?? "评论图片"} />
+    <img src={url} alt={alt ?? "旁注图片"} />
   ) : (
     <span className="pp-markdown-view__missing">{alt || "图片暂不可用"}</span>
   );

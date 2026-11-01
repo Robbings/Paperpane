@@ -579,6 +579,7 @@
 .pp-splitter[data-placement='bottom'] {
   bottom: calc(var(--pp-gap) + var(--pp-rail) + var(--pp-research-h) - 2px);
   left: calc(var(--pp-edge-left) + 18px);
+
   right: calc(var(--pp-gap) + 18px);
   height: 8px;
   cursor: row-resize;
@@ -821,6 +822,45 @@
 .pp-annotation__note {
   font-size: var(--pp-text-read-sm);
   line-height: var(--pp-leading-body);
+}
+
+/* Long items are cut short so the list stays scannable; "展开全部" shows the rest. */
+.pp-annotation__quote[data-clamped] {
+  display: -webkit-box;
+  overflow: hidden;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 4;
+}
+
+.pp-annotation__note[data-clamped] {
+  max-height: calc(var(--pp-leading-body) * 6em);
+  overflow: hidden;
+}
+
+.pp-annotation-item[data-long] .pp-annotation__note[data-clamped] {
+  -webkit-mask-image: linear-gradient(#000 calc(100% - 2em), transparent);
+  mask-image: linear-gradient(#000 calc(100% - 2em), transparent);
+}
+
+.pp-annotation-item[data-long] .pp-annotation {
+  border-bottom-color: transparent;
+  padding-bottom: 4px;
+}
+
+.pp-annotation__more {
+  display: block;
+  width: 100%;
+  padding: 0 4px var(--pp-space-3);
+  border: 0;
+  border-bottom: 0.5px solid var(--pp-hairline);
+  background: transparent;
+  color: var(--pp-accent);
+  font-size: var(--pp-text-xs);
+  text-align: left;
+}
+
+.pp-annotation__more:hover {
+  text-decoration: underline;
 }
 
 /* Notes */
@@ -1289,3 +1329,12 @@
 .pp-thumb__page--live { padding: 0; height: auto; min-height: 130px; overflow: hidden; }
 .pp-thumb__page--live img { display: block; width: 112px; height: auto; }
 .pp-thumb__page--live .pp-thumb__status { background: none; height: auto; width: auto; margin: auto; font-size: 12px; color: #555; }
+
+/* The research area fills the window: what it covers is hidden, not just underneath. */
+.pp-reader[data-maximized='true'] > :is(.pp-toolbar, .pp-findbar, .pp-sidebar, .pp-reader__translation, .pp-reader__paper, .pp-scroll) {
+  visibility: hidden;
+}
+
+.pp-reader[data-maximized='true'] .pp-splitter[data-placement='bottom'] {
+  left: calc(var(--pp-gap) + 18px);
+}

@@ -1,6 +1,6 @@
 import { MarkdownEditor } from '@/ui/markdown/MarkdownEditor';
 import { MarkdownView } from '@/ui/markdown/MarkdownView';
-import { useRef, useState, type CSSProperties } from 'react';
+import { useLayoutEffect, useRef, useState, type CSSProperties } from 'react';
 import { Button, Menu, IconButton, SaveStatus, Tooltip, Segmented, highlightColors, type HighlightColor, type LocalSaveState, type SyncState } from '@/ui/components';
 import type { AnnotationView } from '../types';
 import { PanelBody } from './PanelBody';
@@ -11,7 +11,7 @@ type KindFilter = 'all' | 'highlight' | 'comment';
 const kindOptions = [
   { value: 'all', label: '全部' },
   { value: 'highlight', label: '高亮' },
-  { value: 'comment', label: '评论' },
+  { value: 'comment', label: '旁注' },
 ] as const;
 
 const colorNames: Record<HighlightColor, string> = { yellow: '黄色', green: '绿色', blue: '蓝色', pink: '粉色', purple: '紫色' };
@@ -79,7 +79,7 @@ export function AnnotationsPanel({ items, local, sync, simulated, onLocate, onCo
       <PanelBody>
       <div className="pp-panel__scroll">
         {items.length === 0 ? (
-          <p className="pp-panel__empty">还没有批注。选中论文里的文字，就可以高亮或写评论。</p>
+          <p className="pp-panel__empty">还没有批注。选中论文里的文字，就可以高亮或写旁注。</p>
         ) : visible.length === 0 ? (
           <p className="pp-panel__empty">没有符合筛选条件的批注。</p>
         ) : (
@@ -122,25 +122,43 @@ function AnnotationItem({ item, onLocate, onColor, onComment, onDelete, onRemove
   const [deletion, setDeletion] = useState<{x:number;y:number}|null>(null);
   const [editing, setEditing] = useState<string | null>(null);
   const editSession=useRef({original:'',active:false,cancelled:false});const currentEdit=editSession.current;
+  // A long quote or note is cut to a few lines so the items after it stay in sight.
+  const [expanded, setExpanded] = useState(false);
+  const [long, setLong] = useState(false);
+  const quote = useRef<HTMLSpanElement>(null), body = useRef<HTMLDivElement>(null);
+  useLayoutEffect(() => {
+    if (expanded) return;
+    const check = () => setLong([quote.current, body.current].some((el) => !!el && el.scrollHeight > el.clientHeight + 1));
+    check();
+    const observer = new ResizeObserver(check);
+    // The note's box is capped, so also watch its content (e.g. an image that loads later).
+    for (const el of [quote.current, body.current, body.current?.firstElementChild]) if (el) observer.observe(el);
+    return () => observer.disconnect();
+  }, [expanded, item.quote, item.note, editing === null]);
 
   const save = () => {
     currentEdit.active=false;setEditing(null);
   };
 
   return (
-    <li className="pp-annotation-item" data-editing={editing !== null ? 'true' : undefined}>
+    <li className="pp-annotation-item" data-editing={editing !== null ? 'true' : undefined} data-long={(long || expanded) && editing === null ? '' : undefined}>
       <button type="button" className="pp-annotation" onClick={onLocate}>
         <span className="pp-annotation__meta">
           <span className="pp-annotation__dot" style={dot(item.color)} aria-hidden="true" />
-          {item.kind === 'highlight' ? '高亮' : '页面评论'} · 第 {item.pageIndex + 1} 页
+          {item.kind === 'highlight' ? '高亮' : '页面旁注'} · 第 {item.pageIndex + 1} 页
         </span>
-        {item.quote && <span className="pp-annotation__quote">{item.quote}</span>}
-        {item.note && editing === null && <div className="pp-annotation__note"><MarkdownView value={item.note}/></div>}
+        {item.quote && <span ref={quote} className="pp-annotation__quote" data-clamped={!expanded || undefined}>{item.quote}</span>}
+        {item.note && editing === null && <div ref={body} className="pp-annotation__note" data-clamped={!expanded || undefined}><MarkdownView value={item.note}/></div>}
       </button>
+      {(long || expanded) && editing === null && (
+        <button type="button" className="pp-annotation__more" aria-expanded={expanded} onClick={() => setExpanded((v) => !v)}>
+          {expanded ? '收起' : '展开全部'}
+        </button>
+      )}
 
       {editing !== null && (
         <div className="pp-annotation__edit">
-          <MarkdownEditor storageKey={'comment:'+item.id} compact label="评论" value={editing} autoFocus placeholder="写下你的想法…"
+          <MarkdownEditor storageKey={'comment:'+item.id} compact label="旁注" value={editing} autoFocus placeholder="写下你的想法…"
             onChange={value=>{if(currentEdit.cancelled)return;if(currentEdit.active)setEditing(value);onComment(value);}}
             onSave={save} onEscape={()=>{currentEdit.active=false;currentEdit.cancelled=true;onComment(currentEdit.original);setEditing(null);}}/>
           <div className="pp-annotation__edit-bar">
@@ -183,7 +201,7 @@ function AnnotationItem({ item, onLocate, onColor, onComment, onDelete, onRemove
                 </button>
               </Tooltip>
             )}
-            <IconButton icon="edit" label={item.note ? '编辑评论' : '添加评论'} size="md" shape="pill" onClick={() => {editSession.current={original:item.note??'',active:true,cancelled:false};setEditing(item.note??'');}} />
+            <IconButton icon="edit" label={item.note ? '编辑旁注' : '添加旁注'} size="md" shape="pill" onClick={() => {editSession.current={original:item.note??'',active:true,cancelled:false};setEditing(item.note??'');}} />
             <IconButton icon="trash" label={item.note ? '删除选项' : '删除高亮'} size="md" shape="pill" onClick={event=>{
               if (!item.note) { onDelete(); return; }
               const box=event.currentTarget.getBoundingClientRect();setDeletion({x:box.right,y:box.bottom});
@@ -192,7 +210,7 @@ function AnnotationItem({ item, onLocate, onColor, onComment, onDelete, onRemove
         )}
       </span>
       {deletion && <Menu label="删除选项" anchor={deletion} align="end" entries={[
-        {id:'comment',label:'仅删除评论（保留高亮）'},
+        {id:'comment',label:'仅删除旁注（保留高亮）'},
         {id:'annotation',label:'删除整条批注（含高亮）'},
       ]} onClose={()=>setDeletion(null)} onSelect={id=>{setEditing(null);if(id==='comment')onRemoveComment();else onDelete();}}/>}
     </li>

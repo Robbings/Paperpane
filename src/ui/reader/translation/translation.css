@@ -248,3 +248,9 @@
 .pp-reader__paper.pp-translation-page-actions { padding-right: 52px; }
 .pp-tr-page-actions { position: absolute; top: 0; left: 0; pointer-events: none; z-index: 3; }
 .pp-tr-page-action { position: absolute; pointer-events: auto; border-radius: var(--pp-radius-pill); }
+
+/* The document action keeps its words while there is room; a narrow pane shows only the icon. */
+.pp-tr__all { flex-shrink: 0; }
+@container (max-width: 360px) {
+  .pp-tr__all > span { position: absolute; width: 1px; height: 1px; overflow: hidden; clip-path: inset(50%); }
+}

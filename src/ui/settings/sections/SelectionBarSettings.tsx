@@ -5,7 +5,7 @@ import { DEFAULT_SELECTION_BAR, type SelectionBarItem, type SelectionBarPrefs } 
 
 const items: Record<SelectionBarItem, { label: string; icon: IconName }> = {
   colors: { label: '高亮颜色', icon: 'marker' },
-  comment: { label: '评论', icon: 'comment' },
+  comment: { label: '旁注', icon: 'comment' },
   translate: { label: '翻译', icon: 'translate' },
   explain: { label: '解释', icon: 'explain' },
   ask: { label: '提问', icon: 'ask' },

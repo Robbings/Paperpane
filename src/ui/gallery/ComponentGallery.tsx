@@ -73,7 +73,7 @@ const colorTokens = [
 ] as const;
 
 const newSelectionActions: readonly SelectionMenuAction[] = [
-  { id: 'comment', label: '评论', icon: 'comment' },
+  { id: 'comment', label: '旁注', icon: 'comment' },
   { id: 'translate', label: '翻译', icon: 'translate' },
   { id: 'explain', label: '解释', icon: 'explain' },
   { id: 'ask', label: '提问', icon: 'ask' },
@@ -81,7 +81,7 @@ const newSelectionActions: readonly SelectionMenuAction[] = [
 ];
 
 const highlightActions: readonly SelectionMenuAction[] = [
-  { id: 'comment', label: '评论', icon: 'comment' },
+  { id: 'comment', label: '旁注', icon: 'comment' },
   { id: 'explain', label: '解释', icon: 'explain' },
   { id: 'copy', label: '复制', icon: 'copy' },
 ];
@@ -269,7 +269,7 @@ function ButtonsSection() {
           options={[
             { value: 'all', label: '全部' },
             { value: 'highlight', label: '高亮' },
-            { value: 'comment', label: '评论' },
+            { value: 'comment', label: '旁注' },
           ]}
           value={filter}
           onChange={setFilter}
@@ -391,7 +391,7 @@ function DialogSection() {
         open={open === 'delete'}
         onClose={close}
         title="删除这条批注？"
-        description="高亮和它的评论会一起删除。删除后几秒内可以撤销。"
+        description="高亮和它的旁注会一起删除。删除后几秒内可以撤销。"
         footer={
           <>
             <Button onClick={close}>取消</Button>
@@ -550,7 +550,7 @@ function FormsSection() {
           error={url && !url.startsWith('https://') ? '请使用 https:// 开头的地址。' : undefined}
           disabled={disabled}
         />
-        <TextArea label="评论" value={comment} onChange={setComment} placeholder="写下你的想法……" rows={2} maxRows={6} disabled={disabled} />
+        <TextArea label="旁注" value={comment} onChange={setComment} placeholder="写下你的想法……" rows={2} maxRows={6} disabled={disabled} />
         <TextArea label="提示词" value={prompt} onChange={setPrompt} maxLength={300} rows={3} description="会自动长高，超过上限后滚动。" disabled={disabled} />
       </div>
       <div className="gallery__toggles">
@@ -623,7 +623,7 @@ function EmptySection() {
         <EmptyState
           icon="marker"
           title="还没有批注"
-          description="选中论文里的文字，就可以高亮或写评论。"
+          description="选中论文里的文字，就可以高亮或写旁注。"
         />
         <EmptyState
           icon="alert"

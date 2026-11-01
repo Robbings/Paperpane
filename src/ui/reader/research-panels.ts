@@ -6,5 +6,5 @@ export const researchPanels: readonly { id: ResearchPanelId; label: string; icon
   { id: 'discuss', label: '讨论', icon: 'discuss' },
   { id: 'annotations', label: '批注', icon: 'marker' },
   { id: 'notes', label: '笔记', icon: 'notes' },
-  { id: 'cite', label: '引用', icon: 'cite' },
+  // 'cite' (引用) returns here once the citation panel exists; the rail's length follows this list.
 ];

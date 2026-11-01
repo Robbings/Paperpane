@@ -4,15 +4,22 @@ import { useLayoutEffect, useMemo, useRef, useSyncExternalStore } from 'react';
 // transition). Never feed that subpixel residual back into the scroll origin.
 const layoutPixel = (value: number) => Math.round(value * 64) / 64;
 
-/** Leave movement room beyond one card, including when it is collapsed to a pill. */
-export const floatingInsetLimit = (container: Pick<HTMLElement, 'clientWidth'>) => Math.max(0, container.clientWidth - 96);
-export const floatingMargin = (container: Pick<HTMLElement, 'clientWidth'>, cardWidth = 360) =>
-  Math.min(floatingInsetLimit(container), Math.max(520, Math.floor(container.clientWidth * 2 / 3), (Number.isFinite(cardWidth) ? Math.max(0, cardWidth) : 360) + 96));
-export const floatingLeft = (container: Pick<HTMLElement, 'clientWidth'>, left: number, cardWidth = 360, paperLeft = 0) =>
-  Math.max(paperLeft + 12 - floatingMargin(container, cardWidth), Number.isFinite(left) ? left : paperLeft + 12);
+export interface PaperBounds { left:number; right:number; bottom:number }
+
+/**
+ * How far a card may move beside the paper. It is a share of the paper's own width,
+ * so it grows and shrinks with the PDF zoom like the cards do: zooming never changes
+ * where a card may sit relative to the paper.
+ */
+export const floatingMargin = (paper: Pick<PaperBounds,'left'|'right'>, cardWidth = 360) => {
+  const width = Math.max(0, paper.right - paper.left), card = Number.isFinite(cardWidth) ? Math.max(0, cardWidth) : 360;
+  return Math.max(width * 0.8, card + width * 0.12);
+};
+export const floatingLeft = (paper: Pick<PaperBounds,'left'|'right'>, left: number, cardWidth = 360) =>
+  Math.max(paper.left + 12 - floatingMargin(paper, cardWidth), Number.isFinite(left) ? left : paper.left + 12);
 
 /** PDF bounds only: floating windows and their spacers must never enlarge their own limits. */
-export function floatingPaperBounds(container: HTMLElement, inset = spaces.get(container)?.getSnapshot() ?? 0) {
+export function floatingPaperBounds(container: HTMLElement, inset = spaces.get(container)?.getSnapshot() ?? 0): PaperBounds {
   const box = container.getBoundingClientRect();
   const pages = [...container.querySelectorAll<HTMLElement>('.page, [data-page-index]')]
     .map(page => page.getBoundingClientRect()).filter(page => page.width > 0 && page.height > 0);
@@ -45,8 +52,8 @@ export class FloatingCanvas {
   private apply() {
     const min = Math.min(12, ...[...this.extents.values()].map(card => card.left));
     const paper = floatingPaperBounds(this.container, this.inset);
-    const limit = Math.max(0, Math.floor(floatingInsetLimit(this.container) - Math.max(0, paper.left)));
-    const next = Math.min(limit, Math.ceil(Math.max(0, 12 - layoutPixel(min))));
+    // Cards are already kept within floatingMargin of the paper, so this stays bounded.
+    const next = Math.ceil(Math.max(0, 12 - layoutPixel(min)));
     const maxRight = Math.max(0, ...[...this.extents.values()].map(card => card.right));
     const rightExtent = layoutPixel(maxRight) > paper.right ? Math.ceil(layoutPixel(maxRight + next + 16)) : 0;
     if (next === this.inset && rightExtent === this.rightExtent) return;

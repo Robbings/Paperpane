@@ -607,7 +607,6 @@ export function useResearch(
               zoomPercent={(state?.position.zoom ?? 1) * 100}
               onLayoutChange={layout => service.layoutExplanation(windowSession.id, layout)}
               onLayoutCommit={() => void service.flush()}
-              clampOnResize
               initialOffset={{ x: (index % 4) * 18, y: (index % 4) * 26 }}
               stackOrder={frontWindow === windowSession.id ? 5 : 3}
               onActivate={() => setFrontWindow(windowSession.id)}
