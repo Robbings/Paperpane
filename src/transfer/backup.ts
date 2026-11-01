@@ -5,7 +5,7 @@ export const BACKUP_LIMITS={bytes:1024*1024*1024,entries:50000,manifest:64*1024*
 export async function sha256(bytes:Uint8Array):Promise<string>{return Array.from(new Uint8Array(await crypto.subtle.digest('SHA-256',new Uint8Array(bytes))),b=>b.toString(16).padStart(2,'0')).join('');}
 function ensure(condition:unknown,message:string):asserts condition {if(!condition)throw new Error(message);}
 function validate(snapshot:TransferSnapshot){
-  ensure(snapshot?.format==='paperpane-backup'&&[1,2].includes(snapshot.version),'备份格式或版本不支持');
+  ensure(snapshot?.format==='paperpane-backup'&&[1,2,3].includes(snapshot.version),'备份格式或版本不支持');
   ensure(typeof snapshot.id==='string'&&snapshot.id.length>0&&typeof snapshot.createdAt==='string'&&typeof snapshot.complete==='boolean','备份清单无效');
   ensure(Array.isArray(snapshot.databases)&&Array.isArray(snapshot.assets),'备份数据无效');
   const names=new Set<string>();

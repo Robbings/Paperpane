@@ -4,6 +4,7 @@ import { WebDavClient, DavError } from './webdav-client';
 import { canonical, flatten, inflate, syncSnapshot, type SyncManifest } from './manifest';
 import { mergeEntities, stable } from './merge';
 import { assetPath, assetMime, imageReferences } from '@/transfer/assets';
+import { versionRows } from './versions';
 import { recordPayload } from '@/transfer/records';
 import { sha256 } from '@/transfer/backup';
 import type { TransferAsset } from '@/contracts/transfer';
@@ -15,7 +16,7 @@ export async function responseBytes(response:Response,max:number,signal?:AbortSi
   const bytes=new Uint8Array(size);let offset=0;for(const chunk of chunks){bytes.set(chunk,offset);offset+=chunk.length;}return bytes;
 }
 function validate(m:SyncManifest){
-  if(m.format!=='paperpane-sync'||![1,2].includes(m.version)||typeof m.generation!=='string'||!m.records||typeof m.records!=='object'||Array.isArray(m.records)||!Array.isArray(m.assets)||m.assets.length>50000)throw new Error('远程同步清单不兼容');
+  if(m.format!=='paperpane-sync'||![1,2,3].includes(m.version)||typeof m.generation!=='string'||!m.records||typeof m.records!=='object'||Array.isArray(m.records)||!Array.isArray(m.assets)||m.assets.length>50000)throw new Error('远程同步清单不兼容');
   for(const a of m.assets)if(!/^[a-f0-9]{64}$/.test(a.sha256)||typeof a.id!=='string'||a.database!=='paperpane'||!['application/pdf','image/png'].includes(assetMime(a))||(assetMime(a)==='image/png'&&a.id!=='note-image:'+a.sha256))throw new Error('远程附件清单无效');
   // Version 1 published local availability/index fields. They are derived again
   // on this device, and must not keep an upgraded client permanently pending.
@@ -23,10 +24,10 @@ function validate(m:SyncManifest){
 }
 export async function synchronize(signal:AbortSignal,options:{store?:TransferStore;connections?:ConnectionStore;client?:WebDavClient}={}){
   const store=options.store??new TransferStore(),connections=options.connections??new ConnectionStore();
-  const run=async()=>{
+  const run=async(attempt=0):Promise<void>=>{
     const previous=await connections.status();
     try{
-      if((await store.conflicts()).length)throw new Error('请先处理已有同步或恢复冲突');
+      await store.migrateConflicts();
       const config=await connections.view(),connection=await connections.dav();
       if(!connection||!config.dav?.conditional)throw new Error('请先连接支持条件写入的 WebDAV');
       const client=options.client??new WebDavClient(connection);
@@ -45,21 +46,15 @@ export async function synchronize(signal:AbortSignal,options:{store?:TransferSto
         if(await sha256(bytes)!==a.sha256)throw new Error('远程附件文件校验失败');
         assets.set(a.database+':'+a.id,{...a,blob:new Blob([new Uint8Array(bytes)],{type:assetMime(a)})});
       }
-      if(merged.conflicts.length&&remote){
-        const prepared=inflate({...remote,records:merged.records},local);prepared.assets=[...assets.values()];await store.restore(prepared,local);
-        const roots=new Set(merged.conflicts.map(p=>p.split('/').slice(0,3).join('/')));
-        const conflicts={...remote,records:Object.fromEntries(Object.entries(remote.records).filter(([key])=>roots.has(key)))};
-        const incoming=inflate(conflicts,local);incoming.complete=false;incoming.assets=[...assets.values()];
-        await store.restore(incoming);
-        await connections.write('transfer-sync-baseline',{url:client.base.href+'|'+connection.username,manifest:remote});
-        await connections.write('transfer-sync-state',{...previous,phase:'conflicts',message:`${roots.size} 项内容需要选择保留版本`});return;
+      for(const row of versionRows(merged.versions,new Date().toISOString())){
+        const id=['paperpane','meta',row.key].map(encodeURIComponent).join('/');
+        merged.records[id]??=row;
       }
       // Never publish a dangling image reference, including images retained in note history.
       for(const hash of imageReferences(merged.records))if(![...assets.values()].some(a=>a.id==='note-image:'+hash))throw new Error('同步内容缺少嵌入图片，请恢复附件后重试');
-      const manifest:SyncManifest={format:'paperpane-sync',version:2,generation:crypto.randomUUID(),createdAt:new Date().toISOString(),records:merged.records,assets:[...assets.values()].map(({blob,...a})=>a)};
+      const manifest:SyncManifest={format:'paperpane-sync',version:3,generation:crypto.randomUUID(),createdAt:new Date().toISOString(),records:merged.records,assets:[...assets.values()].map(({blob,...a})=>a)};
       const incoming=inflate(manifest,local);incoming.assets=[...assets.values()];
-      const applied=await store.restore(incoming,local);
-      if(applied.conflicts){await connections.write('transfer-sync-state',{...previous,phase:'conflicts',message:'同步期间本机内容发生变化，请处理冲突后重试'});return;}
+      await store.restore(incoming,local);
       await client.mkdir('paperpane/assets',signal);
       const existing=new Set(remote?.assets.map(assetPath)??[]);
       for(const a of assets.values()){
@@ -79,8 +74,8 @@ export async function synchronize(signal:AbortSignal,options:{store?:TransferSto
           'transfer-sync-state':pending?{...previous,phase:'idle',message:'本轮内容已上传，仍有改动待同步'}:{phase:'success',lastSuccess:new Date().toISOString(),message:'已同步'},
         };
       });
-    }catch(error){await connections.write('transfer-sync-state',{...previous,phase:'failed',message:error instanceof Error?error.message:'同步失败'});throw error;}
+    }catch(error){if(error instanceof DavError&&error.status===412&&attempt<2){signal.throwIfAborted();return run(attempt+1);}await connections.write('transfer-sync-state',{...previous,phase:'failed',message:error instanceof Error?error.message:'同步失败'});throw error;}
   };
-  try{if(globalThis.navigator?.locks)await navigator.locks.request('paperpane-sync',{signal},run);else await run();}
+  try{if(globalThis.navigator?.locks)await navigator.locks.request('paperpane-sync',{signal},()=>run());else await run();}
   finally{if(!options.store)await store.close();if(!options.connections)await connections.close();}
 }

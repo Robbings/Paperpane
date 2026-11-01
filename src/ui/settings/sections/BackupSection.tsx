@@ -17,7 +17,7 @@ export function BackupSection(){
     else{const blob=await downloadCloudBackup(client,action);await transfer.inspect(blob);setCloud(undefined);}
   }catch(e){setCloudMessage(e instanceof Error?e.message:'云备份操作失败');}finally{setCloudBusy(false);await db.close();}}
   return <SettingGroup title="备份与恢复">
-    <SettingRow label="本机备份"><Tooltip label="保存 PDF、书目、批注、笔记历史、嵌入图片与已保存的研究内容，不包含密钥"><Button onClick={()=>void download()} disabled={transfer.busy}>导出</Button></Tooltip><Tooltip label="校验备份后合并恢复，冲突保留双方版本"><Button onClick={()=>input.current?.click()} disabled={transfer.busy}>恢复</Button></Tooltip></SettingRow>
+    <SettingRow label="本机备份"><Tooltip label="保存 PDF、书目、批注、笔记历史、嵌入图片与已保存的研究内容，不包含密钥"><Button onClick={()=>void download()} disabled={transfer.busy}>导出</Button></Tooltip><Tooltip label="校验后自动合并恢复，不同内容保留多个版本"><Button onClick={()=>input.current?.click()} disabled={transfer.busy}>恢复</Button></Tooltip></SettingRow>
     <SettingRow label="云备份"><Tooltip label="上传并校验完整备份，与多端同步独立保存"><Button disabled={cloudBusy||transfer.busy||!connections.dav} onClick={()=>void remote('upload')}>备份</Button></Tooltip><Button disabled={cloudBusy||transfer.busy||!connections.dav} onClick={()=>void remote('list')}>恢复</Button></SettingRow>
     <SyncTrash/>
     {cloudMessage&&<p role="status">{cloudMessage}</p>}{cloudBusy&&<ProgressBar label="正在处理云备份"/>}

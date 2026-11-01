@@ -27,7 +27,7 @@ export async function exportZotero(client:ZoteroClient,ids:readonly string[],col
   try{for(const id of ids){signal.throwIfAborted();const warnings:string[]=[];let title=id;
     try{
       const local=await db.getItem(id);if(!local)throw new Error('所选文献已不存在');title=local.title;
-      const transfer=new TransferStore();try{const conflicts=await transfer.conflicts();if(conflicts.some(c=>(c.store==='libraryItems'&&c.key===id)||(c.store==='annotations'&&(c.local?.anchor as any)?.documentId===local.documentId)||c.external?.mappingKey===`zotero-map:${client.userId}:${id}`))throw new Error('请先在同步设置中处理这篇论文的冲突');}finally{await transfer.close();}
+      const transfer=new TransferStore();try{await transfer.migrateConflicts();}finally{await transfer.close();}
       let link=await db.link(client.userId,id);
       if(!link||link.original?.itemType==='attachment')link={itemKey:zoteroKey(),attachmentKey:undefined,collections:[],annotationKeys:{}};
       const checkpoint=async()=>db.saveLink(client.userId,id,link!);

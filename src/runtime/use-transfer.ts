@@ -14,6 +14,6 @@ export function useTransfer(){
   return {busy,message,preview,result,cancel:()=>controller.current?.abort(),dismiss:()=>setPreview(undefined),
     backup:(complete=true)=>work(async signal=>{const db=new TransferStore();try{return await packBackup(await db.snapshot(complete),signal);}finally{await db.close();}}),
     inspect:(file:Blob)=>work(async signal=>{const data=await openBackup(file,signal);if(live.current)setPreview(data);}),
-    restore:()=>work(async signal=>{if(!preview)return;signal.throwIfAborted();const db=new TransferStore();try{const value=await db.restore(preview);if(live.current){setResult(value);setPreview(undefined);setMessage(`已恢复 ${value.imported} 条记录${value.conflicts?`，${value.conflicts} 项冲突待处理`:''}${value.warnings.length?'。'+value.warnings.join(' '):''}`);}return value;}finally{await db.close();}})
+    restore:()=>work(async signal=>{if(!preview)return;signal.throwIfAborted();const db=new TransferStore();try{const value=await db.restore(preview);if(live.current){setResult(value);setPreview(undefined);setMessage(`已恢复 ${value.imported} 条记录${value.preserved?`，另存 ${value.preserved} 个内容版本`:''}${value.warnings.length?'。'+value.warnings.join(' '):''}`);}return value;}finally{await db.close();}})
   };
 }
