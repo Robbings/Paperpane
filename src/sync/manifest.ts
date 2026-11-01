@@ -1,6 +1,7 @@
 import type { TransferSnapshot, TransferRecord } from '@/contracts/transfer';
+import { recordPayload } from '@/transfer/records';
 import type { EntityMap } from './merge';
-export interface SyncManifest {format:'paperpane-sync';version:1;generation:string;createdAt:string;records:EntityMap;assets:Omit<TransferSnapshot['assets'][number],'blob'>[]}
+export interface SyncManifest {format:'paperpane-sync';version:1|2;generation:string;createdAt:string;records:EntityMap;assets:Omit<TransferSnapshot['assets'][number],'blob'>[]}
 /** Canonical document identities converge independently imported copies of the same PDF. */
 export function canonical(snapshot:TransferSnapshot):TransferSnapshot{
   const ids=new Map<string,string>();
@@ -21,9 +22,7 @@ export function flatten(snapshot:TransferSnapshot):EntityMap{
     const key=String(store==='meta'||store==='libraryPreferences'?row.key:row.id);
     // Interface/model configuration stays device-local during automatic sync. Backups retain its redacted copy.
     if(store==='meta'&&['modelSettings-v1','readerPreferences'].includes(key))continue;
-    const value={...row};delete value.revision;delete value.updatedAt;delete value.save;
-    if(store==='meta'&&value.value&&typeof value.value==='object'&&!Array.isArray(value.value)){value.value={...(value.value as Record<string,unknown>)};delete (value.value as Record<string,unknown>).revision;}
-    records[[db.name,store,key].map(encodeURIComponent).join('/')]=value;
+    records[[db.name,store,key].map(encodeURIComponent).join('/')]=recordPayload(row);
   }return records;
 }
 export function inflate(manifest:SyncManifest,template:TransferSnapshot):TransferSnapshot{
@@ -32,5 +31,14 @@ export function inflate(manifest:SyncManifest,template:TransferSnapshot):Transfe
     const [database,store,key]=id.split('/').map(decodeURIComponent);if(database!==template.databases[0]?.name||!store||!key)throw new Error('远程记录标识无效');
     (stores[store]??=[]).push(row);
   }
-  return {...template,id:manifest.generation,createdAt:manifest.createdAt,databases:[{...template.databases[0]!,stores}],assets:[]};
+  return {...template,version:manifest.version,id:manifest.generation,createdAt:manifest.createdAt,databases:[{...template.databases[0]!,stores}],assets:[]};
+}
+
+/** Full backups retain local PDFs; WebDAV only transports explicitly eligible files. */
+export function syncSnapshot(snapshot:TransferSnapshot):TransferSnapshot{
+  const wanted=new Set<string>();
+  for(const db of snapshot.databases)for(const doc of db.stores.documents??[]){
+    if(doc.syncScope==='record-and-file')wanted.add(`${db.name}:${(doc.file as any)?.assetId}`);
+  }
+  return {...snapshot,complete:false,assets:snapshot.assets.filter(a=>a.id.startsWith('note-image:')||wanted.has(`${a.database}:${a.id}`))};
 }

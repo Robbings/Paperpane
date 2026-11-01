@@ -17,13 +17,13 @@ export function BackupSection(){
     else{const blob=await downloadCloudBackup(client,action);await transfer.inspect(blob);setCloud(undefined);}
   }catch(e){setCloudMessage(e instanceof Error?e.message:'云备份操作失败');}finally{setCloudBusy(false);await db.close();}}
   return <SettingGroup title="备份与恢复">
-    <SettingRow label="本机备份"><Tooltip label="保存 PDF、书目、批注与已保存的研究内容，不包含密钥"><Button onClick={()=>void download()} disabled={transfer.busy}>导出</Button></Tooltip><Tooltip label="校验备份后合并恢复，冲突保留双方版本"><Button onClick={()=>input.current?.click()} disabled={transfer.busy}>恢复</Button></Tooltip></SettingRow>
+    <SettingRow label="本机备份"><Tooltip label="保存 PDF、书目、批注、笔记历史、嵌入图片与已保存的研究内容，不包含密钥"><Button onClick={()=>void download()} disabled={transfer.busy}>导出</Button></Tooltip><Tooltip label="校验备份后合并恢复，冲突保留双方版本"><Button onClick={()=>input.current?.click()} disabled={transfer.busy}>恢复</Button></Tooltip></SettingRow>
     <SettingRow label="云备份"><Tooltip label="上传并校验完整备份，与多端同步独立保存"><Button disabled={cloudBusy||transfer.busy||!connections.dav} onClick={()=>void remote('upload')}>备份</Button></Tooltip><Button disabled={cloudBusy||transfer.busy||!connections.dav} onClick={()=>void remote('list')}>恢复</Button></SettingRow>
     <SyncTrash/>
     {cloudMessage&&<p role="status">{cloudMessage}</p>}{cloudBusy&&<ProgressBar label="正在处理云备份"/>}
     <Dialog open={cloud!==undefined} onClose={()=>setCloud(undefined)} title="选择云备份">{cloud?.map(path=><div key={path}><Button variant="quiet" disabled={cloudBusy} onClick={()=>void remote(path)}>{path.split('/').at(-1)}</Button></div>)}</Dialog>
     {transfer.busy&&<ProgressBar label="正在处理备份"/>}{transfer.message&&<p role="status">{transfer.message}</p>}
     <input ref={input} hidden type="file" accept=".zip,application/zip" onChange={e=>{const file=e.target.files?.[0];e.target.value='';if(file)void transfer.inspect(file);}}/>
-    <Dialog open={!!transfer.preview} onClose={transfer.dismiss} title="恢复备份" description={transfer.preview?`${transfer.preview.complete?'完整备份':'数据备份'} · ${transfer.preview.assets.length} 个 PDF · ${transfer.preview.databases.reduce((n,d)=>n+Object.values(d.stores).reduce((m,r)=>m+r.length,0),0)} 条记录`:''} footer={<><Button onClick={transfer.dismiss} disabled={transfer.busy}>取消</Button><Button variant="primary" onClick={()=>void transfer.restore()} disabled={transfer.busy}>合并恢复</Button></>}/>
+    <Dialog open={!!transfer.preview} onClose={transfer.dismiss} title="恢复备份" description={transfer.preview?`${transfer.preview.version===1?'旧版备份（可能缺少笔记与图片）':transfer.preview.complete?'完整备份':'数据备份'} · ${transfer.preview.assets.length} 个附件 · ${transfer.preview.databases.reduce((n,d)=>n+Object.values(d.stores).reduce((m,r)=>m+r.length,0),0)} 条记录`:''} footer={<><Button onClick={transfer.dismiss} disabled={transfer.busy}>取消</Button><Button variant="primary" onClick={()=>void transfer.restore()} disabled={transfer.busy}>合并恢复</Button></>}/>
   </SettingGroup>;
 }

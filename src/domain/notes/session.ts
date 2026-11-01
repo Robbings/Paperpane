@@ -48,7 +48,7 @@ export class NoteSession implements NoteService {
     };
     this.snapshot = { mode: "live", state: "loading", data: this.state };
     this.channel.onmessage = (e) => {
-      if (e.data?.key === this.key) void this.refresh();
+      if (e.data?.key === this.key || e.data?.type === "restored") void this.refresh();
     };
   }
   private get key() {
