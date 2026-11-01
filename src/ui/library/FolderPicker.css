@@ -1,0 +1,15 @@
+.pp-folder-picker {
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+  height: min(320px, 46vh);
+  padding: 4px;
+  overflow: auto;
+  border-radius: var(--pp-radius-control);
+  background: var(--pp-fill);
+}
+
+/* The footer's first button sits apart, on the left. */
+.pp-folder-picker__new {
+  margin-right: auto;
+}

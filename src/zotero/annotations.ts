@@ -3,7 +3,7 @@ import type { DocumentRef } from '@/contracts/document';
 import type { ZoteroItem, ZoteroData } from './types';
 const colors:Record<HighlightColor,string>={yellow:'#ffd400',green:'#5fb236',blue:'#2ea8e5',pink:'#ff6666',purple:'#a28ae5'};
 export function fromZoteroAnnotation(item:ZoteroItem,ref:DocumentRef,views:readonly number[][],id:string):Annotation{
-  const d=item.data;if(!['highlight','note'].includes(d.annotationType??''))throw new Error('不支持的 Zotero 批注类型，已保留原始数据');
+  const d=item.data;if(!['highlight','note'].includes(d.annotationType??''))throw new Error('有批注类型暂不支持');
   const position=JSON.parse(String(d.annotationPosition??'null'));if(!position||!Number.isInteger(position.pageIndex))throw new Error('Zotero 批注位置无效');
   function page(index:number,rects:unknown){const view=views[index];if(!view||!Array.isArray(rects)||!rects.length)throw new Error('Zotero 批注页码或矩形无效');
     return {pageIndex:index,rects:rects.map(r=>{if(!Array.isArray(r)||r.length!==4||!r.every(Number.isFinite)||r[2]<=r[0]||r[3]<=r[1])throw new Error('Zotero 批注矩形无效');return {x:r[0]-view[0]!,y:r[1]-view[1]!,width:r[2]-r[0],height:r[3]-r[1]};})};}

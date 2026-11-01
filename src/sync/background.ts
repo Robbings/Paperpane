@@ -7,7 +7,7 @@ import { ConnectionStore } from './settings';
 export function installSync(){
   const alarm='paperpane-sync';
   // MV3 can stop a worker mid-transfer. A stale persisted flag is not a live task.
-  void navigator.locks.request('paperpane-sync',{ifAvailable:true},async lock=>{if(!lock)return;const db=new ConnectionStore();try{const state=await db.status();if(state.phase==='running')await db.write('transfer-sync-state',{...state,phase:'failed',message:'上次同步被中断，可重新同步'});}finally{await db.close();}}).catch(()=>{});
+  void navigator.locks.request('paperpane-sync',{ifAvailable:true},async lock=>{if(!lock)return;const db=new ConnectionStore();try{const state=await db.status();if(state.phase==='running')await db.write('transfer-sync-state',{...state,phase:'failed',message:'上次同步中断了'});}finally{await db.close();}}).catch(()=>{});
   async function configure(){const db=new ConnectionStore();try{const config=await db.view();if(config.dav?.automatic&&config.dav.conditional)await browser.alarms.create(alarm,{periodInMinutes:5,delayInMinutes:1});else await browser.alarms.clear(alarm);}finally{await db.close();}}
   const contentChannels=['paperpane-notes','paperpane-documents','paperpane-annotations','paperpane-ai'].map(name=>{
     const channel=new BroadcastChannel(name);

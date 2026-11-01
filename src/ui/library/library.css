@@ -315,10 +315,8 @@
   white-space: nowrap;
 }
 
-/* Only shown as text when the search is narrowed to some fields. */
+/* Narrowed to some fields (the tooltip names them): the icon takes the accent colour. */
 .pp-lib-search__scope[data-narrowed='true'] {
-  padding: 0 6px 0 8px;
-  background: var(--pp-accent-soft);
   color: var(--pp-accent);
 }
 
@@ -1082,39 +1080,3 @@ td[data-column='starred'] .pp-lib-cell-center {
   font-size: var(--pp-text-sm);
 }
 
-/* Zotero import / export dialog */
-.pp-zotero-toolbar { display:grid; grid-template-columns:minmax(0,1fr) auto; gap:12px; margin-bottom:12px; }
-.pp-zotero-target { display:flex; align-items:center; gap:8px; color:var(--pp-text-2); font-size:var(--pp-text-sm); white-space:nowrap; }
-.pp-zotero-target > :last-child { width:160px; }
-.pp-zotero-picker { display:grid; grid-template-columns:200px minmax(0,1fr); height:min(420px,52vh); border-radius:var(--pp-radius-control); box-shadow:inset 0 0 0 0.5px var(--pp-hairline); overflow:hidden; }
-.pp-zotero-picker[data-mode=export] { grid-template-columns:1fr; height:min(360px,48vh); }
-.pp-zotero-collections { min-width:0; overflow:auto; padding:6px; background:var(--pp-fill); }
-.pp-zotero-picker[data-mode=import] .pp-zotero-collections { border-right:0.5px solid var(--pp-hairline); }
-.pp-zotero-all { margin-bottom:1px; }
-.pp-zotero-list { display:flex; flex-direction:column; min-width:0; min-height:0; }
-.pp-zotero-list__head { display:flex; align-items:center; justify-content:space-between; gap:12px; min-height:40px; padding:0 6px 0 12px; border-bottom:0.5px solid var(--pp-hairline); color:var(--pp-text-2); font-size:var(--pp-text-sm); }
-.pp-zotero-list__head .pp-toggle__label { font-size:var(--pp-text-sm); color:var(--pp-text-2); }
-.pp-zotero-pager { display:flex; align-items:center; gap:2px; font-variant-numeric:tabular-nums; }
-.pp-zotero-pager > span:not(:empty) { margin-right:4px; }
-.pp-zotero-list__empty { margin:auto; color:var(--pp-text-3); font-size:var(--pp-text-sm); }
-.pp-zotero-items { flex:1; min-height:0; margin:0; padding:0 4px; overflow:auto; list-style:none; transition:opacity var(--pp-dur-fast) var(--pp-ease-out); }
-.pp-zotero-items[data-loading] { opacity:.5; }
-.pp-zotero-items li { display:flex; align-items:flex-start; justify-content:space-between; gap:12px; padding:9px 8px; border-radius:var(--pp-radius-control); }
-.pp-zotero-items li + li { box-shadow:0 -0.5px 0 var(--pp-hairline); }
-.pp-zotero-items li:hover { background:var(--pp-fill-hover); }
-.pp-zotero-items li[data-selected] { background:var(--pp-accent-soft); }
-.pp-zotero-items .pp-toggle { min-width:0; }
-.pp-zotero-items .pp-toggle__label { display:-webkit-box; -webkit-line-clamp:2; -webkit-box-orient:vertical; overflow:hidden; line-height:1.4; }
-.pp-zotero-items .pp-toggle__description { overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
-.pp-zotero-kind { flex-shrink:0; margin-top:2px; padding:1px 6px; border-radius:999px; background:var(--pp-fill-hover); color:var(--pp-text-2); font-size:var(--pp-text-xs); }
-.pp-zotero-wait { display:flex; align-items:center; justify-content:center; min-height:200px; color:var(--pp-text-2); }
-.pp-zotero-results { display:flex; flex-direction:column; gap:8px; margin-top:12px; }
-.pp-zotero-results ul { max-height:150px; margin:0; padding:0; overflow:auto; list-style:none; }
-.pp-zotero-results li { display:flex; align-items:flex-start; gap:8px; padding:6px 2px; font-size:var(--pp-text-sm); }
-.pp-zotero-results li + li { border-top:0.5px solid var(--pp-hairline); }
-.pp-zotero-results li > svg { flex-shrink:0; margin-top:3px; color:var(--pp-ok); }
-.pp-zotero-results li[data-failed] > svg { color:var(--pp-danger); }
-.pp-zotero-results li > span { display:flex; flex-direction:column; min-width:0; }
-.pp-zotero-results strong { overflow:hidden; text-overflow:ellipsis; white-space:nowrap; font-weight:var(--pp-weight-medium); }
-.pp-zotero-results small { color:var(--pp-text-2); font-size:var(--pp-text-xs); }
-@media(max-width:560px){.pp-zotero-toolbar{grid-template-columns:1fr}.pp-zotero-picker{grid-template-columns:1fr;height:auto}.pp-zotero-collections{max-height:150px;border-right:0!important;border-bottom:0.5px solid var(--pp-hairline)}.pp-zotero-items{max-height:45vh}}

@@ -16,6 +16,7 @@ export interface PaperView {
   tagIds: string[];
   /** null = top level of the library. */
   folderId: string | null;
+  folderIds?: string[];
   pageCount?: number;
   annotationCount: number;
   /** 0–1 of the paper read so far, when known. */

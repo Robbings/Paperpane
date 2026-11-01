@@ -1,7 +1,7 @@
 import type { TransferSnapshot, TransferRecord } from '@/contracts/transfer';
 import { recordPayload } from '@/transfer/records';
 import type { EntityMap } from './merge';
-export interface SyncManifest {format:'paperpane-sync';version:1|2;generation:string;createdAt:string;records:EntityMap;assets:Omit<TransferSnapshot['assets'][number],'blob'>[]}
+export interface SyncManifest {format:'paperpane-sync';version:1|2|3;generation:string;createdAt:string;records:EntityMap;assets:Omit<TransferSnapshot['assets'][number],'blob'>[]}
 /** Canonical document identities converge independently imported copies of the same PDF. */
 export function canonical(snapshot:TransferSnapshot):TransferSnapshot{
   const ids=new Map<string,string>();

@@ -15,11 +15,11 @@ export async function exportZotero(client:ZoteroClient,ids:readonly string[],col
   const existing=async(key:string)=>{try{return await client.item(key,signal);}catch(e){if(e instanceof ZoteroError&&e.status===404)return undefined;throw e;}};
   const save=async(data:ZoteroData,knownVersion?:number):Promise<ZoteroItem>=>{
     const remote=data.key?await existing(data.key):undefined;
-    if(remote&&knownVersion!==undefined&&remote.version!==knownVersion)throw new ZoteroError(412,'Zotero 中的内容已被修改，请先导入核对再导出');
+    if(remote&&knownVersion!==undefined&&remote.version!==knownVersion)throw new ZoteroError(412,'Zotero 里有新改动，请先导入');
     if(remote&&knownVersion===undefined){
       // A reserved key whose request previously completed is adopted, never blindly overwritten.
       if(remote.data.itemType!==data.itemType||remote.data.parentItem!==data.parentItem)throw new Error('远程条目标识冲突');
-      if(Object.entries(data).some(([key,value])=>!['key','version'].includes(key)&&stable(value)!==stable(remote.data[key])))throw new ZoteroError(412,'上次导出的远程内容与本机不同，请先导入核对');
+      if(Object.entries(data).some(([key,value])=>!['key','version'].includes(key)&&stable(value)!==stable(remote.data[key])))throw new ZoteroError(412,'Zotero 里有新改动，请先导入');
       return remote;
     }
     return client.save({...data,...(remote?{version:knownVersion}:{})},signal);
@@ -27,7 +27,7 @@ export async function exportZotero(client:ZoteroClient,ids:readonly string[],col
   try{for(const id of ids){signal.throwIfAborted();const warnings:string[]=[];let title=id;
     try{
       const local=await db.getItem(id);if(!local)throw new Error('所选文献已不存在');title=local.title;
-      const transfer=new TransferStore();try{const conflicts=await transfer.conflicts();if(conflicts.some(c=>(c.store==='libraryItems'&&c.key===id)||(c.store==='annotations'&&(c.local?.anchor as any)?.documentId===local.documentId)||c.external?.mappingKey===`zotero-map:${client.userId}:${id}`))throw new Error('请先在同步设置中处理这篇论文的冲突');}finally{await transfer.close();}
+      const transfer=new TransferStore();try{await transfer.migrateConflicts();}finally{await transfer.close();}
       let link=await db.link(client.userId,id);
       if(!link||link.original?.itemType==='attachment')link={itemKey:zoteroKey(),attachmentKey:undefined,collections:[],annotationKeys:{}};
       const checkpoint=async()=>db.saveLink(client.userId,id,link!);
@@ -46,7 +46,7 @@ export async function exportZotero(client:ZoteroClient,ids:readonly string[],col
           if(attachment.data.itemType!=='attachment'||attachment.data.parentItem!==link.itemKey)throw new Error('远程附件标识冲突');
           if(link.attachmentVersion!==undefined&&attachment.version!==link.attachmentVersion){
             const pending=!link.uploaded||link.fileHash!==doc.file.sha256;
-            if(!pending||attachment.data.md5!==md5(new Uint8Array(await blob.arrayBuffer())))throw new ZoteroError(412,'Zotero 附件已变化，请先导入核对');
+            if(!pending||attachment.data.md5!==md5(new Uint8Array(await blob.arrayBuffer())))throw new ZoteroError(412,'Zotero 附件有改动，请先导入');
             // Registration succeeded before a lost response: adopt only the exact uploaded bytes.
             link.uploaded=true;link.fileHash=doc.file.sha256;
           }
@@ -64,7 +64,7 @@ export async function exportZotero(client:ZoteroClient,ids:readonly string[],col
               const group=groups.get(target.key);
               if(group){
                 const first=JSON.parse(String(group.value.annotationPosition)),next=JSON.parse(String(values[index]!.annotationPosition));
-                if(next.pageIndex!==first.pageIndex+1||first.nextPageRects)throw new Error('跨页批注不能安全转换，已保留原始记录');first.nextPageRects=next.rects;group.value.annotationPosition=JSON.stringify(first);group.slots.push(slot);
+                if(next.pageIndex!==first.pageIndex+1||first.nextPageRects)throw new Error('跨页批注没有导出');first.nextPageRects=next.rects;group.value.annotationPosition=JSON.stringify(first);group.slots.push(slot);
               }else groups.set(target.key,{slots:[slot],value:{...values[index]!,key:target.key,...(target.localColor===row.color&&target.color?{annotationColor:target.color}:{})},version:target.version});
             }
             await checkpoint();
@@ -79,6 +79,6 @@ export async function exportZotero(client:ZoteroClient,ids:readonly string[],col
       }
       link.version=(await client.item(link.itemKey,signal)).version;await checkpoint();
       onResult({key:id,title,ok:true,message:'已导出到 Zotero',warnings});
-    }catch(e){onResult({key:id,title,ok:false,message:e instanceof Error?e.message:'导出失败，已完成的阶段会保留以便重试',warnings});}
+    }catch(e){onResult({key:id,title,ok:false,message:e instanceof Error?e.message:'导出失败，可重试',warnings});}
   }}finally{await Promise.all([db.close(),annotations.close()]);}
 }

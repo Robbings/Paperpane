@@ -183,7 +183,7 @@ export function PaperDetail(props: PaperDetailProps) {
             onClick={() => setMoveOpen((open) => !open)}
           >
             <Icon name="folder" size={15} />
-            <span>{folderPath(folders, paper.folderId)}</span>
+            <span>{[...new Set([...(paper.folderId?[paper.folderId]:[]),...(paper.folderIds??[])])].map(id=>folderPath(folders,id)).join('；') || '未分类'}</span>
             <Icon name="chevronDown" size={12} strokeWidth={2} />
           </button>
         </div>

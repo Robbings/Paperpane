@@ -13,6 +13,7 @@ import { sinceText } from '../StatusLine';
 import { SyncConflicts } from '../SyncConflicts';
 import { SyncTrash } from '../SyncTrash';
 import { ZoteroDiscovery } from './ZoteroDiscovery';
+import { ZoteroSetupSteps } from '@/ui/library/ZoteroSetupSteps';
 
 const failed = (error: unknown, fallback: string) => toast.show({ tone: 'error', message: error instanceof Error ? error.message : fallback });
 const done = (message: string) => toast.show({ tone: 'success', message, duration: 2600 });
@@ -170,7 +171,7 @@ function WebDavGroup() {
               断开
             </Button>
           </SettingRow>
-          <SettingRow label="立即同步" hint="合并两端已保存的内容；有冲突时由你选择保留哪一份">
+          <SettingRow label="立即同步" hint="自动合并两端内容，不同改动会另存版本">
             <span className="pp-set-value">{state.lastSuccess ? `上次 ${sinceText(state.lastSuccess)}` : '尚未同步'}</span>
             {running ? (
               <Button size="sm" variant="quiet" onClick={() => controller.current?.abort()}>
@@ -365,12 +366,17 @@ function ZoteroGroup() {
           </Button>
         </SettingRow>
       ) : (
-        <SettingRow label="API Key" hint="在 zotero.org 的设置里创建，需要读取文献库的权限">
+        <SettingRow label="API Key">
           <TextField label="Zotero API Key" hideLabel type="password" autoComplete="new-password" value={key} onChange={setKey} />
           <Button size="sm" variant="primary" disabled={busy || !key.trim()} onClick={() => void connect()}>
             {busy ? '连接中…' : '连接'}
           </Button>
         </SettingRow>
+      )}
+      {!zotero && (
+        <div className="pp-set-note">
+          <ZoteroSetupSteps />
+        </div>
       )}
     </SettingGroup>
   );

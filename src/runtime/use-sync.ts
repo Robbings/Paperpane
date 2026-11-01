@@ -9,7 +9,7 @@ export function useSync(){
     return()=>{live=false;channel.close();window.removeEventListener('focus',load);void pending.finally(()=>db.close());};
   },[]);
   const status:Partial<StatusSummary>={syncImplemented:true,syncConfigured:!!connections.dav,lastSyncedAt:state.lastSuccess??null,
-    sync:error?'failed':!connections.dav?'unconfigured':state.phase==='success'?'synced':state.phase==='running'?'syncing':state.phase==='failed'?'failed':state.phase==='conflicts'?'conflict':'pending',
+    sync:error?'failed':!connections.dav?'unconfigured':state.phase==='success'?'synced':state.phase==='running'?'syncing':state.phase==='failed'?'failed':'pending',
     syncMessage:error||(!connections.dav?'数据仅保存在本机':state.phase==='idle'?(state.message??'已连接，尚未同步'):undefined)};
   return {connections,state,status,error};
 }

@@ -32,3 +32,5 @@ export function enrichItem(item: LibraryItem, bibliography: PdfBibliography | un
   }
   return next;
 }
+
+export const itemFolders = (item: Pick<LibraryItem, 'folderId' | 'folderIds'>): string[] => [...new Set([...(item.folderId ? [item.folderId] : []), ...(item.folderIds ?? [])])];

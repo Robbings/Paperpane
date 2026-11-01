@@ -7,7 +7,7 @@ export class WebDavClient {
   constructor(connection:DavConnection,fetcher:typeof fetch=fetch){
     this.fetcher=fetcher.bind(globalThis);
     const url=new URL(connection.url);
-    if(url.username||url.password||url.search||url.hash||!['https:','http:'].includes(url.protocol)||(url.protocol==='http:'&&!['localhost','127.0.0.1','[::1]'].includes(url.hostname)))throw new Error('WebDAV 地址须使用 HTTPS，本机测试可使用 HTTP');
+    if(url.username||url.password||url.search||url.hash||!['https:','http:'].includes(url.protocol)||(url.protocol==='http:'&&!['localhost','127.0.0.1','[::1]'].includes(url.hostname)))throw new Error('地址需要以 https:// 开头');
     url.pathname=url.pathname.replace(/\/*$/,'/');this.base=url;
     this.authorization='Basic '+btoa(Array.from(new TextEncoder().encode(connection.username+':'+connection.password),b=>String.fromCharCode(b)).join(''));
   }
@@ -15,10 +15,10 @@ export class WebDavClient {
   private async request(method:string,path:string,headers:HeadersInit={},body?:BodyInit,signal?:AbortSignal){
     const h=new Headers(headers);h.set('Authorization',this.authorization);
     const response=await this.fetcher(this.path(path),{method,headers:h,body,signal:signal?AbortSignal.any([signal,AbortSignal.timeout(120000)]):AbortSignal.timeout(120000),redirect:'error',credentials:'omit',cache:'no-store'});
-    if(!response.ok)throw new DavError(response.status,response.status===412?'远程内容已更新，请重新同步':response.status===401||response.status===403?'WebDAV 认证失败或没有权限':response.status===507?'WebDAV 存储空间不足':`WebDAV 请求失败（${response.status}）`);
+    if(!response.ok)throw new DavError(response.status,response.status===412?'云端有更新，请重新同步':response.status===401||response.status===403?'用户名或密码不对':response.status===507?'WebDAV 存储空间不足':`WebDAV 请求失败（${response.status}）`);
     return response;
   }
-  async get(path:string,signal?:AbortSignal){const r=await this.request('GET',path,{},undefined,signal);return {response:r,etag:r.headers.get('ETag')};}
+  async get(path:string,signal?:AbortSignal,range?:string){const r=await this.request('GET',path,range?{Range:range}:{},undefined,signal);return {response:r,etag:r.headers.get('ETag')};}
   async put(path:string,body:BodyInit,etag?:string|null,signal?:AbortSignal){const headers:Record<string,string>={};if(etag===null)headers['If-None-Match']='*';else if(etag)headers['If-Match']=etag;const r=await this.request('PUT',path,headers,body,signal);return r.headers.get('ETag');}
   async mkdir(path:string,signal?:AbortSignal){try{await this.request('MKCOL',path,{},undefined,signal);}catch(e){if(!(e instanceof DavError)||![405,301].includes(e.status))throw e;}}
   async remove(path:string,signal?:AbortSignal){try{await this.request('DELETE',path,{},undefined,signal);}catch(e){if(!(e instanceof DavError)||e.status!==404)throw e;}}

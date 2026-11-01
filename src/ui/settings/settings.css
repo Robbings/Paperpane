@@ -478,8 +478,8 @@
 .pp-transfer-compare section { min-width:0; }
 .pp-transfer-compare pre { white-space:pre-wrap; overflow-wrap:anywhere; max-height:320px; overflow:auto; font-size:12px; }
 @media(max-width:600px){.pp-transfer-compare{grid-template-columns:1fr}}
-.pp-transfer-compare h3 { margin:0 0 6px; color:var(--pp-text-2); font-size:var(--pp-text-sm); font-weight:var(--pp-weight-semibold); }
-.pp-transfer-compare pre { margin:0; padding:10px 12px; border-radius:var(--pp-radius-control); background:var(--pp-fill); }
+.pp-transfer-compare :is(h3,h4) { margin:0 0 6px; color:var(--pp-text-2); font-size:var(--pp-text-sm); font-weight:var(--pp-weight-semibold); }
+.pp-transfer-compare :is(pre,.pp-saved-version-content) { margin:0; padding:10px 12px; border-radius:var(--pp-radius-control); background:var(--pp-fill); }
 
 /* ---- Page header: title, page actions and saving, always at the top ------------- */
 
@@ -734,4 +734,21 @@
   color: var(--pp-text);
   font-size: var(--pp-text-md);
   font-weight: var(--pp-weight-medium);
+}
+
+/* Saved versions: a list on the left, the two sides compared on the right. */
+.pp-saved-versions { display:grid; grid-template-columns:200px minmax(0,1fr); gap:16px; min-height:min(360px,50vh); }
+.pp-saved-versions nav { display:flex; flex-direction:column; gap:2px; max-height:55vh; overflow:auto; }
+.pp-saved-version-item { display:flex; flex-direction:column; gap:2px; width:100%; padding:8px 10px; border:0; border-radius:var(--pp-radius-control); background:transparent; color:var(--pp-text); text-align:left; overflow-wrap:anywhere; }
+.pp-saved-version-item:hover { background:var(--pp-fill-hover); }
+.pp-saved-version-item[aria-pressed=true] { background:var(--pp-accent-soft); }
+.pp-saved-version-item strong { font-size:var(--pp-text-md); font-weight:var(--pp-weight-medium); }
+.pp-saved-version-item span, .pp-saved-version-item time { color:var(--pp-text-2); font-size:var(--pp-text-xs); }
+.pp-saved-version-content { max-height:44vh; overflow:auto; white-space:pre-wrap; overflow-wrap:anywhere; font-size:var(--pp-text-sm); line-height:1.65; }
+.pp-saved-version-content mark { border-radius:2px; background:color-mix(in srgb, var(--pp-warn) 28%, transparent); color:inherit; }
+@media(max-width:700px){.pp-saved-versions{grid-template-columns:1fr}.pp-saved-versions nav{max-height:160px}}
+
+/* A small aside under a group's rows, e.g. how to get a Zotero key. */
+.pp-set-note {
+  padding: 10px 2px 2px;
 }

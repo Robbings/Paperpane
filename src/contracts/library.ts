@@ -26,6 +26,8 @@ export interface LibraryItem extends RecordStamp {
   addedAt: string;
   starred: boolean;
   folderId: Id | null;
+  /** Additional collection memberships, used by Zotero multi-collection imports. */
+  folderIds?: Id[];
   tagIds: Id[];
   /** Original CSL data retains author structure, volume, pages, identifiers, etc. */
   citation?: Record<string, Json>;
