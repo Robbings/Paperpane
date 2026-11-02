@@ -57,6 +57,8 @@ export function ZoteroImportDialog(props: Props) {
   const [count, setCount] = useState(0);
   const [results, setResults] = useState<ZoteroTransferItemResult[]>([]);
   const [showProblems, setShowProblems] = useState(false);
+  /** Set when a run ends: the dialog then says it is done and offers 完成. */
+  const [finished, setFinished] = useState<number | null>(null);
   const [writable, setWritable] = useState(false);
   const [password, setPassword] = useState('');
   const [passwordPrompt, setPasswordPrompt] = useState<{ incorrect: boolean; resolve: (value: string | null) => void }>();
@@ -89,6 +91,7 @@ export function ZoteroImportDialog(props: Props) {
     setWritable(false);
     setResults([]);
     setShowProblems(false);
+    setFinished(null);
     setSelected(new Map());
     setFolder(props.folderId ?? 'root');
     setDestination('collections');
@@ -155,6 +158,7 @@ export function ZoteroImportDialog(props: Props) {
     operation.current = abort;
     setBusy(true);
     setShowProblems(false);
+    setFinished(null);
     const failed = new Set(results.filter((r) => !r.ok).map((r) => r.key));
     const finished: ZoteroTransferItemResult[] = retry ? results.filter((r) => r.ok) : [];
     setResults(finished.slice());
@@ -194,14 +198,18 @@ export function ZoteroImportDialog(props: Props) {
       const verb = importing ? '导入' : '导出';
       const bad = finished.filter((r) => !r.ok).length;
       const partial = finished.filter((r) => r.ok && r.warnings.length).length;
+      setFinished(finished.length - bad);
       if (bad) {
         // Stay open on the problems, with retry in the footer.
         setShowProblems(true);
         toast.show({ tone: 'warning', message: `${finished.length - bad} 篇已${verb}，${bad} 篇失败` });
       } else {
-        toast.show({ tone: 'success', message: `已${verb} ${batch} 篇${partial ? `，${partial} 篇有缺失内容` : ''}`, duration: 3200 });
-        if (partial) setShowProblems(true);
-        else props.onClose();
+        toast.show({ tone: 'success', message: `已${verb} ${batch} 篇${partial ? `，${partial} 篇有部分内容未导入` : ''}`, duration: 3200 });
+        // Imported, with notes on what was left out: say so and let the reader close it.
+        if (partial) {
+          setSelected(new Map());
+          setShowProblems(true);
+        } else props.onClose();
       }
     } catch (e) {
       if (live.current && !abort.signal.aborted) toast.show({ tone: 'error', message: message(e, '操作失败'), action: { label: '重试', onAction: () => void run(retry) } });
@@ -403,25 +411,41 @@ export function ZoteroImportDialog(props: Props) {
                   <Spinner size={13} label="正在传输" />
                   {results.length} / {count}
                 </>
-              ) : problems.length > 0 ? (
-                <button
-                  type="button"
-                  className="pp-zotero-link"
-                  data-tone={failures ? 'danger' : undefined}
-                  aria-expanded={showProblems}
-                  onClick={() => setShowProblems((v) => !v)}
-                >
-                  {failures ? `${failures} 篇失败` : `${problems.length} 篇有缺失内容`}
-                </button>
+              ) : finished !== null ? (
+                <>
+                  <span className="pp-zotero-done">
+                    <Icon name="check" size={14} />
+                    已{importing ? '导入' : '导出'} {finished} 篇
+                  </span>
+                  {problems.length > 0 && (
+                    <button
+                      type="button"
+                      className="pp-zotero-link"
+                      data-tone={failures ? 'danger' : undefined}
+                      aria-expanded={showProblems}
+                      onClick={() => setShowProblems((v) => !v)}
+                    >
+                      {failures ? `${failures} 篇失败` : `${problems.length} 篇有部分内容未导入`}
+                    </button>
+                  )}
+                </>
               ) : importing && selected.size > 0 ? (
                 `已选 ${selected.size} 篇`
               ) : null}
             </span>
             {failures > 0 && !busy && <Button onClick={() => void run(true)}>重试失败的</Button>}
-            <Button onClick={close}>{locked ? '取消' : '关闭'}</Button>
-            <Button variant="primary" disabled={locked || !client || (importing ? !selected.size : !writable)} onClick={() => void run()}>
-              {importing ? '导入' : '导出'}
-            </Button>
+            {finished !== null && !busy && !failures && !selected.size ? (
+              <Button variant="primary" onClick={close}>
+                完成
+              </Button>
+            ) : (
+              <>
+                <Button onClick={close}>{locked ? '取消' : '关闭'}</Button>
+                <Button variant="primary" disabled={locked || !client || (importing ? !selected.size : !writable)} onClick={() => void run()}>
+                  {importing ? '导入' : '导出'}
+                </Button>
+              </>
+            )}
           </>
         }
       >

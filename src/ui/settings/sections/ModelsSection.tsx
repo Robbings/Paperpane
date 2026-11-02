@@ -30,6 +30,7 @@ import { DefaultModels } from "./models/DefaultModels";
 import { AdvancedSection } from "./AdvancedSection";
 import { SettingsHeader } from "../SettingsHeader";
 import { ModelEditor } from "./models/ModelEditor";
+import { ManualModelForm, emptyManual, manualModel, type ManualDraft } from "./models/ManualModelForm";
 import { ProviderPicker } from "./models/ProviderPicker";
 import { ProviderList } from "./models/ProviderList";
 import { ProviderLogo } from "./models/ProviderLogo";
@@ -65,13 +66,18 @@ export function ModelsSection({
   const [catalog, setCatalog] = useState(readCatalog),
     [discovered, setDiscovered] = useState<CatalogModel[]>([]),
     [chosen, setChosen] = useState<string[]>([]);
-  const [message, setMessage] = useState(""),
-    [error, setError] = useState(""),
-    [busy, setBusy] = useState(false);
+  const [busy, setBusy] = useState(false);
+  // Results go to toasts like everywhere else; an empty string is "nothing to say".
+  const setMessage = (text: string) => {
+    if (text) toast.show({ tone: "success", message: text, duration: 2600 });
+  };
+  const setError = (text: string) => {
+    if (text) toast.show({ tone: "error", message: text });
+  };
   const [testId, setTestId] = useState<string | null>(null),
     [mode, setMode] = useState<"text" | "image" | "structured">("text");
-  const [manualId, setManualId] = useState(""),
-    [manualName, setManualName] = useState(""),
+  const [manual, setManual] = useState<ManualDraft>(emptyManual),
+    [manualAdded, setManualAdded] = useState<string[]>([]),
     [showKey, setShowKey] = useState(false);
   const [removing, setRemoving] = useState<{
     endpoint?: string;
@@ -125,7 +131,7 @@ export function ModelsSection({
       if (!c.signal.aborted) done(v);
     } catch (e) {
       if (!c.signal.aborted)
-        setError(e instanceof Error ? e.message : "操作失败。");
+        setError(e instanceof Error ? e.message : "操作失败");
     } finally {
       if (operation.current === c) setBusy(false);
     }
@@ -193,7 +199,7 @@ export function ModelsSection({
           return item ? refreshModel(m, item, v.updatedAt) : m;
         }),
       });
-      setMessage("目录已更新，已有模型的手动设置保持不变。");
+      setMessage("目录已更新");
     });
   }
   function openPicker() {
@@ -204,6 +210,8 @@ export function ModelsSection({
     );
     setQuery("");
     setChosen([]);
+    setManual(emptyManual);
+    setManualAdded([]);
     setPicker(true);
   }
   const identity = (m: CatalogModel) =>
@@ -216,7 +224,7 @@ export function ModelsSection({
           (m.protocol ?? endpoint?.protocol),
     );
   /** Adds models after looking up what they can do (catalog, then the web, then defaults to check). */
-  function addItems(items: CatalogModel[]) {
+  function addItems(items: CatalogModel[], keepOpen = false, onAdded?: () => void) {
     if (!endpoint) return;
     const fresh = items.filter((m) => !already(m));
     void run(
@@ -228,7 +236,8 @@ export function ModelsSection({
           models: [...draft.models, ...added],
           defaultModelId: draft.defaultModelId ?? added[0]?.id ?? null,
         });
-        setPicker(false);
+        if (keepOpen) onAdded?.();
+        else setPicker(false);
         const guessed = added.filter((m) => m.capabilitiesGuessed).length;
         if (guessed) toast.show({ tone: 'warning', message: `${guessed} 个模型没查到资料，已用默认能力，请在详情里核对。` });
       },
@@ -279,17 +288,12 @@ export function ModelsSection({
           <Button
             size="sm"
             variant="quiet"
-            onClick={() => {
-              cancel();
-              setMessage("已取消。");
-            }}
+            onClick={cancel}
           >
             取消
           </Button>
         </p>
       )}
-      {message && <p>{message}</p>}
-      {error && <p role="alert">{error}</p>}
     </div>
   );
   return (
@@ -445,17 +449,10 @@ export function ModelsSection({
             </SettingGroup>
             <SettingGroup
               title="模型"
-              hint={`models.dev 目录 · ${catalog.updatedAt.slice(0, 10)}。目录是能力参考，不代表账号可以调用；可通过模型右侧的测试操作确认。`}
+              hint="能力来自公开目录，仅供参考；可用右侧的测试确认"
               actions={
                 <div className="pp-model-actions">
                   <span className="pp-model-detail-count">{models.length}</span>
-                  <IconButton
-                    icon="sync"
-                    label="更新目录"
-                    size="md"
-                    disabled={busy}
-                    onClick={refreshCatalog}
-                  />
                   <IconButton
                     icon="plus"
                     label="添加模型"
@@ -560,25 +557,23 @@ export function ModelsSection({
             </Button>
             {source === "manual" ? (
               <Button
-                disabled={!manualId.trim()}
+                variant="primary"
+                disabled={busy || !manual.modelId.trim()}
                 onClick={() => {
-                  if (models.some((m) => m.modelId === manualId.trim())) {
-                    setError("该模型已经添加。");
+                  const id = manual.modelId.trim();
+                  if (models.some((m) => m.modelId === id)) {
+                    setError("这个模型已经添加过了");
                     return;
                   }
-                  addItems([
-                    {
-                      provider: "",
-                      modelId: manualId.trim(),
-                      label: manualName.trim() || manualId.trim(),
-                      reasoning: { kind: "unknown" },
-                    },
-                  ]);
-                  setManualId("");
-                  setManualName("");
+                  // Stays open for the next one; what was added is listed under the form.
+                  addItems([manualModel(manual)], true, () => {
+                    setManualAdded((list) => [...list, manual.label.trim() || id]);
+                    setManual(emptyManual);
+                    setMessage(`已添加 ${manual.label.trim() || id}`);
+                  });
                 }}
               >
-                添加到草稿
+                添加
               </Button>
             ) : (
               <Button
@@ -615,18 +610,7 @@ export function ModelsSection({
           ))}
         </div>
         {source === "manual" ? (
-          <div className="pp-model-fields">
-            <TextField
-              label="请求模型 ID"
-              value={manualId}
-              onChange={setManualId}
-            />
-            <TextField
-              label="显示名称"
-              value={manualName}
-              onChange={setManualName}
-            />
-          </div>
+          <ManualModelForm value={manual} onChange={setManual} added={manualAdded} />
         ) : (
           <>
             <div className="pp-model-picker-tools">
@@ -641,6 +625,7 @@ export function ModelsSection({
                 onChange={setCapability}
               />
               {source === "catalog" ? (
+                <>
                 <Select
                   label="模型厂商"
                   value={brand}
@@ -665,6 +650,15 @@ export function ModelsSection({
                     setChosen([]);
                   }}
                 />
+                <IconButton
+                  icon="sync"
+                  label={`更新目录 · ${catalog.updatedAt.slice(0, 10)}`}
+                  size="md"
+                  disabled={busy}
+                  className={busy ? "pp-model-refreshing" : undefined}
+                  onClick={refreshCatalog}
+                />
+                </>
               ) : (
                 <Button
                   disabled={busy}
@@ -674,7 +668,7 @@ export function ModelsSection({
                       (s) => fetchEndpointModels(endpoint, catalog, s),
                       (v) => {
                         setDiscovered(v);
-                        setMessage(`端点返回 ${v.length} 个模型。`);
+                        setMessage(`找到 ${v.length} 个模型`);
                       },
                     )
                   }

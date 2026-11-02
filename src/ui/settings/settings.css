@@ -392,7 +392,44 @@
 
 .pp-set-selbar__actions {
   display: flex;
-  justify-content: flex-end;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.pp-set-selbar__tip {
+  color: var(--pp-text-3);
+  font-size: var(--pp-text-xs);
+}
+
+.pp-set-selbar__look-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 2px 2px 6px;
+  border-bottom: 0.5px solid var(--pp-hairline);
+  font-size: var(--pp-text-md);
+}
+
+/* The bar as it looks now, small, beside the row's button. */
+.pp-set-selbar__mini {
+  display: inline-flex;
+  margin-right: 4px;
+  pointer-events: none;
+}
+
+.pp-set-selbar__mini .pp-selmenu {
+  position: static;
+  animation: none;
+  box-shadow: 0 0 0 0.5px var(--pp-hairline);
+  zoom: 0.85;
+}
+
+/* A few choices in one row, e.g. what element detection looks for. */
+.pp-set-checks {
+  display: inline-flex;
+  flex-wrap: wrap;
+  gap: 4px 16px;
 }
 
 /* 显示方式: folded away by default. */

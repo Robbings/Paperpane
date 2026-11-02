@@ -54,3 +54,4 @@
 .pp-zotero-group li:hover { background:var(--pp-fill-hover); }
 .pp-zotero-group li[data-selected] { background:var(--pp-accent-soft); }
 .pp-zotero-group .pp-toggle__description { overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+.pp-zotero-done { display:inline-flex; align-items:center; gap:5px; color:var(--pp-ok); }

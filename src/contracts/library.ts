@@ -61,6 +61,8 @@ export interface LibraryState {
   items: readonly LibraryRow[]; total: number; folders: readonly LibraryFolder[]; tags: readonly LibraryTag[];
   counts: LibraryCounts; query: LibraryQuery; preferences: LibraryPreferences;
   unavailableSearchFields: readonly LibraryField[];
+  /** Tags used by papers in the current collection, before tag and text filters. */
+  collectionTagIds?: readonly Id[];
 }
 export interface LibraryService extends Readable<LibraryState> {
   setQuery(patch: Partial<LibraryQuery>): void;

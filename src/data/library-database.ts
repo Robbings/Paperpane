@@ -85,6 +85,7 @@ export class LibraryDatabase extends PaperDatabase {
       const folderSets = new Map(folders.map(f => [f.id, descendants(folders, f.id)]));
       const tagMap = new Map(tags.map(t => [t.id, t.label]));
       const items: LibraryRow[] = []; let total = 0;
+      const collectionTags = new Set<string>();
       const needle = query.text.trim().normalize('NFKC').toLocaleLowerCase();
       const value = (item: LibraryRow): string | number => {
         switch (query.sort.column) {
@@ -122,6 +123,7 @@ export class LibraryDatabase extends PaperDatabase {
               if (query.collection.kind === 'starred') matches &&= item.starred;
               if (query.collection.kind === 'unfiled') matches &&= !itemFolders(item).length;
               if (query.collection.kind === 'folder') matches &&= itemFolders(item).some(id => folderSets.get((query.collection as {folderId:string}).folderId)?.has(id));
+              if (matches) for (const id of item.tagIds) collectionTags.add(id);
               if (query.tagIds.length) matches &&= query.tagIds.some(id => item.tagIds.includes(id));
               if (needle) matches &&= query.fields.some(field => {
                 const text = field === 'authors' ? item.authors.join(' ') : field === 'note' ? item.shortNote : field === 'body' || field === 'summary' ? '' : item[field];
@@ -142,7 +144,7 @@ export class LibraryDatabase extends PaperDatabase {
           } else accept();
         };
       });
-      return { items, total, folders, tags, counts, preferences: pref?.value ?? structuredClone(libraryDefaults), unavailableSearchFields: ['body', 'summary'] };
+      return { items, total, folders, tags, counts, preferences: pref?.value ?? structuredClone(libraryDefaults), unavailableSearchFields: ['body', 'summary'], collectionTagIds: [...collectionTags] };
     });
   }
   private async items(tx: IDBTransaction, ids: readonly string[]): Promise<LibraryItem[]> {

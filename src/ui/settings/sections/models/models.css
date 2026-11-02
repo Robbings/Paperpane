@@ -803,3 +803,12 @@
   background: var(--pp-reading-surface);
   max-height: 100dvh;
 }
+
+/* Manual add: the facts in two columns; what was added this time listed under them. */
+.pp-model-manual { display: flex; flex-direction: column; gap: 12px; }
+.pp-model-manual__grid { display: grid; grid-template-columns: 1fr 1fr; gap: 12px 16px; }
+.pp-model-manual__added { margin: 0; color: var(--pp-text-2); font-size: var(--pp-text-sm); }
+@media (max-width: 560px) { .pp-model-manual__grid { grid-template-columns: 1fr; } }
+
+.pp-model-refreshing svg { animation: pp-model-spin 1s linear infinite; }
+@keyframes pp-model-spin { to { transform: rotate(360deg); } }

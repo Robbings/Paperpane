@@ -80,7 +80,7 @@ export function LibraryPage({ owner }: { owner: Runtime }) {
       snapshot.state !== 'loading' && <LibraryView
         papers={papers} total={data.total} onLoadMore={service.loadMore}
         paperById={id => papers.find(p => p.id === id)}
-        folders={data.folders} tags={data.tags} counts={data.counts}
+        folders={data.folders} tags={data.tags} collectionTagIds={data.collectionTagIds} counts={data.counts}
         query={data.query} onQuery={patch => {
           if (patch.fields?.some(f => data.unavailableSearchFields.includes(f))) toast.show({ tone: 'warning', message: '正文与 AI 总结还没有索引；本次只搜索已接入的书目信息和短注释' });
           service.setQuery(patch);
