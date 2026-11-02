@@ -2,7 +2,7 @@ import { useEffect } from 'react';
 import { Checkbox, Segmented, Select, Stepper, Switch, toast } from '@/ui/components';
 import { SettingGroup, SettingRow } from '../SettingRow';
 import { SelectionBarSettings } from './SelectionBarSettings';
-import { BrowserEntrySection } from './BrowserEntrySection';
+
 import { fontSizeLabel, localeOptions, themeOptions } from '../options';
 import { FONT_SIZE, UI_SCALE, type Preferences, type PreferencesState } from '../types';
 
@@ -48,7 +48,7 @@ export function GeneralSection({ state, onPreference, onRetry }: GeneralSectionP
         </SettingRow>
       </SettingGroup>
 
-      <BrowserEntrySection />
+
 
       <SettingGroup title="选中文字">
         <SelectionBarSettings value={p.selectionBar} onChange={(bar) => onPreference('selectionBar', bar)} />

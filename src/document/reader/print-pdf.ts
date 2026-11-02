@@ -1,4 +1,5 @@
 import { getDocument } from 'pdfjs-dist';
+import { pdfjsResources } from '../pdfjs-resources';
 import type { Annotation } from '@/contracts/annotations';
 /** Called with a window opened synchronously by the original user gesture. */
 export async function printAnnotatedPdf(win:Window,bytes:Uint8Array,rows:readonly Annotation[],title:string) {
@@ -7,7 +8,7 @@ export async function printAnnotatedPdf(win:Window,bytes:Uint8Array,rows:readonl
   style.textContent='body{margin:0;font:14px sans-serif;color:#111;background:white} .sheet{break-after:page} .sheet img{display:block;width:100%;height:100%;object-fit:contain} .comments{padding:24px;white-space:pre-wrap;overflow-wrap:anywhere} article{break-inside:avoid;margin-bottom:24px} @media print{.controls{display:none}}';
   doc.head.append(style);
   const controls=doc.createElement('div');controls.className='controls';controls.textContent='正在准备全部页面，可关闭此窗口取消。';doc.body.replaceChildren(controls);
-  const task=getDocument({data:bytes,enableXfa:false});
+  const task=getDocument({...pdfjsResources(),data:bytes,enableXfa:false});
   try {
     const pdf=await task.promise;
     for(let i=1;i<=pdf.numPages;i++) {

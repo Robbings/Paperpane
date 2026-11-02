@@ -28,9 +28,9 @@ export function isPdfResponse(details: PdfResponse): boolean {
     && !/^attachment(?:;|$)/i.test(header('content-disposition').trim());
 }
 
-export function shouldAutoOpen(settings: BrowserEntrySettings, raw: string, bypass?: string): boolean {
-  try { return settings.autoOpenPdf && pdfSourceUrl(raw) !== (bypass ? pdfSourceUrl(bypass) : undefined); }
-  catch { return false; }
+export function shouldAutoOpen(_settings: BrowserEntrySettings, _raw: string, _bypass?: string): boolean {
+  // Retained for compatibility with older callers; navigation is always manual.
+  return false;
 }
 
 export function pdfReaderUrl(reader: string, pdf: string): string {
@@ -38,4 +38,14 @@ export function pdfReaderUrl(reader: string, pdf: string): string {
   url.searchParams.set('import', pdfSourceUrl(pdf));
   url.searchParams.set('source', new URL(pdf).hostname);
   return url.href;
+}
+
+/** Header observation plus completed navigation; never infer readiness from a URL. */
+export function completedPdfUrl(
+  tab: { url?: string; pendingUrl?: string; status?: string },
+  known?: { pageUrl: string; pdfUrl?: string; direct: boolean; completed?: boolean },
+): string | undefined {
+  if (tab.status !== 'complete' || tab.pendingUrl || !known?.direct || !known.completed || !known.pdfUrl) return;
+  try { return pdfSourceUrl(tab.url ?? '') === known.pageUrl ? known.pdfUrl : undefined; }
+  catch { return; }
 }

@@ -28,8 +28,8 @@ test('默认手动打开；返回原 PDF 的同标签页不自动循环', () => 
   const url = 'https://papers.test/paper.pdf';
   assert.deepEqual(browserEntryDefaults, { autoOpenPdf: false, showPdfButtons: true });
   assert.equal(shouldAutoOpen(browserEntryDefaults, url), false);
-  assert.equal(shouldAutoOpen({ ...browserEntryDefaults, autoOpenPdf: true }, url), true);
-  assert.equal(shouldAutoOpen({ autoOpenPdf: true, showPdfButtons: false }, url), true);
+  assert.equal(shouldAutoOpen({ ...browserEntryDefaults, autoOpenPdf: true }, url), false);
+  assert.equal(shouldAutoOpen({ autoOpenPdf: true, showPdfButtons: false }, url), false);
   assert.equal(shouldAutoOpen({ ...browserEntryDefaults, autoOpenPdf: true }, url, url + '#page=2'), false);
-  assert.equal(shouldAutoOpen({ ...browserEntryDefaults, autoOpenPdf: true }, url, 'https://papers.test/another.pdf'), true);
+  assert.equal(shouldAutoOpen({ ...browserEntryDefaults, autoOpenPdf: true }, url, 'https://papers.test/another.pdf'), false);
 });

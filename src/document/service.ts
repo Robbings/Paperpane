@@ -1,3 +1,4 @@
+import type { BrowserPdfSource } from './browser-pdf';
 import type { DocumentService, DocumentState, ImportJob, ImportSource, DocumentRef } from '../contracts/document';
 import type { Result, Snapshot } from '../contracts/common';
 import { failure, success } from '../contracts/common';
@@ -5,6 +6,9 @@ import { PaperDatabase, type ImportReceipt } from '../data/database';
 import { abortIfNeeded, importError } from './errors';
 import { downloadPdf, parseSourceUrl, readPdfBytes, safeFilename } from './download';
 import { requestImportOrigin, hasImportOrigin } from './permissions';
+import { readableLocalSource } from './cached-source';
+
+type JobReceipt = ImportReceipt & { browserSource?: BrowserPdfSource };
 
 type Run = {
   source: ImportSource; controller: AbortController; saving: boolean; epoch: number;
@@ -20,14 +24,14 @@ export interface LiveDocumentOwner {
   readFile(ref: DocumentRef): Promise<Result<Blob>>;
   clearCache(): Promise<Result<void>>;
   refresh(): Promise<void>;
-  getImportReceipt(jobId: string): ImportReceipt | undefined;
+  getImportReceipt(jobId: string): JobReceipt | undefined;
   dispose(): void;
 }
 /** Own this once per extension page, above React panels. No network work in popup lifetimes. */
 export function createDocumentService(database = new PaperDatabase(), options: { checkUrlPermissionOnly?: boolean } = {}): LiveDocumentOwner {
   let snapshot: Snapshot<DocumentState> = freeze({ mode: 'live', state: 'loading', data: { documents: [], jobs: [], recentIds: [] } });
   const listeners = new Set<() => void>(); const runs = new Map<string, Run>();
-  const receipts = new Map<string, ImportReceipt>();
+  const receipts = new Map<string, JobReceipt>();
   const channel = typeof BroadcastChannel === 'undefined' ? undefined : new BroadcastChannel('paperpane-documents');
   let disposed = false; let refreshVersion = 0;
   function publish(next: Snapshot<DocumentState>) {
@@ -59,12 +63,15 @@ export function createDocumentService(database = new PaperDatabase(), options: {
     try {
       const progress = (value: NonNullable<ImportJob['progress']>) => { if (active()) patchJob(id, { progress: value }); };
       let bytes: Uint8Array<ArrayBuffer>; let filename: string; let sourceUrl: string | undefined;
+      let browserSource: BrowserPdfSource | undefined;
       if (run.source.kind === 'local') {
         filename = safeFilename(run.source.file.name);
         bytes = await readPdfBytes(run.source.file, signal, progress);
+      } else if (run.source.browserTabId !== undefined) {
+        const { readBrowserPdf } = await import('./browser-pdf');
+        ({ bytes, filename, sourceUrl, browserSource } = await readBrowserPdf(run.source.browserTabId, parseSourceUrl(run.source.url).href, signal, progress));
       } else {
-        const result = await downloadPdf(parseSourceUrl(run.source.url), signal, progress);
-        ({ bytes, filename, sourceUrl } = result);
+        ({ bytes, filename, sourceUrl } = await downloadPdf(parseSourceUrl(run.source.url), signal, progress));
       }
       abortIfNeeded(signal);
       if (!active()) return;
@@ -88,7 +95,7 @@ export function createDocumentService(database = new PaperDatabase(), options: {
       run.saving = true;
       const receipt = await database.commitImport({ blob: run.source.kind === 'local' ? run.source.file : new Blob([bytes], { type: 'application/pdf' }), sha256, filename, pageCount, sourceUrl, bibliography,
         syncScope: run.source.kind === 'url' && run.source.intent === 'browse' ? 'record-only' : 'record-and-file' });
-      receipts.set(id, receipt);
+      receipts.set(id, { ...receipt, browserSource });
       if (active()) patchJob(id, { phase: 'readable', document: { documentId: receipt.document.id, fileVersion: receipt.document.fileVersion }, progress: undefined, error: undefined });
       // Completed jobs cannot be retried; release their original File/URL owner.
       runs.delete(id);
@@ -96,6 +103,16 @@ export function createDocumentService(database = new PaperDatabase(), options: {
     } catch (error) {
       if (!active()) return;
       const detail = signal.aborted ? { code: 'CANCELLED' as const, message: '导入已取消', recovery: ['retry' as const] } : importError(error);
+      if (detail.code === 'RATE_LIMITED' && run.source.kind === 'url') {
+        const local = await readableLocalSource(database, run.source.url, signal).catch(() => undefined);
+        if (!active() || signal.aborted) return;
+        if (local) {
+          receipts.set(id, { document: local, duplicate: true });
+          patchJob(id, { phase: 'readable', document: { documentId: local.id, fileVersion: local.fileVersion }, progress: undefined, error: undefined });
+          runs.delete(id);
+          return;
+        }
+      }
       patchJob(id, { phase: detail.code === 'CANCELLED' ? 'cancelled' : 'failed', error: detail, passwordRequest: undefined, progress: undefined });
     } finally { if (run.epoch === epoch) { run.password = undefined; run.saving = false; } }
   }
