@@ -92,7 +92,7 @@ export function LiveReaderPage() {
     onSearch:(q,options)=>owner?.reader.search(q,options),onSearchStep:direction=>owner?.reader.stepSearch(direction),onSearchClose:()=>owner?.reader.closeSearch(),
     noteLayouts:saved?.layouts??[],onNoteLayouts:layouts=>owner?.annotations?.setLayouts(layouts),
   };
-  const notice = saved?.error?.message || owner?.message || state?.error?.message || failedJob?.error?.message || (job ? '正在导入…' : '');
+  const notice = saved?.error?.message || owner?.message || state?.error?.message || failedJob?.error?.message;
   useEffect(()=>{if(notice&&!saved?.error)toast.show({message:notice});},[notice,saved?.error]);
   const local=!saved?'unmodified':saved.error?'failed':saved.pending?'saving':'saved';
   const unavailable=<EmptyState icon="file" title="尚未接入" description="本轮完成 PDF 阅读、高亮和旁注保存，其余研究功能将在后续接入。"/>;
