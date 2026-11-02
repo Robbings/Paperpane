@@ -1,4 +1,4 @@
-import { browser } from 'wxt/browser';
+import { browser, type Browser } from 'wxt/browser';
 import { mountCompletedPdfLink } from './completed-pdf-link';
 import { completedPdfUrl, isPdfResponse, pdfReaderUrl, pdfSourceUrl } from './pdf';
 import { BROWSER_ENTRY_KEY, normalizeBrowserSettings, readBrowserSettings } from './settings';
@@ -6,6 +6,25 @@ interface PdfTab { pageUrl: string; pdfUrl?: string; direct: boolean; completed:
 interface PdfNavigation { url: string; requestId?: string }
 const navigationKey = (id: number) => `pdfNavigation:${id}`;
 const tabKey = (id: number) => `pdfTab:${id}`;
+// Chrome can return from window.open before the new tab commits its blank URL.
+async function waitForPdfTab(windowId: number, openerTabId: number, marker: string) {
+  const { promise, resolve, reject } = Promise.withResolvers<number>();
+  const match = (tab: Browser.tabs.Tab) => {
+    if (tab.id !== undefined && tab.windowId === windowId && tab.openerTabId === openerTabId &&
+        tab.url === marker && !tab.pendingUrl && tab.status === 'complete') resolve(tab.id);
+  };
+  const updated: Parameters<typeof browser.tabs.onUpdated.addListener>[0] = (_id, _change, tab) => match(tab);
+  browser.tabs.onUpdated.addListener(updated);
+  const timeout = setTimeout(() => reject(new Error('新标签页未就绪，请重试。')), 10000);
+  try {
+    void browser.tabs.query({ windowId }).then(tabs => tabs.forEach(match), reject);
+    return await promise;
+  } finally {
+    clearTimeout(timeout);
+    browser.tabs.onUpdated.removeListener(updated);
+  }
+}
+
 export function installBrowserEntry() {
   let settingsTail = Promise.resolve();
   const extensionUrl = browser.runtime.getURL('/');
@@ -129,14 +148,8 @@ export function installBrowserEntry() {
           const tab = await browser.tabs.get(tabId);
           if (tab.pendingUrl || pdfSourceUrl(tab.url ?? '') !== pdfSourceUrl(sender.url)) throw new Error('论文页面已改变，请重试。');
           if (typeof message.marker !== 'string' || !/^about:blank#paperpane-(?:\d+-){3}\d+$/.test(message.marker)) throw new Error('打开请求已失效，请重试。');
-          const children = await browser.tabs.query({});
-          const destination = children.find(child => child.openerTabId === tabId &&
-            (child.pendingUrl ?? child.url) === message.marker);
-          if (destination?.id === undefined) throw new Error('新窗口已关闭或页面已改变。');
-          await browser.windows.create({ tabId: destination.id, focused: true, incognito: tab.incognito });
-          // Drain the initial about:blank event before arming this specific tab.
-          await tails.get(destination.id);
-          await browser.storage.session.set({ [navigationKey(destination.id)]: { url } });
+          const destinationId = await waitForPdfTab(tab.windowId, tabId, message.marker);
+          await browser.storage.session.set({ [navigationKey(destinationId)]: { url } });
         } else if (message.type === 'OPEN_CURRENT_PDF') {
           if (sender.tab?.id === undefined || sender.frameId !== 0) throw new Error('请从已打开的 PDF 页面导入。');
           await tails.get(sender.tab.id);

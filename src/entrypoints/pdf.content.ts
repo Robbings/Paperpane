@@ -13,12 +13,12 @@ export default defineContentScript({
       // Keep the navigation in the clicked site's browser context (cookies and referrer).
       const marker = 'about:blank#paperpane-' + crypto.getRandomValues(new Uint32Array(4)).join('-');
       const destination = window.open(marker, '_blank');
-      if (!destination) throw new Error('请允许此页面打开新窗口后重试。');
+      if (!destination) throw new Error('请允许此页面打开新标签页后重试。');
       try {
         const result = await browser.runtime.sendMessage({ type: 'BEGIN_PDF_NAVIGATION', pdfUrl, marker });
         if (!result?.ok) throw new Error(result?.error ?? '请刷新页面后重试。');
         // Only navigate our blank page. The user may already have closed or reused it.
-        if (destination.closed || destination.location.href !== marker) throw new Error('新窗口已关闭或页面已改变。');
+        if (destination.closed || destination.location.href !== marker) throw new Error('新标签页已关闭或页面已改变。');
         destination.opener = null;
         destination.location.replace(pdfUrl);
       } catch (error) {

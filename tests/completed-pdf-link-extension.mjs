@@ -58,6 +58,11 @@ try {
   const page = await context.newPage();
   await page.goto(base);
   const windowOf = url => worker.evaluate(async url => (await chrome.tabs.query({})).find(tab => tab.url === url)?.windowId, url);
+  const sourceWindow = await windowOf(page.url());
+  const initialTabs = await worker.evaluate(async windowId => {
+    const tabs = await chrome.tabs.query({ windowId });
+    return tabs.map(tab => tab.id);
+  }, sourceWindow);
   const nativePage = context.waitForEvent('page');
   const opened = context.waitForEvent('page', candidate => candidate.url().startsWith(readerUrl));
   await page.locator('[data-paperpane-button]').click();
@@ -67,9 +72,13 @@ try {
   assert.equal(page.url(), base + '/');
   const destinationWindow = await windowOf(reader.url());
   assert.ok(Number.isInteger(destinationWindow));
-  assert.notEqual(destinationWindow, await windowOf(page.url()));
+  assert.equal(destinationWindow, sourceWindow);
   assert.equal(await windowOf(base + '/cached.pdf'), undefined);
-  assert.deepEqual(await worker.evaluate(async id => (await chrome.tabs.query({ windowId: id })).map(tab => tab.url), destinationWindow), [reader.url()]);
+  const addedUrls = await worker.evaluate(async ({ windowId, initialTabs }) => {
+    const tabs = await chrome.tabs.query({ windowId });
+    return tabs.filter(tab => !initialTabs.includes(tab.id)).map(tab => tab.url);
+  }, { windowId: sourceWindow, initialTabs });
+  assert.deepEqual(addedUrls, [reader.url()]);
   assert.equal(requests.get('/cached.pdf').length, 1);
   assert.equal(cachedPdfReferrer, base + '/');
   console.log('PASS webpage button → browser PDF → reader, one PDF request with caching');
@@ -87,6 +96,8 @@ try {
   });
   assert.ok(scroll > 0);
   async function openSelected() {
+    // Return to the results tab before selecting a paper again. Chrome records the active tab as its opener.
+    await scholar.bringToFront();
     const opened = context.waitForEvent('page');
     await scholar.locator('#two [data-paperpane-button]').click();
     const challenge = await opened;
@@ -94,7 +105,7 @@ try {
     assert.equal(challenge.url(), base + '/challenge');
     assert.equal(scholar.url(), results);
     assert.equal(await scholar.evaluate(() => window.scrollY), scroll);
-    assert.notEqual(await windowOf(challenge.url()), await windowOf(results));
+    assert.equal(await windowOf(challenge.url()), await windowOf(results));
     return challenge;
   }
   // Abandon only the destination. Another click on the same result starts afresh.
