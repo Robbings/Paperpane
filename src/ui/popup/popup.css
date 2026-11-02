@@ -71,15 +71,15 @@ body[data-page='popup'] {
 }
 
 .pp-popup__name {
+  flex: 1;
   color: var(--pp-text);
   font-size: var(--pp-text-lg);
   font-weight: var(--pp-weight-semibold);
   letter-spacing: 0.02em;
 }
 
-.pp-popup__name-en {
+.pp-popup__head .pp-icon-btn {
   color: var(--pp-text-2);
-  font-size: var(--pp-text-sm);
 }
 
 /* ---- Current tab --------------------------------------------------------------- */
@@ -153,11 +153,6 @@ body[data-page='popup'] {
   filter: var(--pp-paper-filter);
 }
 
-.pp-popup__thumb--empty {
-  background: var(--pp-fill);
-  box-shadow: none;
-}
-
 .pp-popup__thumb-lines {
   position: absolute;
   inset: 8px 7px auto;
@@ -180,28 +175,6 @@ body[data-page='popup'] {
   line-height: 12px;
   letter-spacing: 0.04em;
   -webkit-font-smoothing: antialiased;
-}
-
-.pp-popup__badge-icon {
-  display: flex;
-  flex-shrink: 0;
-  align-items: center;
-  justify-content: center;
-  width: 36px;
-  height: 36px;
-  border-radius: 10px;
-  background: var(--pp-fill);
-  color: var(--pp-text-2);
-}
-
-.pp-popup__badge-icon[data-block='in-reader'] {
-  background: color-mix(in srgb, var(--pp-ok) 14%, transparent);
-  color: var(--pp-ok);
-}
-
-.pp-popup__badge-icon[data-block='file-access'] {
-  background: color-mix(in srgb, var(--pp-warn) 14%, transparent);
-  color: var(--pp-warn);
 }
 
 .pp-popup__primary {
@@ -231,14 +204,7 @@ body[data-page='popup'] {
   filter: brightness(0.94);
 }
 
-.pp-popup__primary--soft {
-  background: var(--pp-fill);
-  box-shadow: inset 0 0 0 0.5px var(--pp-hairline);
-  color: var(--pp-text);
-  -webkit-font-smoothing: auto;
-}
-
-/* ---- Auto-open ------------------------------------------------------------------- */
+/* ---- Switches ---------------------------------------------------------------------- */
 
 .pp-popup__row {
   display: flex;
@@ -248,10 +214,20 @@ body[data-page='popup'] {
   padding: 6px 12px 6px 14px;
 }
 
+.pp-popup__row + .pp-popup__row {
+  box-shadow: 0 -0.5px 0 var(--pp-hairline);
+}
+
 .pp-popup__row-label {
   flex: 1;
   color: var(--pp-text);
   font-size: var(--pp-text-md);
+}
+
+.pp-popup__row-label .pp-field__label {
+  color: var(--pp-text);
+  font-size: var(--pp-text-md);
+  font-weight: var(--pp-weight-regular);
 }
 
 /* ---- Recent ---------------------------------------------------------------------- */
@@ -270,6 +246,7 @@ body[data-page='popup'] {
 }
 
 .pp-popup__recent button {
+  position: relative;
   display: flex;
   align-items: baseline;
   gap: 10px;
@@ -297,20 +274,65 @@ body[data-page='popup'] {
 
 .pp-popup__recent-meta {
   flex-shrink: 0;
-  color: var(--pp-text-2);
+  color: var(--pp-text-3);
   font-size: var(--pp-text-xs);
   font-variant-numeric: tabular-nums;
 }
 
+/* How far the paper has been read: a hairline under the title, no words. */
+.pp-popup__recent-progress {
+  position: absolute;
+  left: 8px;
+  right: 8px;
+  bottom: 2px;
+  height: 2px;
+  border-radius: 1px;
+  background: linear-gradient(90deg, color-mix(in srgb, var(--pp-accent) 55%, transparent) var(--pp-progress), var(--pp-fill) var(--pp-progress));
+}
+
 /* ---- Status and dock --------------------------------------------------------------- */
 
-.pp-popup__status {
+/* Only problems get a line; each opens the settings that fix it. */
+.pp-popup__issues {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px 12px;
+  margin: 0;
   padding: 0 8px;
+  list-style: none;
+  color: var(--pp-danger);
+  font-size: var(--pp-text-sm);
+}
+
+.pp-popup__issues li {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.pp-popup__issues li::before {
+  content: '';
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: currentColor;
+}
+
+.pp-popup__issues button {
+  padding: 0;
+  border: 0;
+  background: none;
+  color: inherit;
+  font: inherit;
+}
+
+.pp-popup__issues button:hover {
+  text-decoration: underline;
 }
 
 .pp-popup__dock {
   display: grid;
-  grid-template-columns: repeat(3, 1fr);
+  grid-template-columns: repeat(2, 1fr);
   gap: 2px;
   padding: 4px;
 }

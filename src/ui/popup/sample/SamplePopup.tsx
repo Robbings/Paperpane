@@ -44,6 +44,7 @@ const open = (path: string) => window.open(path, '_blank', 'noopener');
 export function SamplePopup() {
   const { status } = useSampleSettings();
   const [autoOpen, setAutoOpen] = useState(true);
+  const [buttons, setButtons] = useState(true);
   const tab = state in tabs ? tabs[state]! : tabs.pdf!;
 
   return (
@@ -54,6 +55,8 @@ export function SamplePopup() {
         onAllowFileAccess={() => toast.show({ message: '示例：会打开本扩展的详情页' })}
         autoOpenPdf={autoOpen}
         onAutoOpenPdf={setAutoOpen}
+        showPdfButtons={buttons}
+        onShowPdfButtons={setButtons}
         recent={recent}
         onOpenRecent={() => open('./reader.html')}
         onOpenLibrary={() => open('./library.html')}
