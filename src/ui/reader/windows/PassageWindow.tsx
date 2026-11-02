@@ -43,6 +43,8 @@ interface Props {
 const clamp=(n:number,min:number,max:number)=>Math.max(min,Math.min(n,Math.max(min,max)));
 const nearest=(r:PassageRect,x:number,y:number)=>({x:clamp(x,r.left,r.left+r.width),y:clamp(y,r.top,r.top+r.height)});
 const same=(a:Point,b:Point)=>a.x===b.x&&a.y===b.y;
+/** The widest single page; stays the same when pages are shown one or two across. */
+const pageWidth=(container:HTMLElement)=>Math.max(1,...[...container.querySelectorAll<HTMLElement>('.page, [data-page-index]')].map(page=>page.getBoundingClientRect().width));
 
 /**
  * Shared passage window for translation/explanation. Uses comment-note visuals and drag/pan behavior.
@@ -67,7 +69,8 @@ export function PassageWindow(props:Props){
   const gesture=useRef<{kind:'move'|'resize';size:{width:number;height:number};id:number;target:HTMLElement;x:number;y:number;px:number;py:number;scrollX:number;scrollY:number;inset:number;start:Point;moved:boolean}|null>(null);
   const paper=floatingPaperBounds(container);
   // Anything proportional to the paper's size works as a zoom: only its ratio to the placing zoom is used.
-  const zoom=props.zoomPercent??Math.max(1,paper.right-paper.left);
+  // One page's width, not the whole spread: switching to two pages side by side is not a zoom.
+  const zoom=props.zoomPercent??pageWidth(container);
   const saved=props.layout&&props.zoomPercent!==undefined?props.layout.zoom:undefined;
   const layout={...(props.layout??localLayout),zoom:saved??(placedAt.current??=zoom)};
   const scale=layout.zoom>0&&zoom>0?zoom/layout.zoom:1;
