@@ -92,7 +92,7 @@ export function installBrowserEntry() {
     });
   }, filter);
   browser.tabs.onUpdated.addListener((tabId, change) => {
-    if (change.url && !/^https?:/.test(change.url)) enqueue(tabId, () => browser.storage.session.remove(navigationKey(tabId)));
+    if (change.url && !/^https?:/.test(change.url) && !change.url.startsWith('about:blank#paperpane-')) enqueue(tabId, () => browser.storage.session.remove(navigationKey(tabId)));
     if (change.status === 'complete') enqueue(tabId, () => handleReady(tabId));
   });
   browser.tabs.onRemoved.addListener(tabId => {
@@ -128,7 +128,15 @@ export function installBrowserEntry() {
           await tails.get(tabId);
           const tab = await browser.tabs.get(tabId);
           if (tab.pendingUrl || pdfSourceUrl(tab.url ?? '') !== pdfSourceUrl(sender.url)) throw new Error('论文页面已改变，请重试。');
-          await browser.storage.session.set({ [navigationKey(tabId)]: { url } });
+          if (typeof message.marker !== 'string' || !/^about:blank#paperpane-(?:\d+-){3}\d+$/.test(message.marker)) throw new Error('打开请求已失效，请重试。');
+          const children = await browser.tabs.query({});
+          const destination = children.find(child => child.openerTabId === tabId &&
+            (child.pendingUrl ?? child.url) === message.marker);
+          if (destination?.id === undefined) throw new Error('新窗口已关闭或页面已改变。');
+          await browser.windows.create({ tabId: destination.id, focused: true, incognito: tab.incognito });
+          // Drain the initial about:blank event before arming this specific tab.
+          await tails.get(destination.id);
+          await browser.storage.session.set({ [navigationKey(destination.id)]: { url } });
         } else if (message.type === 'OPEN_CURRENT_PDF') {
           if (sender.tab?.id === undefined || sender.frameId !== 0) throw new Error('请从已打开的 PDF 页面导入。');
           await tails.get(sender.tab.id);

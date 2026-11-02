@@ -53,7 +53,7 @@ try {
   await button.waitFor();
   await arxiv.evaluate(() => document.body.append(document.createElement('div')));
   assert.equal(await arxiv.locator('#paperpane-open-arxiv').count(), 1);
-  const created = context.waitForEvent('page');
+  const created = context.waitForEvent('page', page => page.url().startsWith(root + '/reader.html'));
   await button.click();
   const reader = await created;
   await rendered(reader);
@@ -102,7 +102,7 @@ try {
     await db.close();
   }, `${root}/chunks/${databaseChunk}`);
   assert.equal((await snapshot(reader)).items[0].inLibrary, true, 'explicit import without bibliography restores membership');
-  const secondCreated = context.waitForEvent('page');
+  const secondCreated = context.waitForEvent('page', page => page.url().startsWith(root + '/reader.html'));
   await arxiv.locator('#paperpane-open-arxiv').click();
   const secondReader = await secondCreated;
   await rendered(secondReader);
@@ -143,7 +143,7 @@ try {
     await live.goto('https://arxiv.org/abs/1706.03762', { waitUntil: 'domcontentloaded', timeout: 60000 });
     await live.getByRole('button', { name: '用纸窗打开 PDF', exact: true }).waitFor({ timeout: 15000 });
     await live.screenshot({ path: resolve(output, 'arxiv-live-button.png') });
-    const opened = context.waitForEvent('page');
+    const opened = context.waitForEvent('page', page => page.url().startsWith(root + '/reader.html'));
     await live.locator('#paperpane-open-arxiv').click();
     const liveReader = await opened;
     await rendered(liveReader);
