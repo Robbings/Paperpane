@@ -54,7 +54,7 @@ export type LibraryPatch = Partial<Pick<LibraryItem, 'title' | 'authors' | 'year
 export interface LibraryCounts { all: number; recent: number; starred: number; unfiled: number; folders: Record<Id, number> }
 export interface LibraryRow extends LibraryItem {
   lastReadAt?: string; pageCount?: number; progress?: number; hasPdf: boolean;
-  /** No live annotation store yet: omit rather than invent a count. */
+  /** Library queries count active annotations for the associated PDF version. */
   annotationCount?: number;
 }
 export interface LibraryState {

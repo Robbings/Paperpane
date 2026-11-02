@@ -46,7 +46,7 @@ function CurrentTab({ tab, onOpen, onImport }: { tab: ActiveTabView; onOpen: () 
         </div>
       </div>
       <button type="button" className="pp-popup__primary" onClick={local ? onImport : onOpen}>
-        {local ? '选择文件导入' : '在纸窗中打开'}
+        {local ? '选择文件导入' : '在纸间中打开'}
       </button>
     </section>
   );
@@ -67,7 +67,7 @@ export function PopupView(props: PopupViewProps) {
     <div className="pp-popup">
       <header className="pp-popup__head">
         <LogoMark className="pp-popup__logo" />
-        <span className="pp-popup__name">纸窗</span>
+        <span className="pp-popup__name">纸间</span>
         <IconButton icon="settings" label="设置" shape="pill" onClick={() => props.onOpenSettings()} />
       </header>
 

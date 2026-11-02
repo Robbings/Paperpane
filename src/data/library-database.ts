@@ -24,14 +24,16 @@ function descendants(folders: readonly LibraryFolder[], root: string): Set<strin
   return ids;
 }
 function row(item: LibraryItem, document?: StoredDocument): LibraryRow {
-  return { ...item, lastReadAt: document?.lastReadAt, pageCount: document?.pageCount,
+  return { ...item,
+    document: document ? { documentId: document.id, fileVersion: document.fileVersion } : item.document,
+    lastReadAt: document?.lastReadAt, pageCount: document?.pageCount,
     progress: document?.position && document.pageCount ? Math.min(1, (document.position.pageIndex + document.position.offset) / document.pageCount) : undefined,
     hasPdf: !!document && !document.deletedAt && !['local-missing', 'remote-missing'].includes(document.file.availability),
   };
 }
 export class LibraryDatabase extends PaperDatabase {
-  private async run<T>(mode: IDBTransactionMode, fn: (tx: IDBTransaction) => Promise<T>): Promise<T> {
-    const db = await this.open(); const tx = db.transaction(stores, mode, { durability: 'strict' });
+  private async run<T>(mode: IDBTransactionMode, fn: (tx: IDBTransaction) => Promise<T>, scope = stores): Promise<T> {
+    const db = await this.open(); const tx = db.transaction(scope, mode, { durability: 'strict' });
     const done = new Promise<void>((resolve, reject) => { tx.oncomplete = () => resolve(); tx.onabort = () => reject(tx.error); });
     // Attach the rejection handler immediately; callback errors may abort before awaiting completion.
     void done.catch(() => undefined);
@@ -144,8 +146,14 @@ export class LibraryDatabase extends PaperDatabase {
           } else accept();
         };
       });
+      const annotations = tx.objectStore('annotations').index('byDocument');
+      await Promise.all(items.map(async item => {
+        const ref = item.document;
+        const rows = ref ? await req(annotations.getAll([ref.documentId, ref.fileVersion])) : [];
+        item.annotationCount = rows.filter(annotation => !annotation.deletedAt).length;
+      }));
       return { items, total, folders, tags, counts, preferences: pref?.value ?? structuredClone(libraryDefaults), unavailableSearchFields: ['body', 'summary'], collectionTagIds: [...collectionTags] };
-    });
+    }, [...stores, 'annotations']);
   }
   private async items(tx: IDBTransaction, ids: readonly string[]): Promise<LibraryItem[]> {
     return Promise.all([...new Set(ids)].map(async id => required(await req(tx.objectStore(LIBRARY).get(id)) as LibraryItem | undefined)));

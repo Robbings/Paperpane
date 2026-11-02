@@ -119,7 +119,7 @@ export function installBrowserEntry() {
   });
   async function currentPdf(tabId: number, inspectExisting = false) {
     const tab = await browser.tabs.get(tabId), raw = tab.url ?? '';
-    if (raw.startsWith(extensionUrl)) return { tabId, title: tab.title ?? '纸窗', block: /^\/(reader|reader-proof)\.html$/.test(new URL(raw).pathname)?'in-reader':'in-paperpane' };
+    if (raw.startsWith(extensionUrl)) return { tabId, title: tab.title ?? '纸间', block: /^\/(reader|reader-proof)\.html$/.test(new URL(raw).pathname)?'in-reader':'in-paperpane' };
     if (raw.startsWith('file:')) return { tabId, title: tab.title ?? '本地文件', block: 'file-access' };
     try { pdfSourceUrl(raw); } catch { return { tabId, title: tab.title ?? '', block: 'restricted' }; }
     const known = (await browser.storage.session.get(tabKey(tabId)))[tabKey(tabId)] as PdfTab | undefined;
@@ -138,7 +138,7 @@ export function installBrowserEntry() {
     if (!supported.includes(message?.type)) return;
     void (async () => {
       try {
-        if (sender.id !== browser.runtime.id || !sender.url) throw new Error('无效的纸窗入口。');
+        if (sender.id !== browser.runtime.id || !sender.url) throw new Error('无效的纸间入口。');
         const fromExtension = sender.url.startsWith(extensionUrl);
         if (message.type === 'BEGIN_PDF_NAVIGATION') {
           if (sender.frameId !== 0 || sender.tab?.id === undefined || fromExtension) throw new Error('请从论文网页打开 PDF。');
@@ -157,9 +157,9 @@ export function installBrowserEntry() {
           if (!('pdfUrl' in state) || !state.pdfUrl || pdfSourceUrl(sender.url) !== state.pdfUrl) throw new Error('PDF 页面尚未完成加载，请稍后重试。');
           await openReader(state.tabId, state.pdfUrl);
         } else if (['OPEN_ARXIV_PAPER', 'OPEN_PDF', 'REPORT_PAGE_PDF'].includes(message.type)) {
-          throw new Error('请先在浏览器中打开 PDF，再通过纸窗扩展弹窗导入。');
+          throw new Error('请先在浏览器中打开 PDF，再通过纸间扩展弹窗导入。');
         } else {
-          if (!fromExtension) throw new Error('请从纸窗界面进行此操作。');
+          if (!fromExtension) throw new Error('请从纸间界面进行此操作。');
           if (message.type === 'GET_PDF_STATE' || message.type === 'OPEN_TAB_PDF') {
             if (!Number.isInteger(message.tabId)) throw new Error('当前标签页已不可用。');
             await tails.get(message.tabId);

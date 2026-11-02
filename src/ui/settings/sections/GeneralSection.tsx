@@ -76,8 +76,8 @@ export function GeneralSection({ state, onPreference, onRetry }: GeneralSectionP
             size="sm"
             value={formulaCopy}
             options={[
-              { value: 'brackets', label: 'LaTeX  \\( … \\)' },
-              { value: 'dollars', label: 'LaTeX  $ … $' },
+              { value: 'brackets', label: 'LaTeX  \\[ … \\]' },
+              { value: 'dollars', label: 'LaTeX  $$ … $$' },
               { value: 'none', label: 'LaTeX（不加符号）' },
               { value: 'image', label: '图片' },
             ]}

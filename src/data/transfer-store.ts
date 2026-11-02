@@ -46,7 +46,7 @@ export class TransferStore extends PaperDatabase {
     await this.migrateConflicts();
     const db=await this.open();
     const names=[...db.objectStoreNames].filter(n=>!['assets','changes','cache'].includes(n));
-    if(names.some(n=>!TRANSFER_STORES.includes(n as any)))throw new Error('备份来自更新的版本，请先更新纸窗');
+    if(names.some(n=>!TRANSFER_STORES.includes(n as any)))throw new Error('备份来自更新的版本，请先更新纸间');
     const tx=db.transaction([...names,'assets'],'readonly'),completion=done(tx);
     const values=await Promise.all([...names,'assets'].map(n=>request(tx.objectStore(n).getAll())));await completion;
     return this.makeSnapshot(db, Object.fromEntries(names.map((n,i)=>[n,values[i]??[]])), complete ? values.at(-1)??[] : [], complete);

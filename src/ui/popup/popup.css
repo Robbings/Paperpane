@@ -394,7 +394,7 @@ body[data-page='popup'] {
   line-height: 1.45;
 }
 
-/* Tinted rather than solid, so "在纸窗中打开" stays the main button. */
+/* Tinted rather than solid, so "在纸间中打开" stays the main button. */
 .pp-popup__setup .pp-popup__primary {
   grid-column: 1 / -1;
   background: var(--pp-accent-soft);

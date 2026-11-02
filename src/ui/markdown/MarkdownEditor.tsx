@@ -1,4 +1,5 @@
 import { useEffect, useId, useRef, useState, useSyncExternalStore } from "react";
+import { formulaMarkdown } from "@/domain/notes/formula-paste";
 import type Vditor from "vditor";
 import { IconButton, toast } from "@/ui/components";
 import {
@@ -290,6 +291,24 @@ export function MarkdownEditor(props: Props) {
       className="pp-markdown-editor"
       data-compact={props.compact ? "true" : undefined}
       data-pp-overlay=""
+      onPasteCapture={(event) => {
+        const input = editor.current?.vditor.ir?.element;
+        const target = event.target;
+        const data = event.clipboardData;
+        if (!input?.isContentEditable || !(target instanceof Element) || !input.contains(target) ||
+            data.files.length || data.types.includes("text/html")) return;
+        const anchor = window.getSelection()?.anchorNode;
+        const element = anchor instanceof Element ? anchor : anchor?.parentElement;
+        if (element?.closest('code, [data-type="code-block"], [data-type="math-block"], [data-type="inline-math"]')) return;
+        const markdown = formulaMarkdown(data.getData("text/plain"));
+        if (!markdown) return;
+        // Use Vditor's normal paste handling for selection replacement, sanitization and undo.
+        event.preventDefault();
+        event.stopPropagation();
+        const clipboardData = new DataTransfer();
+        clipboardData.setData("text/plain", markdown);
+        target.dispatchEvent(new ClipboardEvent("paste", { clipboardData, bubbles: true, cancelable: true }));
+      }}
       onKeyDown={(e) => e.stopPropagation()}
     >
       <div id={id} ref={host} />

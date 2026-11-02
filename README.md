@@ -1,8 +1,8 @@
 <div align="center">
 
-<img src="docs/readme/logo.svg" width="96" alt="纸窗" />
+<img src="docs/readme/logo.svg" width="96" alt="纸间" />
 
-<h1>纸窗 Paperpane</h1>
+<h1>纸间 Paperpane</h1>
 
 <p><b>在浏览器里读论文：对照翻译，随手提问。</b></p>
 
@@ -22,7 +22,7 @@
   <a href="docs/DEVELOPMENT.md">参与开发</a>
 </p>
 
-<img src="docs/readme/images/hero.png" width="100%" alt="纸窗阅读器：左侧是论文，右侧是逐段对照的中文译文" />
+<img src="docs/readme/images/hero.png" width="100%" alt="纸间阅读器：左侧是论文，右侧是逐段对照的中文译文" />
 
 </div>
 
@@ -40,13 +40,13 @@
 </div>
 
 
-## 为什么做纸窗
+## 为什么做纸间
 
 - 浏览器自带的 PDF 阅读器只能看，读到一半想翻译、想查一个概念，就得在好几个窗口之间来回切。
 - 网页翻译插件会把排版打乱，公式和图表也跟着被「翻译」。
 - 普通阅读器对LLM接入不原生，问 AI 要先复制、再粘贴、再解释上下文，回答也很难对回原文的哪一句。
 
-纸窗把这些放进同一个阅读器里：保持阅读体验的同时，围绕模型能力打造翻译、解释、提问和笔记等功能，且与论文丝滑融合。
+纸间把这些放进同一个阅读器里：保持阅读体验的同时，围绕模型能力打造翻译、解释、提问和笔记等功能，且与论文丝滑融合。
 
 ## 安静的阅读界面
 
@@ -58,9 +58,9 @@
 
 ### 1. 一键打开，快速了解论文
 
-在 arXiv、Google Scholar、OpenReview 等论文网站，PDF 链接旁会出现「用纸窗打开」。点一下，论文进入阅读器，右侧自动整理概览。
+在 arXiv、Google Scholar、OpenReview 等论文网站，PDF 链接旁会出现「用纸间打开」。点一下，论文进入阅读器，右侧自动整理概览。
 
-<img src="docs/readme/images/f1-open.gif" width="100%" alt="在 arXiv 页面点击「用纸窗打开」，阅读器打开后自动生成概览" />
+<img src="docs/readme/images/f1-open.gif" width="100%" alt="在 arXiv 页面点击「用纸间打开」，阅读器打开后自动生成概览" />
 
 - **概览**：快速了解一篇论文：一段话的总结、关键词、研究问题、方法、结论和要点，且可以根据需要自行设置调整。
 - **不止 arXiv**：支持十几个常见论文网站，网页里的普通 PDF 链接和嵌入的 PDF 也能打开；本地 PDF 可以直接导入。
@@ -90,13 +90,13 @@
 
 ### 4. 元素自动识别，公式一键复制
 
-纸窗在本机识别论文里的公式、表格和图片。鼠标移上去就能复制：公式复制为 LaTeX，表格复制为 Markdown、LaTeX 或 Excel，图片复制为图片。
+纸间在本机识别论文里的公式、表格和图片。鼠标移上去就能复制：公式复制为 LaTeX，表格复制为 Markdown、LaTeX 或 Excel，图片复制为图片。
 
 <img src="docs/readme/images/f4-formula.gif" width="100%" alt="鼠标移到公式上，点击复制，粘贴到笔记里显示为排版好的公式" />
 
 - **识别在本机完成**：版面识别采用本地小模型。
 - **公式转写更准**：公式转写调用大模型，公式由支持图片的模型转写成 LaTeX，可以在打开论文时提前转写，复制时立即可用。
-- **格式随你**：LaTeX 的定界符（`\( \)`、`$ $` 或不加）可以在设置里选。
+- **格式随你**：整块公式的 LaTeX 定界符（`\[ … \]`、`$$ … $$` 或不加）可以在设置里选。
 
 ### 5. 批注与笔记
 
@@ -130,11 +130,11 @@
 
 **应用商店**：Chrome 应用商店和 Edge 加载项正在准备中。
 
-第一次打开纸窗时会有一段简短的配置引导，带你添加模型和翻译服务。
+第一次打开纸间时会有一段简短的配置引导，带你添加模型和翻译服务。
 
 ## 隐私与费用
 
-- **数据保存在本机**：论文、批注、笔记和设置都保存在浏览器里，不经过纸窗的服务器（纸窗没有服务器）。
+- **数据保存在本机**：论文、批注、笔记和设置都保存在浏览器里，不经过纸间的服务器（纸间没有服务器）。
 - **密钥不离开本机**：API 密钥只保存在本机，不会写进备份，也不会同步。
 - **论文只发给你选的服务**：只有在你使用概览、翻译、解释、提问等功能时，相关内容才会发给你配置的模型或翻译服务。
 - **扩展本身不收费**：模型和翻译服务按你自己的账号计费。谷歌翻译免费版不需要密钥。
@@ -146,7 +146,7 @@
 **翻译服务**：谷歌翻译（免费）、Google Cloud 翻译、微软翻译、DeepL、百度翻译、腾讯翻译、阿里翻译、有道翻译、火山翻译。
 
 <details>
-<summary><b>支持「用纸窗打开」的论文网站</b></summary>
+<summary><b>支持「用纸间打开」的论文网站</b></summary>
 
 <br />
 
@@ -172,7 +172,7 @@ arXiv、Google Scholar、Semantic Scholar、OpenReview、ACL Anthology、CVF Ope
 
 <br />
 
-点击浏览器工具栏里的纸窗图标，选择「打开文件」；或者在文献库里点「导入」。
+点击浏览器工具栏里的纸间图标，选择「打开文件」；或者在文献库里点「导入」。
 
 </details>
 
@@ -190,7 +190,7 @@ arXiv、Google Scholar、Semantic Scholar、OpenReview、ACL Anthology、CVF Ope
 
 <br />
 
-纸窗可以单独使用，也可以和 Zotero 配合：填写 Zotero API Key 后，能从 Zotero 个人库导入论文和批注，也能把纸窗里的论文和高亮导出回 Zotero。
+纸间可以单独使用，也可以和 Zotero 配合：填写 Zotero API Key 后，能从 Zotero 个人库导入论文和批注，也能把纸间里的论文和高亮导出回 Zotero。
 
 </details>
 
@@ -223,8 +223,8 @@ pnpm build
 
 ## 致谢与许可
 
-纸窗使用了 [PDF.js](https://github.com/mozilla/pdf.js)、[WXT](https://wxt.dev)、[React](https://react.dev)、[Vditor](https://github.com/Vanessa219/vditor)、[ONNX Runtime Web](https://github.com/microsoft/onnxruntime)、[PP-PicoDet 版面模型](https://huggingface.co/PaddlePaddle/PicoDet-S_layout_17cls)、[models.dev](https://models.dev) 和 [Lobe Icons](https://github.com/lobehub/lobe-icons)，各自的许可证见 `public/licenses/`。
+纸间使用了 [PDF.js](https://github.com/mozilla/pdf.js)、[WXT](https://wxt.dev)、[React](https://react.dev)、[Vditor](https://github.com/Vanessa219/vditor)、[ONNX Runtime Web](https://github.com/microsoft/onnxruntime)、[PP-PicoDet 版面模型](https://huggingface.co/PaddlePaddle/PicoDet-S_layout_17cls)、[models.dev](https://models.dev) 和 [Lobe Icons](https://github.com/lobehub/lobe-icons)，各自的许可证见 `public/licenses/`。
 
 截图中的论文为 Rafailov 等人的 [Direct Preference Optimization](https://arxiv.org/abs/2305.18290)，采用 CC BY 4.0 许可。
 
-纸窗采用 [GNU AGPL v3.0](LICENSE) 许可证：可以自由使用、修改，也可以用于商业用途；但分发修改后的版本，或者以网络服务的形式提供给他人使用时，必须以同样的许可证公开完整源代码。
+纸间采用 [GNU AGPL v3.0](LICENSE) 许可证：可以自由使用、修改，也可以用于商业用途；但分发修改后的版本，或者以网络服务的形式提供给他人使用时，必须以同样的许可证公开完整源代码。

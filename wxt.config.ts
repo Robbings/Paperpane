@@ -10,7 +10,7 @@ const pdfjsDirectory=dirname(require.resolve('pdfjs-dist/package.json'));
 export default defineConfig({
   srcDir:'src',modules:['@wxt-dev/module-react'],imports:false,manifestVersion:3,
   manifest:{
-    name:'Paperpane（纸窗）',description:'Paperpane 论文阅读工具',
+    name:'Paperpane（纸间）',description:'Paperpane 论文阅读工具',
     permissions:['offscreen','unlimitedStorage','alarms','clipboardWrite','storage','webRequest','scripting','tabs'],
     content_security_policy:{extension_pages:"script-src 'self' 'wasm-unsafe-eval'; object-src 'self';"},
     host_permissions:['https://*/*','http://*/*'],
