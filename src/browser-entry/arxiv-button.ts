@@ -14,7 +14,7 @@ export function mountArxivButton(doc: Document, open: (url: string) => Promise<v
     const button = createPdfButton(doc, () => {
       if (pdfLink && pdfLink.href.split(/[?#]/, 1)[0] === url) return open(pdfLink.href);
       return open(url);
-    }, '用纸窗打开 PDF', 'link');
+    }, '用纸间打开 PDF', 'link');
     button.id = 'paperpane-open-arxiv';
     const listItem = anchor.closest('li');
     if (listItem) {

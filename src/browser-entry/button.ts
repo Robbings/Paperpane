@@ -10,7 +10,7 @@ button[data-paperpane-button][data-look=link]:hover { background:none; text-deco
  * 'link' sits in a page's own list of links and reads like one of them (text in the link colour);
  * 'solid' floats over a PDF, where it has to stand out from the document.
  */
-export function createPdfButton(doc: Document, open: () => Promise<void>, label = '在 Paperpane 中打开', look: 'solid' | 'link' = 'solid'): HTMLButtonElement {
+export function createPdfButton(doc: Document, open: () => Promise<void>, label = '在纸间中打开', look: 'solid' | 'link' = 'solid'): HTMLButtonElement {
   if (!doc.getElementById('paperpane-entry-style')) {
     const style = doc.createElement('style'); style.id = 'paperpane-entry-style'; style.textContent = CSS;
     (doc.head ?? doc.documentElement).append(style);

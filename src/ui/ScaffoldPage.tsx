@@ -5,7 +5,7 @@ import './scaffold.css';
 export function ScaffoldPage({ title, children }: { title: string; children?: ReactNode }) {
   return (
     <main className="scaffold">
-      <p>Paperpane · 纸窗</p>
+      <p>Paperpane · 纸间</p>
       <h1>{title}</h1>
       <p>界面正在设计中。</p>
       {children}

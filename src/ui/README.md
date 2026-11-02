@@ -188,8 +188,8 @@ toast.show({ message: '翻译失败：请求超时', tone: 'error', action: { la
 
 - 浅灰磨砂底配白色圆角卡片，与阅读器同一套风格；弹窗是独立小窗口，背后没有可模糊的内容，磨砂感用顶部的柔光渐变表现。宽 340px，高度随内容。
 - 原则：只显示能用的东西和需要处理的问题，不放说明文字。
-- **顶部**：标志、「纸窗」，右侧设置按钮 → `onOpenSettings()`。
-- **当前页面**：只在能打开时出现（`canOpenInReader`，识别中不显示）。显示首页缩略、标题、`displayUrl`（不含查询参数），`inLibrary` 为真时标「已收藏」，按钮「在纸窗中打开」→ `onOpenInReader(tabId)`。读不到的本地 PDF（`block: 'file-access'`）也显示，按钮改为「选择文件导入」→ `onAllowFileAccess`。其余 `block`（非 PDF、受限页面、已在阅读器等）整块不显示。
+- **顶部**：标志、「纸间」，右侧设置按钮 → `onOpenSettings()`。
+- **当前页面**：只在能打开时出现（`canOpenInReader`，识别中不显示）。显示首页缩略、标题、`displayUrl`（不含查询参数），`inLibrary` 为真时标「已收藏」，按钮「在纸间中打开」→ `onOpenInReader(tabId)`。读不到的本地 PDF（`block: 'file-access'`）也显示，按钮改为「选择文件导入」→ `onAllowFileAccess`。其余 `block`（非 PDF、受限页面、已在阅读器等）整块不显示。
 - **开关**：自动打开 PDF（`autoOpenPdf`），网页快捷按钮（`showPdfButtons`，悬停标签有说明）。
 - **最近阅读**：`recent` 最多 3 篇，`onOpenRecent(id)`；右侧是时间，阅读进度是标题下的一条细线。没有记录（或读取中、失败）时整块不显示。
 - **问题**：只在出问题时出现一行红点文字（本机保存失败、同步失败或冲突、模型不可用，以及 `error`），点击跳到设置的对应一节。「数据仅保存在本机」「还没有配置模型」这类常态不在弹窗显示。

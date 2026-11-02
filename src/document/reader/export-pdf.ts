@@ -21,7 +21,7 @@ export async function annotatedPdf(bytes: Uint8Array, rows: readonly Annotation[
       const right=Math.max(...rects.map(r=>r.x+r.width)),top=Math.max(...rects.map(r=>r.y+r.height));
       const highlight=row.kind==='highlight';
       const rect=highlight?[left,bottom,right,top]:[left,bottom,left+16,bottom+16];
-      const note=pdf.context.obj({Type:'Annot',Subtype:highlight?'Highlight':'Text',Rect:rect,Contents:PDFHexString.fromText(row.comment || row.quote),T:PDFHexString.fromText('纸窗 Paperpane'),NM:PDFHexString.fromText(`paperpane:${row.id}:${part.pageIndex}`),C:[r,g,b],F:4,Name:'Comment'});
+      const note=pdf.context.obj({Type:'Annot',Subtype:highlight?'Highlight':'Text',Rect:rect,Contents:PDFHexString.fromText(row.comment || row.quote),T:PDFHexString.fromText('纸间 Paperpane'),NM:PDFHexString.fromText(`paperpane:${row.id}:${part.pageIndex}`),C:[r,g,b],F:4,Name:'Comment'});
       if(highlight)note.set(PDFName.of('QuadPoints'),pdf.context.obj(rects.flatMap(q=>[q.x,q.y+q.height,q.x+q.width,q.y+q.height,q.x,q.y,q.x+q.width,q.y])));
       const paint=highlight?rects.map(q=>`${q.x-left} ${q.y-bottom} ${q.width} ${q.height} re f`).join('\n'):'0 0 16 16 re f';
       const appearance=pdf.context.flateStream(`q /GS gs ${r} ${g} ${b} rg\n${paint}\nQ`,{Type:'XObject',Subtype:'Form',BBox:[0,0,rect[2]!-rect[0]!,rect[3]!-rect[1]!],Resources:{ExtGState:{GS:{Type:'ExtGState',ca:.42,CA:.42,BM:'Multiply'}}}});

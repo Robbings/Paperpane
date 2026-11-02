@@ -21,7 +21,7 @@ FileStore.read / put 隔离原文件读写。未来迁移 OPFS / 外部目录时
 
 ## 查询与偏好
 
-查询包括集合、任意标签匹配、字段子串搜索和排序；每次追加 60 条。使用游标扫描并保留有限的排序窗口，不读取 PDF Blob。当前全文和 AI 总结没有索引，unavailableSearchFields 明确返回 body / summary。批注数量没有持久化服务，annotationCount 保持未知；现有 UI 要求 number，运行时暂传 0 并显示尚未接入提示，需要 UI 支持未知值。
+查询包括集合、任意标签匹配、字段子串搜索和排序；每次追加 60 条。使用游标扫描并保留有限的排序窗口，不读取 PDF Blob。当前全文和 AI 总结没有索引，unavailableSearchFields 明确返回 body / summary。列表和详情显示当前 PDF 版本已保存且未删除的批注数，纯书目为 0。
 
 视图模式、可见列、列宽、侧栏和详情栏开关保存在 libraryPreferences。查询文本/当前选择不属于持久化数据。ReadingPosition 由 PDF.js 提供，保存页码、页内纵向比例、缩放、旋转和最近阅读时间。
 

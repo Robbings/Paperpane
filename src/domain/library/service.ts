@@ -45,6 +45,10 @@ export function createLibraryService(database = new LibraryDatabase()) {
     }
   }
   channel.onmessage = () => void refresh();
+  const annotations = new BroadcastChannel('paperpane-annotations');
+  annotations.onmessage = ({ data }) => {
+    if (data?.countChanged) void refresh();
+  };
   const visible = () => { if (document.visibilityState === 'visible') void refresh(); };
   document.addEventListener('visibilitychange', visible);
   const service: LibraryService = {
@@ -70,6 +74,6 @@ export function createLibraryService(database = new LibraryDatabase()) {
   void refresh();
   return { database, service, refresh, mutate,
     async invalidate() { if (!disposed) { channel.postMessage({ kind: 'invalidate' }); await refresh(); } },
-    dispose() { disposed = true; epoch++; channel.close(); listeners.clear(); document.removeEventListener('visibilitychange', visible); },
+    dispose() { disposed = true; epoch++; channel.close(); annotations.close(); listeners.clear(); document.removeEventListener('visibilitychange', visible); },
   };
 }

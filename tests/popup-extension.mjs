@@ -28,19 +28,19 @@ try{
   const worker=context.serviceWorkers()[0]??await context.waitForEvent('serviceworker');
   const root=`chrome-extension://${new URL(worker.url()).host}`;
   const popup=await context.newPage();await popup.goto(root+'/popup.html');
-  await popup.getByText('当前在纸窗中',{exact:true}).waitFor();
+  await popup.getByText('当前在纸间中',{exact:true}).waitFor();
   await popup.getByText('还没有最近阅读记录',{exact:true}).waitFor();
   await popup.getByText('还没有配置模型',{exact:true}).waitFor();
   await popup.getByText('数据仅保存在本机',{exact:true}).waitFor();
   const web=await context.newPage();await web.goto(base+'/links');
-  await popup.getByRole('button',{name:'在纸窗中打开',exact:true}).waitFor();
+  await popup.getByRole('button',{name:'在纸间中打开',exact:true}).waitFor();
   const created=context.waitForEvent('page');
   // A background extension tab stands in for the native popup without changing the active web tab.
-  await popup.getByRole('button',{name:'在纸窗中打开',exact:true}).evaluate(el=>el.click());
+  await popup.getByRole('button',{name:'在纸间中打开',exact:true}).evaluate(el=>el.click());
   const reader=await created;
   await reader.waitForURL(url=>url.searchParams.has('documentId'),{timeout:30000});
   await reader.locator('.textLayer span').first().waitFor({timeout:30000});
-  await popup.getByText('正在纸窗中阅读',{exact:true}).waitFor();
+  await popup.getByText('正在纸间中阅读',{exact:true}).waitFor();
   await reader.close();await web.bringToFront();
   await popup.getByText('已在文献库',{exact:true}).waitFor();
   console.log('PASS: real active tab classification, empty state, popup PDF open and library membership');

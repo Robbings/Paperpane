@@ -34,7 +34,7 @@ export function mountPdfPage(doc: Document, open: (url: string) => Promise<void>
       if(site)wrapper.dataset.paperpaneSource=site;
       if (floating) { wrapper.dataset.paperpaneFloating = ''; wrapper.style.cssText = 'position:fixed;left:20px;bottom:20px;z-index:2147483647;'; }
       else wrapper.style.cssText = site==='google-scholar'?'display:block;margin:6px 0;':'display:inline-flex;margin:4px 8px;vertical-align:middle';
-      wrapper.append(floating ? createPdfButton(doc, () => open(url)) : createPdfButton(doc, () => open(url), '用纸窗打开 PDF', 'link'));
+      wrapper.append(floating ? createPdfButton(doc, () => open(url)) : createPdfButton(doc, () => open(url), '用纸间打开 PDF', 'link'));
       if (floating) doc.documentElement.append(wrapper); else if(position==='append')(anchor??source).append(wrapper);else(anchor??source).after(wrapper);
       controls.set(source, { control: wrapper, url, anchor });
     }

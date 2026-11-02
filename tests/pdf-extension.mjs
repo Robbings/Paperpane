@@ -34,8 +34,8 @@ try {
   const worker = context.serviceWorkers()[0] ?? await context.waitForEvent('serviceworker');
   const root = `chrome-extension://${new URL(worker.url()).host}`;
   const settings = await context.newPage(); await settings.goto(root+'/options.html');
-  const show = settings.getByRole('switch',{name:'显示网页打开按钮',exact:true});
-  const auto = settings.getByRole('switch',{name:'自动用纸窗打开 PDF',exact:true});
+  const show = settings.getByRole('switch',{name:'网页快捷按钮',exact:true});
+  const auto = settings.getByRole('switch',{name:'自动在纸间中打开 PDF',exact:true});
   await show.waitFor(); assert.equal(await show.isChecked(),true); assert.equal(await auto.isChecked(),false);
   await show.scrollIntoViewIfNeeded(); await settings.screenshot({path:resolve(output,'settings.png')});
   const links = await context.newPage(); await links.goto(base+'/links');
@@ -149,7 +149,7 @@ try {
   assert.equal(attachment.url().startsWith(root),false);
   console.log('PASS: attachment download remains a browser download');
   const popup = await context.newPage(); await popup.goto(root+'/popup.html');
-  await popup.getByRole('switch',{name:'显示网页打开按钮',exact:true}).waitFor();
+  await popup.getByRole('switch',{name:'网页快捷按钮',exact:true}).waitFor();
   assert.equal(await popup.getByRole('switch',{name:'自动打开 PDF',exact:true}).isChecked(),true);
   await popup.locator('.pp-popup').screenshot({path:resolve(output,'popup.png')});
   assert.deepEqual(errors,[]);

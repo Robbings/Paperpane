@@ -15,8 +15,8 @@ export const localeOptions: SegmentedOption<UiLocale>[] = [
 ];
 
 export const mathOptions: SegmentedOption<Preferences['mathDelimiter']>[] = [
-  { value: 'brackets', label: '\\( \\)' },
-  { value: 'dollars', label: '$ $' },
+  { value: 'brackets', label: '\\[ \\]' },
+  { value: 'dollars', label: '$$ $$' },
   { value: 'none', label: '不加' },
 ];
 

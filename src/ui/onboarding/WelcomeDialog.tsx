@@ -92,7 +92,7 @@ export function WelcomeDialog({ open, onStart, onClose }: WelcomeDialogProps) {
         <Preview />
         <div className="pp-welcome__body">
           <h2 id={titleId} className="pp-welcome__title">
-            欢迎使用纸窗
+            欢迎使用纸间
           </h2>
           <p className="pp-welcome__lead">在浏览器里读论文：打开 PDF，对照翻译，有不懂的地方直接问模型。</p>
           <ul className="pp-welcome__features">

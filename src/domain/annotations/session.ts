@@ -74,12 +74,12 @@ export class AnnotationSession implements AnnotationService {
     this.queue = result.then(() => undefined);
     return result;
   }
-  private changed() { if (!this.disposed) this.channel.postMessage({ documentId: this.document.documentId }); }
+  private changed(countChanged = false) { if (!this.disposed) this.channel.postMessage({ documentId: this.document.documentId, countChanged }); }
   create(input: NewAnnotation): Promise<Result<Annotation>> {
     if (this.snapshot.state === 'loading') return Promise.resolve(failure('BUSY', '批注仍在读取，请稍候。'));
     const id = crypto.randomUUID(), captured = structuredClone(input);
     return this.enqueue(async () => {
-      try { const row = await this.db.create(this.document, captured, id); this.rows.set(row.id, row); this.changed(); return row; }
+      try { const row = await this.db.create(this.document, captured, id); this.rows.set(row.id, row); this.changed(true); return row; }
       catch (error) { this.failedCreates.set(id, captured); throw error; }
     });
   }
@@ -109,7 +109,7 @@ export class AnnotationSession implements AnnotationService {
   private mutate(id: string, revision: string, operation: 'delete' | 'restore') {
     return this.enqueue(async () => {
       if (this.drafts.has(id)) throw new AnnotationFault('CONFLICT', '此批注有尚未保存的草稿，请先保存或处理冲突。');
-      const row = await this.db.mutate(this.document, id, revision, {}, operation); this.rows.set(id, row); this.changed(); return row;
+      const row = await this.db.mutate(this.document, id, revision, {}, operation); this.rows.set(id, row); this.changed(true); return row;
     });
   }
   async deleteCurrent(id: string): Promise<boolean> {
@@ -165,7 +165,7 @@ export class AnnotationSession implements AnnotationService {
     await this.queue; this.blocked.clear(); this.error = undefined;
     for (const [id, input] of this.failedCreates) await this.enqueue(async () => {
       const row = await this.db.create(this.document, input, id);
-      this.failedCreates.delete(id); this.rows.set(id, row); this.changed();
+      this.failedCreates.delete(id); this.rows.set(id, row); this.changed(true);
     });
     for (const [id, patch] of this.drafts) this.edit(id, { ...patch });
     const layouts = [...this.layoutDrafts.values()]; this.layoutDrafts.clear(); this.setLayouts(layouts);
