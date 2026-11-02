@@ -1,3 +1,4 @@
+import { sentenceFinished } from '@/contracts/translation';
 import type { DocumentRef } from '@/contracts/document';
 import type { ExtractedPaper, TranslationRun, TranslationSentence, SentenceTranslation } from '@/contracts/translation';
 import { TranslationStore } from '@/data/translation-store';
@@ -129,7 +130,7 @@ export class TranslationSession {
         this.taskRun = this.run;
         this.run.sessionId ??= this.run.id;
         if (replace) for (const sentence of candidates) delete this.run.outputs[sentence.id];
-        const selected = candidates.filter(s => this.run!.outputs[s.id]?.state !== 'done');
+        const selected = candidates.filter(s => !sentenceFinished(this.run!.outputs[s.id]));
         if (!selected.length) {
           if (!candidates.length) this.error = '此页没有可翻译文字，扫描件暂不支持。';
           else { this.run.phase = 'completed'; this.run.error = undefined; await this.save(); signal.throwIfAborted(); }
@@ -146,13 +147,23 @@ export class TranslationSession {
             for (const sentence of batch) this.retrying.delete(sentence.id);
             if (!this.retrying.size) this.run!.error = undefined;
             this.update();
-            const remaining = batch.filter(s => this.run!.outputs[s.id]?.state !== 'done');
+            const remaining = batch.filter(s => !sentenceFinished(this.run!.outputs[s.id]));
             if (remaining.length) await this.translateBatch(task.engine, remaining, language, resolved.revision, retryRound, requestSignal);
           },
           split: batch => {
-            const remaining = batch.filter(s => this.run!.outputs[s.id]?.state !== 'done');
+            const remaining = batch.filter(s => !sentenceFinished(this.run!.outputs[s.id]));
             const middle = Math.ceil(remaining.length / 2);
             return [remaining.slice(0, middle), remaining.slice(middle)].filter(part => part.length);
+          },
+          onContentExhausted: async (batch, reason) => {
+            signal.throwIfAborted();
+            for (const sentence of batch) {
+              if (!sentenceFinished(this.run!.outputs[sentence.id])) {
+                this.run!.outputs[sentence.id] = {state:'original', text:'', error:reason};
+              }
+            }
+            await this.save();
+            this.update();
           },
           onRetry: async (batch, attempt, delay, error) => {
             for (const sentence of batch) if (this.run!.outputs[sentence.id]?.state !== 'done')
@@ -163,7 +174,7 @@ export class TranslationSession {
         if (this.saveFailed) throw new Error('译文未能保存，请保持此页打开后重试保存。');
         this.retrying.clear();
         this.run.error = result.errors.length ? [...new Set(result.errors)].join(' ') : undefined;
-        this.run.phase = this.pauseRequested || this.abort.signal.aborted ? 'paused' : result.errors.length ? 'failed' : this.run.requested.every(id => this.run!.outputs[id]?.state === 'done') ? 'completed' : 'paused';
+        this.run.phase = this.pauseRequested || this.abort.signal.aborted ? 'paused' : result.errors.length ? 'failed' : this.run.requested.every(id => sentenceFinished(this.run!.outputs[id])) ? 'completed' : 'paused';
         await this.save();
         signal.throwIfAborted();
       } catch (e) {

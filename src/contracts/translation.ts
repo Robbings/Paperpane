@@ -12,7 +12,9 @@ export interface ExtractedPaper extends DocumentRef {
 export type TranslationEngineKey = string;
 export type TranslationEngineRef = { kind: 'llm'; key: TranslationEngineKey } |
   { kind: 'machine'; key: TranslationEngineKey; apiId: string; apiKind: string; adapterVersion: string };
-export interface SentenceTranslation { engine?: TranslationEngineKey; format?: 'markdown-math-v1'; inferredMath?: boolean; text: string; state: 'pending' | 'streaming' | 'partial' | 'done' | 'failed'; error?: string }
+export interface SentenceTranslation { engine?: TranslationEngineKey; format?: 'markdown-math-v1'; inferredMath?: boolean; text: string; state: 'pending' | 'streaming' | 'partial' | 'done' | 'original' | 'failed'; error?: string }
+/** A source-only sentence has exhausted content retries. It stays readable without being recorded as a translation. */
+export const sentenceFinished = (output?: SentenceTranslation) => output?.state === 'done' || output?.state === 'original';
 export interface TranslationAttempt {
   promptVersion?: string; engine?: string; retryRound?: number;
   sessionId?: string; finishedAt?: string; diagnostics?: TranslationDiagnostics;

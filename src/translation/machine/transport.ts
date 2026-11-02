@@ -64,7 +64,7 @@ export function failure(api: Api, code: string, status = 200, retryAfterMs = 0):
       'service',
       diagnostics,
     );
-  if (status === 413 || code === '10008' || code === '103') return incomplete();
+  if (status === 413 || (api.kind === 'alibaba' && ['10006', '10007', '10008'].includes(code)) || code === '103') return incomplete();
   return new TranslationError(
     name + ' 拒绝了翻译请求（' + (diagnostics.code || status) + '）。',
     false,

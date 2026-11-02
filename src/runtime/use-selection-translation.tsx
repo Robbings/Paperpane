@@ -80,11 +80,11 @@ export function useSelectionTranslation(owner: ReaderController | undefined, pre
     sourceLanguage={card.sourceLanguage} targetLanguage={card.targetLanguage} busy={busy}
     sourceRects={()=>owner?.rects(card.anchor)??[]}
     subscribeGeometry={listener=>owner?.reader.subscribeProjection('viewport',listener)??(()=>{})}
-    error={session.error??session.run?.error} hasOutput={!!output.text}
+    error={session.error??session.run?.error} hasOutput={!!(output.text || card.text)}
     paused={session.run?.phase==='paused'||session.run?.phase==='interrupted'} retrying={!!session.retrying.size} saveFailed={session.saveFailed}
     onTranslate={(source,target,engine)=>void translate(source,target,engine)} onClose={()=>void close()}
     onPause={()=>void session.pause()} onRetry={()=>void(session.saveFailed?session.retrySave():session.resume(card.targetLanguage))}
     onLocate={()=>void owner?.reader.locate(card.anchor)}>
-    {output.engine?.startsWith('mt:') ? literalTranslation(output.text) : output.text && <TranslationMarkdown block text={output.text} inferredMath={output.inferredMath}/>}
+    {!output.text ? card.text : output.engine?.startsWith('mt:') ? literalTranslation(output.text) : <TranslationMarkdown block text={output.text} inferredMath={output.inferredMath}/>}
   </SelectionTranslationWindow>;
 }

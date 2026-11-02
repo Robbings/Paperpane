@@ -2,13 +2,13 @@ import { sentenceRanges } from '../extract';
 
 // Only match identifiable spans. Keep punctuation outside URLs and ordinary words in the prose.
 const span =
-  /https?:\/\/[^\s<>\u3000，。；！？]+|10\.\d{4,9}\/[-._;()/:\w]+|[\w.+-]+@[\w.-]+\.[A-Za-z]{2,}|\[\s*\d+(?:\s*[-–—,，]\s*\d+)*\s*\]|\$[^$\n]+\$|\\\([^\n]*?\\\)|\\[a-zA-Z]+(?:\{[^{}\n]*\})*|\b[A-Za-z]\d*(?:\s*[+*/^-]\s*(?:[A-Za-z]\d*|\d+))+(?!\w)|(?:[\p{L}\d_]+[ \t]*)?[=≤≥≈≠∑∫√±×∈][ \t]*[\p{L}\d_+*/^().-]+|[α-ωΑ-Ω][\d_²³]*/gu;
+  /https?:\/\/[^\s<>\u3000，。；！？]+|10\.\d{4,9}\/[-._;()/:\w]+|[\w.+-]+@[\w.-]+\.[A-Za-z]{2,}|\$[^$\n]+\$|\\\([^\n]*?\\\)|\\[a-zA-Z]+(?:\{[^{}\n]*\})*|\b[A-Za-z]\d*(?:\s*[+*/^-]\s*(?:[A-Za-z]\d*|\d+))+(?!\w)|(?:[\p{L}\d_]+[ \t]*)?[=≤≥≈≠∑∫√±×∈][ \t]*[\p{L}\d_+*/^().-]+|[α-ωΑ-Ω][\d_²³]*/gu;
 export function protectText(text: string) {
   const fragments: { text: string; literal: boolean }[] = [];
   let cursor = 0;
   const spans: string[] = [];
-  // Keep original bracketed numbers distinct from tokens, even in unusual input like "⟦0⟧".
-  const prefix = text.includes('⟦') ? 'PP' + crypto.randomUUID().slice(0, 8) : '';
+  // Citations travel with their sentence. Use named tokens only for formulas, URLs and other protected spans.
+  const prefix = text.includes('PP') ? 'PP' + crypto.randomUUID().slice(0, 8) : 'PP';
   const masked = text.replace(span, (match, offset: number) => {
     const value = /^https?:|^10\./.test(match) ? match.replace(/[.,;:!?]+$/, '') : match;
     fragments.push({ text: text.slice(cursor, offset), literal: false }, { text: value, literal: true });

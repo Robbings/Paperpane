@@ -1,3 +1,4 @@
+import { sentenceFinished } from '@/contracts/translation';
 import { useEffect, useRef, useState, type CSSProperties } from 'react';
 import { createPortal } from 'react-dom';
 import { useSelectionTranslation } from './use-selection-translation';
@@ -93,7 +94,18 @@ export function useTranslation(owner:ReaderController|undefined,preferences:Pref
   const pages:TranslationPageView[]=Array.from({length:pageCount},(_,pageIndex)=>{
     const owned=sentences.filter(s=>s.anchor.pages[0]?.pageIndex===pageIndex);
     const covered=sentences.filter(s=>s.kind!=='formula'&&s.anchor.pages.some(p=>p.pageIndex===pageIndex));
-    const view:TranslationSentenceView[]=owned.map((s,i)=>{const out=session!.output(s.id);return {id:s.id,pageIndex,endsOnPage:s.anchor.pages.at(-1)!.pageIndex,kind:s.kind,source:`${s.source} `,inferredMath:out.inferredMath,text:s.kind==='formula'?'公式 · 查看原文':out.text,state:s.kind==='formula'?'done':out.state,approximate:s.approximate,paragraphStart:i===0||owned[i-1]?.paragraphId!==s.paragraphId};});
+    const view:TranslationSentenceView[]=owned.map((s,i)=>{
+      const out=session?.run?.outputs[s.id];
+      const showOriginal=s.kind!=='formula' && !!out && !out.text;
+      return {
+        id:s.id, pageIndex, endsOnPage:s.anchor.pages.at(-1)!.pageIndex, kind:s.kind,
+        source:showOriginal && mode==='parallel' ? '' : s.source+' ',
+        text:s.kind==='formula' ? '公式 · 查看原文' : showOriginal ? s.source : out?.text ?? '',
+        state:s.kind==='formula' || out?.state==='original' ? 'done' : showOriginal ? 'pending' : out?.state ?? 'pending',
+        inferredMath:out?.inferredMath, approximate:s.approximate,
+        paragraphStart:i===0 || owned[i-1]?.paragraphId!==s.paragraphId
+      };
+    });
     const started=covered.some(s=>session?.run?.outputs[s.id]);
     const counts=new Map<string,number>();
     for (const s of covered) {
@@ -104,7 +116,7 @@ export function useTranslation(owner:ReaderController|undefined,preferences:Pref
     }
     const other=[...counts].sort((a,b)=>b[1]-a[1])[0]?.[0];
     const engineLabel=other ? (options.some(o=>o.value===other) ? engineName(options,other) : '其他引擎') : undefined;
-    return {pageIndex,engineLabel,sentences:view,state:!covered.length?'failed':covered.every(s=>session?.output(s.id).state==='done')?'done':covered.some(s=>session?.output(s.id).state==='streaming')?'translating':started?'partial':'untranslated',error:!covered.length?'此页没有可翻译的文字，扫描件暂不支持。':undefined};
+    return {pageIndex,engineLabel,sentences:view,state:!covered.length?'failed':covered.every(s=>sentenceFinished(session?.output(s.id)))?'done':covered.some(s=>session?.output(s.id).state==='streaming')?'translating':started?'partial':'untranslated',error:!covered.length?'此页没有可翻译的文字，扫描件暂不支持。':undefined};
   });
   const run=session?.run;
   const failureMessage=session?.error ?? (run?.phase==='failed'?run.error:undefined);
@@ -116,7 +128,7 @@ export function useTranslation(owner:ReaderController|undefined,preferences:Pref
     const paid=api && !machineProvider(api.kind)?.unofficial;
     const remaining=sentences.filter(s=>s.kind!=='formula' && (!ids || ids.includes(s.id)) &&
       (page===undefined || s.anchor.pages.some(p=>p.pageIndex===page)) &&
-      (replace || run?.profile.language!==language || run.outputs[s.id]?.state!=='done'));
+      (replace || run?.profile.language!==language || !sentenceFinished(run.outputs[s.id]) || (run.outputs[s.id]?.state==='original' && savedEngineKey(run.profile)!==key)));
     if (replace || retry || (paid && page===undefined)) {
       const cost:TranslationCost=paid ? {kind:'characters',characters:remaining.reduce((n,s)=>n+[...s.source].length,0)} :
         api ? {kind:'free'} : {kind:'tokens'};
@@ -144,8 +156,12 @@ export function useTranslation(owner:ReaderController|undefined,preferences:Pref
   const panel=loading?<EmptyState icon="file" title="正在整理原文" description={`已读取 ${session.extractProgress} / ${pageCount} 页，还没有发出翻译请求。`} actions={<ProgressBar label="整理原文" value={pageCount?session.extractProgress/pageCount:undefined}/>}/>:
     !session?.paper?<EmptyState icon="file" title="原文尚未就绪" description={session?.error??'请先打开 PDF。'}/>:
     <div style={{display:'contents','--pp-text-read':`${(preferences.translationFontSize??preferences.uiFontSize)*.875/16}rem`} as CSSProperties}>
-      <TranslationPane engine={{value,options}} onEngine={setOverride} renderText={s=>session?.output(s.id).engine?.startsWith('mt:') ? literalTranslation(s.text) : <TranslationMarkdown text={s.text} inferredMath={s.inferredMath}/>} pages={pages} mode={mode} onMode={setMode} follow={follow} onFollow={setFollow} onClose={()=>{setOpen(false);setActive(null);}} activeId={active} onHover={setActive} onLocate={id=>{const s=sentences.find(x=>x.id===id);if(s){followGuard.current.suppressUntil=Date.now()+1500;setActive(id);void owner?.reader.locate(s.anchor);}}} reveal={reveal}
-        task={{saveFailed:session.saveFailed,completedSentences:run?.requested.filter(id=>run.outputs[id]?.state==='done').length,totalSentences:run?.requested.length,phase:session.error?'failed':run?.phase??'idle',completedPages:pages.filter(p=>p.state==='done').length,totalPages:pageCount,current:session.retrying.size?`${session.activeRequests} 个请求进行中，${session.retrying.values().next().value}`:session.activeRequests?`${session.activeRequests} 个请求并发`:undefined,error:session.error??run?.error}}
+      <TranslationPane engine={{value,options}} onEngine={setOverride} renderText={s=>{
+          const out=session.output(s.id);
+          if (!out.text) return s.text;
+          return out.engine?.startsWith('mt:') ? literalTranslation(s.text) : <TranslationMarkdown text={s.text} inferredMath={s.inferredMath}/>;
+        }} pages={pages} mode={mode} onMode={setMode} follow={follow} onFollow={setFollow} onClose={()=>{setOpen(false);setActive(null);}} activeId={active} onHover={setActive} onLocate={id=>{const s=sentences.find(x=>x.id===id);if(s){followGuard.current.suppressUntil=Date.now()+1500;setActive(id);void owner?.reader.locate(s.anchor);}}} reveal={reveal}
+        task={{saveFailed:session.saveFailed,completedSentences:run?.requested.filter(id=>sentenceFinished(run.outputs[id])).length,totalSentences:run?.requested.length,phase:session.error?'failed':run?.phase??'idle',completedPages:pages.filter(p=>p.state==='done').length,totalPages:pageCount,current:session.retrying.size?`${session.activeRequests} 个请求进行中，${session.retrying.values().next().value}`:session.activeRequests?`${session.activeRequests} 个请求并发`:undefined,error:session.error??run?.error}}
         onTranslatePage={p=>start(p,session.needsRepeat(p))} onTranslateAll={()=>start()} onPause={()=>void session.pause()} onResume={()=>session.saveFailed?void session.retrySave():start(run?.scope?.page,true,run?.requested,false,run?.profile.language??preferences.translationLanguage)} onRetryPage={p=>start(p,true)} onRetranslatePage={page=>start(page,false,undefined,true)} onRetranslateAll={()=>start(undefined,false,undefined,true)}/>
     </div>;
   const confirmation = <TranslationConfirm

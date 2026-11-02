@@ -41,7 +41,7 @@ export function createMachineEngine(machine: ResolvedMachine): TranslationEngine
         const fragments: (string | undefined)[] = [];
         parts.set(sentence.id, fragments);
         const mask = settings.protectSpans ? protectText(sentence.source) : undefined;
-        // Alibaba may silently drop a reference placeholder while reporting success.
+        // Alibaba may drop placeholders for formulas and URLs even on a successful response.
         // Keep protected spans local on this adapter, including on the first request.
         const keepSpansLocal = api.kind === 'alibaba' && mask?.masked !== sentence.source;
         if (mask && !keepSpansLocal && !unmaskedRetry.has(sentence.id) && measure(mask.masked) <= itemCap) {
