@@ -1,16 +1,122 @@
+// Run after pnpm build. The PDF and authenticated publisher are local to this test.
+import assert from 'node:assert/strict';
+import http from 'node:http';
+import { resolve } from 'node:path';
 import { pathToFileURL } from 'node:url';
-const { chromium } = await import(process.env.PAPERPANE_PLAYWRIGHT_MODULE ? pathToFileURL(process.env.PAPERPANE_PLAYWRIGHT_MODULE).href : 'playwright');
-import assert from 'node:assert/strict';import http from 'node:http';import {readFile} from 'node:fs/promises';import {resolve} from 'node:path';
-const pdf=await readFile('backups/arxiv-validation/1706.03762.pdf');let requests=0;let anonymous=0;
-const server=http.createServer((q,r)=>{if(q.url.startsWith('/paper')){requests++;if(!q.headers.cookie?.includes('pdf_session=verified')){anonymous++;r.writeHead(403);r.end('Session required');return;}r.writeHead(200,{'Content-Type':'application/pdf','Content-Length':pdf.length,...(process.env.PAPERPANE_TEST_NO_CACHE ? {'Cache-Control':'no-store'} : {'Cache-Control':'public, max-age=3600'})});r.end(pdf)}else{r.writeHead(q.url==='/verify'?429:200,{'Content-Type':'text/html','Set-Cookie':'pdf_session=verified; Path=/; SameSite=Lax'});r.end('<html><body>Verify you are human <a href="/paper.pdf">PDF</a></body></html>')}});await new Promise(r=>server.listen(0,'127.0.0.1',r));
-let c;try{
-const ext=resolve('.output/chrome-mv3');c=await chromium.launchPersistentContext(resolve('browser-profiles/pdf-link-'+Date.now()),{executablePath:process.env.PAPERPANE_CHROMIUM,headless:true,viewport:{width:1440,height:1000},ignoreDefaultArgs:['--disable-extensions'],args:[`--load-extension=${ext}`,`--disable-extensions-except=${ext}`]});const w=c.serviceWorkers()[0]??await c.waitForEvent('serviceworker');
-const base=`http://127.0.0.1:${server.address().port}`;
-const p=await c.newPage();await p.goto(base+'/links');assert.equal(await p.locator('#paperpane-completed-pdf-link').count(),0);
-await p.goto(base+'/verify');assert.equal(await p.locator('#paperpane-completed-pdf-link').count(),0);
-await p.goto(base+'/paper.pdf');const link=p.locator('#paperpane-completed-pdf-link');await link.waitFor({timeout:15000});assert.equal(p.url(),base+'/paper.pdf');
-await p.waitForTimeout(3000);
-await p.screenshot({path:'backups/pdf-page-link.png'});
-const opened=c.waitForEvent('page');await link.click();const reader=await opened;await reader.waitForURL(u=>u.protocol==='chrome-extension:'&&u.searchParams.has('documentId'),{timeout:30000});await reader.locator('.textLayer span:visible').first().waitFor({timeout:30000});
-await reader.screenshot({path:'backups/pdf-page-link-reader.png'});assert.equal(await reader.locator('.textLayer span:visible').count()>0,true);assert.equal(requests,process.env.PAPERPANE_TEST_NO_CACHE?2:1,'cached imports must avoid network, uncached imports must use the original session');assert.equal(anonymous,0,'import must preserve the website session instead of anonymous extension download');console.log('PASS native PDF left-bottom entry -> imported reader; HTML and 429 have no entry; requests='+requests);
-}finally{await c?.close();server.close();}
+import { PDFDocument } from 'pdf-lib';
+
+const { chromium } = await import(process.env.PAPERPANE_PLAYWRIGHT_MODULE
+  ? pathToFileURL(process.env.PAPERPANE_PLAYWRIGHT_MODULE).href : 'playwright');
+const document = await PDFDocument.create();
+document.addPage().drawText('Paperpane session verification');
+const pdf = Buffer.from(await document.save());
+const requests = new Map();
+const server = http.createServer((req, res) => {
+  const { pathname } = new URL(req.url, 'http://localhost');
+  if (pathname === '/paper-link') {
+    res.writeHead(302, { Location: '/challenge' }).end();
+  } else if (pathname === '/challenge') {
+    res.writeHead(403, { 'Content-Type': 'text/html' }).end('<form action="/verified"><button>Continue</button></form>');
+  } else if (pathname === '/verified') {
+    res.writeHead(302, { 'Set-Cookie': 'verified=yes; Path=/; SameSite=Lax', Location: '/session.pdf?sig=a%2Fb' }).end();
+  } else if (pathname.endsWith('.pdf')) {
+    const verified = req.headers.cookie?.includes('verified=yes') ?? false;
+    const hits = requests.get(pathname) ?? [];
+    hits.push(verified);
+    requests.set(pathname, hits);
+    if (pathname === '/session.pdf' && !verified) { res.writeHead(403).end(); return; }
+    res.writeHead(200, { 'Content-Type': 'application/pdf', 'Content-Length': pdf.length,
+      'Cache-Control': pathname === '/session.pdf' ? 'no-store' : 'private, max-age=3600' }).end(pdf);
+  } else {
+    res.writeHead(200, { 'Content-Type': 'text/html' }).end('<a href="/cached.pdf">PDF</a>');
+  }
+});
+await new Promise(resolve => server.listen(0, '127.0.0.1', resolve));
+const base = 'http://127.0.0.1:' + server.address().port;
+const ext = resolve(process.env.PAPERPANE_EXTENSION ?? '.output/chrome-mv3');
+let context;
+try {
+  context = await chromium.launchPersistentContext('', {
+    executablePath: process.env.PAPERPANE_CHROMIUM, headless: true,
+    ignoreDefaultArgs: ['--disable-extensions'], args: [`--load-extension=${ext}`, `--disable-extensions-except=${ext}`],
+  });
+  const worker = context.serviceWorkers()[0] ?? await context.waitForEvent('serviceworker');
+  const readerUrl = new URL('reader.html', worker.url()).href;
+  const readers = () => context.pages().filter(page => page.url().startsWith(readerUrl));
+  async function rendered(opened, expected) {
+    const reader = await opened;
+    await reader.waitForURL(url => url.href.startsWith(readerUrl) && url.searchParams.has('documentId'));
+    await reader.locator('.textLayer span:visible').first().waitFor();
+    assert.equal(new URL(reader.url()).searchParams.get('originalPdf'), expected);
+    return reader;
+  }
+
+  const page = await context.newPage();
+  await page.goto(base);
+  const opened = context.waitForEvent('page');
+  await page.locator('[data-paperpane-button]').click();
+  await rendered(opened, base + '/cached.pdf');
+  assert.equal(page.url(), base + '/cached.pdf');
+  assert.equal(requests.get('/cached.pdf').length, 1);
+  console.log('PASS webpage button → browser PDF → reader, one PDF request with caching');
+
+  const scholar = await context.newPage();
+  const results = 'https://scholar.google.com/scholar?q=test';
+  await scholar.route(results, route => route.fulfill({ contentType: 'text/html', body:
+    '<div class="gs_r gs_scl" id="one"><div class="gs_ggs"><a href="' + base + '/other.pdf">[PDF] One</a></div></div>' +
+    '<div class="gs_r gs_scl" id="two"><div class="gs_ggs"><a href="' + base + '/paper-link">[PDF] Two</a></div></div>' }));
+  // Abandoning a pending import in this tab also leaves other PDFs manual.
+  await scholar.goto(results);
+  await scholar.locator('#two [data-paperpane-button]').click();
+  await scholar.getByRole('button', { name: 'Continue' }).waitFor();
+  await scholar.goto(base + '/unrelated.pdf');
+  await scholar.locator('#paperpane-completed-pdf-link').waitFor();
+  assert.equal(readers().length, 1);
+  await scholar.goto(results);
+  await scholar.locator('#two [data-paperpane-button]').click();
+  await scholar.getByRole('button', { name: 'Continue' }).waitFor();
+  assert.equal(scholar.url(), base + '/challenge');
+  assert.equal(readers().length, 1);
+  assert.equal(requests.has('/other.pdf'), false);
+
+  // A manual PDF in a second tab must not consume Scholar's pending click.
+  const manual = await context.newPage();
+  await manual.goto(base + '/manual.pdf');
+  const floating = manual.locator('#paperpane-completed-pdf-link');
+  await floating.waitFor();
+  assert.equal(readers().length, 1);
+  // Chrome's native PDF viewer takes focus as its embedded renderer initializes.
+  await manual.waitForTimeout(3000);
+  const manualReader = context.waitForEvent('page');
+  await floating.click();
+  await rendered(manualReader, base + '/manual.pdf');
+  assert.equal(requests.get('/manual.pdf').length, 1);
+
+  const verified = context.waitForEvent('page');
+  await scholar.getByRole('button', { name: 'Continue' }).click();
+  await rendered(verified, base + '/session.pdf?sig=a%2Fb');
+  assert.deepEqual(requests.get('/session.pdf'), [true, true]);
+  await scholar.reload();
+  await scholar.locator('#paperpane-completed-pdf-link').waitFor();
+  assert.equal(readers().length, 3);
+  const popup = await context.newPage();
+  await popup.goto(new URL('popup.html', worker.url()).href);
+  const popupReader = context.waitForEvent('page');
+  const result = await popup.evaluate(async source => {
+    const [tab] = await chrome.tabs.query({ url: source });
+    // A PDF open before installation has no recorded network observation.
+    await chrome.storage.session.remove('pdfTab:' + tab.id);
+    return chrome.runtime.sendMessage({ type: 'OPEN_TAB_PDF', tabId: tab.id });
+  }, base + '/manual.pdf');
+  assert.equal(result.ok, true);
+  await rendered(popupReader, base + '/manual.pdf');
+  assert.equal(requests.get('/manual.pdf').length, 1);
+  console.log('PASS PDF popup command reuses the original tab and cache');
+  console.log('PASS selected Scholar result → 403 challenge → site session → reader, no anonymous fetch; independent manual PDF and single-use handoff');
+} catch (error) {
+  console.error('Open test pages:', context?.pages().map(page => page.url()), 'PDF requests:', [...requests]);
+  throw error;
+} finally {
+  await context?.close();
+  server.close();
+}

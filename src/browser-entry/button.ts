@@ -19,6 +19,7 @@ export function createPdfButton(doc: Document, open: () => Promise<void>, label 
   button.type = 'button'; button.dataset.paperpaneButton = ''; button.textContent = label;
   if (look === 'link') button.dataset.look = 'link';
   button.addEventListener('click', async event => {
+    if (!event.isTrusted) return;
     event.preventDefault(); event.stopPropagation();
     if (button.disabled) return;
     button.disabled = true; button.textContent = '正在打开…';

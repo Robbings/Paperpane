@@ -1,5 +1,5 @@
 export interface BrowserEntrySettings { autoOpenPdf: boolean; showPdfButtons: boolean }
-export const browserEntryDefaults: BrowserEntrySettings = { autoOpenPdf: false, showPdfButtons: false };
+export const browserEntryDefaults: BrowserEntrySettings = { autoOpenPdf: false, showPdfButtons: true };
 
 export function pdfSourceUrl(raw: string): string {
   const url = new URL(raw);

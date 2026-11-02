@@ -2,9 +2,9 @@ import type { browser } from 'wxt/browser';
 
 /** Self-contained: Chrome serializes this function into the PDF document. */
 export function mountCompletedPdfLink(expectedUrl: string) {
-  if (document.contentType !== 'application/pdf' || location.href.split('#')[0] !== expectedUrl) return;
+  if (document.contentType !== 'application/pdf' || location.href.split('#')[0] !== expectedUrl) return false;
   const id = 'paperpane-completed-pdf-link';
-  if (document.getElementById(id)) return;
+  if (document.getElementById(id)) return true;
   const host = document.createElement('div');
   host.id = id;
   host.style.cssText = 'position:fixed;left:20px;bottom:20px;z-index:2147483647;';
@@ -15,7 +15,8 @@ export function mountCompletedPdfLink(expectedUrl: string) {
   button.type = 'button';
   button.textContent = '在纸窗中打开';
   button.title = '将当前 PDF 导入文献库并在纸窗阅读器中打开';
-  button.addEventListener('click', async () => {
+  button.addEventListener('click', async event => {
+    if (!event.isTrusted || button.disabled) return;
     button.disabled = true;
     try {
       const api = (globalThis as unknown as { chrome: typeof browser }).chrome;
@@ -30,4 +31,5 @@ export function mountCompletedPdfLink(expectedUrl: string) {
   });
   root.append(style, button);
   document.documentElement.append(host);
+  return true;
 }
