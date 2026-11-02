@@ -1,3 +1,4 @@
+import { networkFailure } from '../problems';
 import { TranslationError, safeDetail } from '../errors';
 import type { MachineTranslator } from '../machine-providers';
 import type { TranslationApiView } from '@/ui/settings/types';
@@ -90,7 +91,7 @@ export async function request<T>(api: Api, url: string, init: RequestInit, signa
     body = await response.text();
   } catch {
     signal.throwIfAborted();
-    throw new TranslationError(api.name + ' 暂时无法连接，稍后自动重试。', true, false);
+    throw new TranslationError(networkFailure, true, false, 0, 'service', {category:'network'});
   }
   let data;
   try {

@@ -208,7 +208,7 @@ toast.show({ message: '翻译失败：请求超时', tone: 'error', action: { la
   - 译文栏 `engine` + `onEngine`：任务状态弹层顶部的「翻译引擎」下拉；只影响这个阅读器之后的翻译，不改设置，已翻译的页保持原样。运行中禁用。
   - `TranslationPageView.engineLabel`：这一页的译文（全部或部分）来自另一个引擎时传它的名称，页码旁显示一枚淡色标签；与当前引擎相同时不传。
   - 选区翻译窗口 `engine`：齿轮弹层里多一个「翻译引擎」下拉，所选引擎不支持的目标语言不可选；点「翻译 / 重新翻译」时 `onTranslate(source, target, engine)` 带上所选引擎，只作用于这个窗口。有译文时右下角淡色显示引擎名。
-  - `TranslationConfirm`：重试、重新翻译、用付费服务翻译全文前的确认，`request` 说做什么，`engineLabel` 说用哪个引擎，`cost` 说怎么计费（`tokens` / `characters` 带估算字数 / `free`）。
+  - `TranslationConfirm`：首次翻译时提示 API 用量，提供「翻译」「去设置」「取消」。选区和全文共用本机确认记录。
 - 设置页「翻译」：全文翻译引擎 `translationEngine`、选区翻译引擎 `selectionTranslationEngine`（默认与全文相同），所选引擎不支持默认目标语言时行内报错；翻译服务详情页的「检查连接」调用 `testTranslationApi(draft, apiId, signal)`（`runtime/model-settings-actions.ts`，由逻辑层实现）。
 
 ## 修改与扩展

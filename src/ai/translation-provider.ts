@@ -1,3 +1,4 @@
+import { networkFailure } from '@/translation/problems';
 import { chatRequestOptions } from './model-providers';
 import { supportsModelOperation } from '@/ai/model-configuration';
 import { modelSlot, coolModel } from '@/ai/limit';
@@ -29,7 +30,7 @@ async function streamTranslationAttempt(connection: Connection, messages: { role
     try { return await action(); }
     catch (e) {
       if (signal.aborted) throw signal.reason;
-      const text = timeout.aborted ? '模型请求超时。' : '网络连接失败或响应中断；浏览器未提供 HTTP 状态。';
+      const text = networkFailure;
       report({ category: timeout.aborted ? 'timeout' : 'network', message: text });
       throw new TranslationError(text, true, false, 0, 'service', diagnostics);
     }

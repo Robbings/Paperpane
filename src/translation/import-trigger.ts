@@ -1,3 +1,4 @@
+import type { DocumentRef } from '@/contracts/document';
 import { browser } from 'wxt/browser';
 import { allowTranslation } from './consent';
 import { ImportTranslationJobs } from './import-jobs';
@@ -7,7 +8,7 @@ export async function wakeImportedTranslation(documentId: string, fileVersion: s
   if (
     !(await allowTranslation(
       undefined,
-      '已开启导入时自动翻译。新论文将发送给所选翻译服务处理，可能产生费用。',
+      '导入论文时会自动翻译全文，批量导入可能增加用量。',
     ))
   ) {
     const jobs = new ImportTranslationJobs();
@@ -28,4 +29,10 @@ export async function wakeImportedTranslation(documentId: string, fileVersion: s
   } catch {
     toast.show({ tone: 'warning', message: '论文已导入，自动翻译暂未启动。可在阅读器中手动翻译。' });
   }
+}
+
+export async function retryImportedTranslation(ref:DocumentRef) {
+  const jobs=new ImportTranslationJobs();
+  try {await jobs.retry(ref);} finally {await jobs.close();}
+  await wakeImportedTranslation(ref.documentId,ref.fileVersion);
 }

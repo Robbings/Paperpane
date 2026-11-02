@@ -15,6 +15,9 @@ export { decodeTranslations } from './output';
 
 export class TranslationSession {
   engineOverride?: string;
+  failure?: {message:string;engine?:string;beforeRun:boolean};
+  private lastRetry?:()=>Promise<void>;
+  retryLast() { return this.saveFailed ? this.retrySave() : this.lastRetry?.(); }
   requestScope?: { page?: number; ids?: string[] };
   paper?: ExtractedPaper;
   run?: TranslationRun;
@@ -125,6 +128,9 @@ export class TranslationSession {
   start(language: string, page?: number, retry = false, onlyIds?: string[], replace = false, automatic=false): Promise<void> {
     if (this.active) return this.active;
     if (this.loading || !this.paper || this.disposed || this.leaving) return Promise.resolve();
+    this.failure=undefined;
+    const before=this.run?.revision;
+    this.lastRetry=()=>this.start(language,page,true,onlyIds,replace && this.run?.revision===before);
     this.autoTask=automatic;
     this.taskAbort = new AbortController();
     const signal = AbortSignal.any([this.abort.signal, this.taskAbort.signal]);
@@ -132,7 +138,7 @@ export class TranslationSession {
     this.active = this.execute(language, page, retry, signal, onlyIds, replace, automatic).catch(e => {
       // Cancellation persistence belongs inside the lock, never on an old loaded snapshot.
       if (signal.aborted && !this.saveFailed) return;
-      this.error = message(e); this.update();
+      this.error = message(e); this.failure={message:this.error,engine:this.engineOverride??this.run?.profile.engine?.key,beforeRun:this.run?.revision===before}; this.update();
     }).finally(() => { this.active = undefined; this.autoTask=false; this.taskAbort = undefined; this.retrying.clear(); this.update(); });
     return this.active;
   }
@@ -156,16 +162,17 @@ export class TranslationSession {
             this.run=latest; this.persistedRevision=latest.revision; this.update(); return;
           }
         }
+        const compatible = latest && latest.extractionVersion === this.paper!.version && latest.profile.language === language &&
+          (latest.profile.sourceLanguage ?? 'auto') === (this.selection?.sourceLanguage ?? 'auto');
+        if (candidates.length && (replace || !compatible || candidates.some(s=>latest.outputs[s.id]?.state!=='done'))) {
+          if (!await allowTranslation(signal,undefined,this.engineOverride?.startsWith('mt:')?'translation':'models')) return;
+        }
+        signal.throwIfAborted();
         const resolved = await this.settings.resolveTranslationEngine(this.selection ? 'selection' : 'paper', this.engineOverride);
         signal.throwIfAborted();
         const task = prepareTranslation(resolved, language, this.selection?.sourceLanguage);
-        const compatible = latest && latest.extractionVersion === this.paper!.version && latest.profile.language === language &&
-          (latest.profile.sourceLanguage ?? 'auto') === (this.selection?.sourceLanguage ?? 'auto');
         const same = compatible && savedEngineKey(latest.profile) === resolved.key && latest.profile.promptVersion === task.profile.promptVersion;
         if (retry && onlyIds && latest && !compatible) throw new Error('原文或翻译语言已变化，请重新开始翻译。');
-        const needsRequest=replace || !compatible || candidates.some(s=>!sentenceFinished(latest.outputs[s.id]) || (!same && latest.outputs[s.id]?.state==='original'));
-        if (needsRequest && candidates.length && !await allowTranslation(signal)) return;
-        signal.throwIfAborted();
         const continuing = !!(retry && !replace && same && candidates.every(s => latest.requested.includes(s.id)));
         const now = new Date().toISOString();
         this.run = continuing ? latest! : {
@@ -228,6 +235,7 @@ export class TranslationSession {
         this.run.phase = this.pauseRequested || this.abort.signal.aborted ? 'paused' : result.errors.length ? 'failed' : this.run.requested.every(id => sentenceFinished(this.run!.outputs[id])) ? 'completed' : 'paused';
         await this.save();
         signal.throwIfAborted();
+        if (result.errors.length) throw new Error(this.run.error);
       } catch (e) {
         if (signal.aborted && !this.saveFailed) {
           // Early cancellation never owns the previously loaded run and must not save it.
@@ -292,8 +300,8 @@ export class TranslationSession {
         if (!lock) throw new Error('这篇论文正在另一个窗口翻译，请在那里暂停后再重试保存。');
         await this.save(true);
       });
-      this.error = undefined;
-    } catch (e) { this.error = message(e); }
+      this.error = undefined; this.failure=undefined;
+    } catch (e) { this.error = message(e); this.failure={message:this.error,engine:this.engineOverride,beforeRun:false}; }
     this.update();
   }
   output(id: string): SentenceTranslation { return this.run?.outputs[id] ?? { text: '', state: 'pending' }; }

@@ -1,3 +1,4 @@
+import { showTranslationProblem } from './translation-notices';
 import { allowTranslation, translationCostAccepted } from '@/translation/consent';
 import { toast } from '@/ui/components';
 import { useCallback, useEffect, useRef, useState } from 'react';
@@ -107,7 +108,9 @@ export function useLocalPreferences() {
     const translations=new BroadcastChannel('paperpane-import-translations');
     translations.onmessage=({data})=>{
       if (data?.type==='error' && document.visibilityState==='visible')
-        toast.show({tone:'warning',message:'导入后的自动翻译未完成：'+data.message});
+        showTranslationProblem(data.message,data.engine,()=>{void import('@/translation/import-trigger')
+          .then(({retryImportedTranslation})=>retryImportedTranslation(data))
+          .catch(()=>showTranslationProblem('未能启动重试。'));});
     };
     session.channel.onmessage = () => {
       void session.tail.then(session.refresh);
@@ -148,7 +151,7 @@ export function useLocalPreferences() {
       const when=value==='on-add'?'导入新论文时':'打开论文时';
       const notice=when+'会自动翻译全文，批量处理可能增加用量和费用。';
       if (translationCostAccepted()) toast.show({tone:'warning',message:notice});
-      else if (!await allowTranslation(undefined,notice+'是否开启？')) return;
+      else if (!await allowTranslation(undefined,notice)) return;
       if (!session.active || choice!==autoChoice.current) return;
     }
     const ticket = ++session.generation;

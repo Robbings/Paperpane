@@ -1,3 +1,4 @@
+import {noModel,removedEngine} from './problems';
 import type { Connection } from '@/ai/connection';
 import { resolveConfiguredModel } from '@/ai/model-configuration';
 import type { TranslationRun } from '@/contracts/translation';
@@ -56,6 +57,8 @@ export function resolveEngine(
   const label = engineName(engineOptions(view), key),
     revision = view.revision;
   if (key.startsWith('llm:')) {
+    if (!view.models.length && !key.slice(4)) throw new Error(noModel);
+    if (key.slice(4) && !view.models.some(model=>model.id===key.slice(4))) throw new Error(removedEngine);
     const { model, endpoint } = resolveConfiguredModel(view, key.slice(4) || undefined, 'translate');
     return {
       kind: 'llm',
@@ -66,7 +69,7 @@ export function resolveEngine(
     };
   }
   const api = view.translationApis?.find((a) => 'mt:' + a.id === key);
-  if (!api) throw new Error('所选翻译服务已被移除，请在设置中重新选择。');
+  if (!api) throw new Error(removedEngine);
   const provider = machineProvider(api.kind);
   if (!provider) throw new Error('不支持这个翻译服务。');
   const translator = createMachineTranslator(api, credentials(keys['translation-api:' + api.id]));

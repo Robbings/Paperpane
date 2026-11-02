@@ -1,10 +1,11 @@
+import { useTranslationProblem } from './translation-notices';
 import { sentenceFinished } from '@/contracts/translation';
 import { useEffect, useRef, useState, type CSSProperties } from 'react';
 import { createPortal } from 'react-dom';
 import { useSelectionTranslation } from './use-selection-translation';
 import { TranslationPane } from '@/ui/reader/translation/TranslationPane';
 import type { TranslationMode, TranslationPageView, TranslationSentenceView } from '@/ui/reader/translation/types';
-import { EmptyState, IconButton, ProgressBar, toast } from '@/ui/components';
+import { EmptyState, IconButton, ProgressBar } from '@/ui/components';
 import { TranslationMarkdown } from './translation-markdown';
 import { TranslationSession } from '@/translation/session';
 import type { ReaderController } from './reader-controller';
@@ -130,8 +131,8 @@ export function useTranslation(owner:ReaderController|undefined,preferences:Pref
     return {pageIndex,engineLabel,sentences:view,state:!covered.length?'failed':covered.every(s=>sentenceFinished(session?.output(s.id)))?'done':covered.some(s=>session?.output(s.id).state==='streaming')?'translating':started?'partial':'untranslated',error:!covered.length?'此页没有可翻译的文字，扫描件暂不支持。':undefined};
   });
   const run=session?.run;
-  const failureMessage=session?.error ?? (run?.phase==='failed'?run.error:undefined);
-  useEffect(()=>{if(failureMessage)toast.show({message:'翻译未能完成，可在译文栏的任务状态中查看原因并重试。',tone:'warning',duration:5000});},[failureMessage]);
+  useTranslationProblem(session);
+  const progressRun=session?.failure?.beforeRun ? undefined : run;
   const start=(page?:number,retry=false,ids?:string[],replace=false,language:string=preferences.translationLanguage)=>{
     if (!session) return;
     if (!settingsReady) { owner?.report('翻译设置尚未就绪，请稍后再试。'); return; }
@@ -161,8 +162,8 @@ export function useTranslation(owner:ReaderController|undefined,preferences:Pref
           if (!out.text) return s.text;
           return out.engine?.startsWith('mt:') ? literalTranslation(s.text) : <TranslationMarkdown text={s.text} inferredMath={s.inferredMath}/>;
         }} pages={pages} mode={mode} onMode={setMode} follow={follow} onFollow={setFollow} onClose={()=>{setOpen(false);setActive(null);}} activeId={active} onHover={setActive} onLocate={id=>{const s=sentences.find(x=>x.id===id);if(s){followGuard.current.suppressUntil=Date.now()+1500;setActive(id);void owner?.reader.locate(s.anchor);}}} reveal={reveal}
-        task={{saveFailed:session.saveFailed,completedSentences:run?.requested.filter(id=>sentenceFinished(run.outputs[id])).length,totalSentences:run?.requested.length,phase:session.error?'failed':run?.phase??'idle',completedPages:pages.filter(p=>p.state==='done').length,totalPages:pageCount,current:session.retrying.size?`${session.activeRequests} 个请求进行中，${session.retrying.values().next().value}`:session.activeRequests?`${session.activeRequests} 个请求并发`:undefined,error:session.error??run?.error}}
-        onTranslatePage={p=>start(p,session.needsRepeat(p))} onTranslateAll={()=>start()} onPause={()=>void session.pauseFromReader()} onResume={()=>session.saveFailed?void session.retrySave():start(run?.scope?.page,true,run?.requested,false,run?.profile.language??preferences.translationLanguage)} onRetryPage={p=>start(p,true)} onRetranslatePage={page=>start(page,false,undefined,true)} onRetranslateAll={()=>start(undefined,false,undefined,true)}/>
+        task={{saveFailed:session.saveFailed,completedSentences:progressRun?.requested.filter(id=>sentenceFinished(progressRun.outputs[id])).length,totalSentences:progressRun?.requested.length,phase:session.error?'failed':run?.phase??'idle',completedPages:pages.filter(p=>p.state==='done').length,totalPages:pageCount,current:session.retrying.size?`${session.activeRequests} 个请求进行中，${session.retrying.values().next().value}`:session.activeRequests?`${session.activeRequests} 个请求并发`:undefined,error:busy && run?.error ? '正在等待重试' : undefined}}
+        onTranslatePage={p=>start(p,session.needsRepeat(p))} onTranslateAll={()=>start()} onPause={()=>void session.pauseFromReader()} onResume={()=>session.failure?void session.retryLast():session.saveFailed?void session.retrySave():start(run?.scope?.page,true,run?.requested,false,run?.profile.language??preferences.translationLanguage)} onRetryPage={p=>start(p,true)} onRetranslatePage={page=>start(page,false,undefined,true)} onRetranslateAll={()=>start(undefined,false,undefined,true)}/>
     </div>;
   return {shell:{open,onToggle:()=>setOpen(o=>!o),pane:panel},overlay};
 }

@@ -1,3 +1,4 @@
+import { useTranslationProblem } from './translation-notices';
 import { useEffect, useRef, useState } from 'react';
 import type { DocumentAnchor } from '@/contracts/document';
 import type { ExtractedPaper } from '@/contracts/translation';
@@ -54,6 +55,7 @@ export function useSelectionTranslation(owner: ReaderController | undefined, pre
     })().catch(()=>{if(alive)owner.report('无法打开选区翻译，请重试。');});};
     return()=>{alive=false;++generation.current;owner.translateSelection=undefined;const old=current.current;current.current=undefined;setCard(undefined);if(old)void owner.releaseTranslation(old.session);};
   },[owner,document?.documentId,document?.fileVersion]);
+  useTranslationProblem(card?.session);
   if(!card)return null;
   const session=card.session, output=session.output('selection-text');
   const busy=session.loading||session.run?.phase==='running'||session.run?.phase==='pausing';
@@ -80,7 +82,7 @@ export function useSelectionTranslation(owner: ReaderController | undefined, pre
     sourceLanguage={card.sourceLanguage} targetLanguage={card.targetLanguage} busy={busy}
     sourceRects={()=>owner?.rects(card.anchor)??[]}
     subscribeGeometry={listener=>owner?.reader.subscribeProjection('viewport',listener)??(()=>{})}
-    error={session.error??session.run?.error} hasOutput={!!(output.text || card.text)}
+    hasOutput={!!(output.text || card.text)}
     paused={session.run?.phase==='paused'||session.run?.phase==='interrupted'} retrying={!!session.retrying.size} saveFailed={session.saveFailed}
     onTranslate={(source,target,engine)=>void translate(source,target,engine)} onClose={()=>void close()}
     onPause={()=>void session.pause()} onRetry={()=>void(session.saveFailed?session.retrySave():session.resume(card.targetLanguage))}

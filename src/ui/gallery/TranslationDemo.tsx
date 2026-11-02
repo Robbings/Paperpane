@@ -2,7 +2,7 @@ import { useRef, useState, type ReactNode } from 'react';
 import { Button } from '@/ui/components';
 import { TranslationPane } from '@/ui/reader/translation/TranslationPane';
 import { SelectionTranslationWindow } from '@/ui/reader/translation/SelectionTranslationWindow';
-import { TranslationConfirm, type TranslationConfirmRequest, type TranslationCost } from '@/ui/reader/translation/TranslationConfirm';
+import { TranslationConfirm } from '@/ui/reader/translation/TranslationConfirm';
 import type { TranslationEngineOption, TranslationMode, TranslationPageView, TranslationTaskView } from '@/ui/reader/translation/types';
 import { machineTargets } from '@/translation/machine-providers';
 import type { TranslationLanguage } from '@/translation/languages';
@@ -54,7 +54,7 @@ function Frame({ label, children }: { label: string; children: ReactNode }) {
 export function TranslationDemo() {
   const [mode, setMode] = useState<TranslationMode>('translation');
   const [engine, setEngine] = useState('mt:deepl');
-  const [request, setRequest] = useState<{ value: TranslationConfirmRequest; engine?: string; cost: TranslationCost } | null>(null);
+  const [confirmOpen,setConfirmOpen]=useState(false);
   const [selection, setSelection] = useState({ engine: 'mt:google', target: 'zh-CN' as TranslationLanguage, done: true });
   const [container, setContainer] = useState<HTMLDivElement | null>(null);
   const passage = useRef<HTMLSpanElement>(null);
@@ -62,12 +62,6 @@ export function TranslationDemo() {
     const r = passage.current?.getBoundingClientRect();
     return r ? [{ left: r.left, top: r.top, width: r.width, height: r.height }] : [];
   };
-  const confirms: { label: string; value: TranslationConfirmRequest; engine?: string; cost: TranslationCost }[] = [
-    { label: '付费服务翻译全文', value: { action: 'translate', scope: 'document' }, engine: 'DeepL', cost: { kind: 'characters', characters: 48200 } },
-    { label: '重新翻译本页', value: { action: 'retranslate', scope: 'page' }, engine: 'GPT-4o', cost: { kind: 'tokens' } },
-    { label: '重试未完成', value: { action: 'retry', scope: 'document' }, engine: '谷歌翻译', cost: { kind: 'free' } },
-  ];
-
   return (
     <div className="tr-demo">
       <Frame label="译文栏：点右上角任务状态换引擎；第 1 页的译文来自另一个引擎">
@@ -84,11 +78,11 @@ export function TranslationDemo() {
             onLocate={() => {}}
             task={task}
             onTranslatePage={() => {}}
-            onTranslateAll={() => setRequest(confirms[0]!)}
+            onTranslateAll={() => setConfirmOpen(true)}
             onPause={() => {}}
             onResume={() => {}}
             onRetryPage={() => {}}
-            onRetranslatePage={() => setRequest(confirms[1]!)}
+            onRetranslatePage={() => setConfirmOpen(true)}
             onRetranslateAll={() => {}}
             engine={{ value: engine, options: engines }}
             onEngine={setEngine}
@@ -135,22 +129,12 @@ export function TranslationDemo() {
           )}
         </div>
       </Frame>
-      <Frame label="确认弹窗：同一套说法，按引擎说明计费">
-        <div className="tr-demo__buttons">
-          {confirms.map((c) => (
-            <Button key={c.label} size="sm" onClick={() => setRequest(c)}>
-              {c.label}
-            </Button>
-          ))}
-        </div>
+      <Frame label="首次翻译提示">
+        <Button onClick={()=>setConfirmOpen(true)}>开始翻译</Button>
       </Frame>
-      <TranslationConfirm
-        request={request?.value ?? null}
-        engineLabel={request?.engine}
-        cost={request?.cost}
-        onClose={() => setRequest(null)}
-        onConfirm={() => setRequest(null)}
-      />
+      <TranslationConfirm open={confirmOpen} onClose={()=>setConfirmOpen(false)}
+        onConfirm={()=>setConfirmOpen(false)} onSettings={()=>setConfirmOpen(false)}/>
+
     </div>
   );
 }

@@ -3,6 +3,7 @@ import { getDocument, GlobalWorkerOptions } from 'pdfjs-dist';
 import workerUrl from 'pdfjs-dist/build/pdf.worker.min.mjs?url';
 import type { DocumentRef } from '@/contracts/document';
 import { ImportTranslationJobs } from '@/translation/import-jobs';
+import { pdfjsResources } from '@/document/pdfjs-resources';
 import { extractPaper } from '@/translation/extract';
 import { TranslationSession } from '@/translation/session';
 import { PreferenceStore } from '@/data/preference-store';
@@ -24,16 +25,16 @@ changes.onmessage = async () => {
     await db.close();
   }
 };
-async function translate(ref: DocumentRef, db: ImportTranslationJobs) {
+async function translate(ref: DocumentRef, db: ImportTranslationJobs, retry=false) {
   const preferences = new PreferenceStore();
   const saved = await preferences.read().finally(() => preferences.close());
-  if (saved.autoTranslate !== 'on-add' || !translationCostAccepted()) return;
+  if ((!retry && saved.autoTranslate !== 'on-add') || !translationCostAccepted()) return;
   const session = new TranslationSession(
     ref,
     async (signal, progress) => {
       const bytes = new Uint8Array(await (await db.readFile(ref)).arrayBuffer());
       signal.throwIfAborted();
-      const task = getDocument({ data: bytes, password: passwords.get(ref.documentId), enableXfa: false });
+      const task = getDocument({ ...pdfjsResources(), data: bytes, password: passwords.get(ref.documentId), enableXfa: false });
       const abort = () => {
         void task.destroy().catch(() => {});
       };
@@ -52,12 +53,12 @@ async function translate(ref: DocumentRef, db: ImportTranslationJobs) {
     await session.load();
     const fresh = new PreferenceStore();
     const current = await fresh.read().finally(() => fresh.close());
-    if (current.autoTranslate !== 'on-add') return;
-    await session.startAutomatic(
-      isTranslationLanguage(current.translationLanguage) ? current.translationLanguage : 'zh-CN',
-    );
-    if (session.error || session.run?.phase === 'failed')
-      throw new Error(session.error || session.run?.error || '翻译失败。');
+    if (!retry && current.autoTranslate !== 'on-add') return;
+    const language=isTranslationLanguage(current.translationLanguage)?current.translationLanguage:'zh-CN';
+    if (retry) await session.start(language,undefined,true); else await session.startAutomatic(language);
+    if (session.error || session.run?.phase === 'failed') {
+      return {message:session.error || session.run?.error || '翻译失败。',engine:session.failure?.engine ?? session.run?.profile.engine?.key};
+    }
   } finally {
     await session.dispose();
     active = undefined;
@@ -73,18 +74,14 @@ async function drain() {
   try {
     do {
       again = false;
-      for (const ref of await db.pending()) {
-        try {
-          await translate(ref, db);
-        } catch (e) {
-          updates.postMessage({
-            type: 'error',
-            ...ref,
-            message: e instanceof Error ? e.message : '自动翻译失败。',
-          });
-        }
-        passwords.delete(ref.documentId);
+      for (const {documentId,fileVersion,retry} of await db.pending()) {
+        const ref={documentId,fileVersion};
+        let failure;
+        try { failure=await translate(ref,db,retry); }
+        catch(e){failure={message:e instanceof Error ? e.message : '自动翻译失败。'};}
+        passwords.delete(documentId);
         await db.remove(ref);
+        if(failure) updates.postMessage({type:'error',...ref,...failure});
       }
     } while (again);
   } finally {
