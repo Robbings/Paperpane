@@ -11,6 +11,7 @@
   <img alt="Edge" src="https://img.shields.io/badge/Edge-支持-2f5fd9?logo=microsoftedge&logoColor=white" />
   <img alt="Manifest V3" src="https://img.shields.io/badge/Manifest-V3-6b7280" />
   <img alt="本地优先" src="https://img.shields.io/badge/数据-保存在本机-2f8a4e" />
+  <a href="LICENSE"><img alt="许可证 AGPL-3.0" src="https://img.shields.io/badge/许可证-AGPL--3.0-6b7280" /></a>
 </p>
 
 <p>
@@ -30,39 +31,39 @@
 <div align="center">
 <table>
   <tr>
-    <td align="center" width="25%"><img src="docs/readme/icons/open.svg" width="48" alt="" /><br /><b>一键打开</b><br /><sub>论文网页上直接打开，<br />自动整理概览</sub></td>
-    <td align="center" width="25%"><img src="docs/readme/icons/translate.svg" width="48" alt="" /><br /><b>对照翻译</b><br /><sub>整篇对照，划选即译；<br />大模型或翻译服务</sub></td>
-    <td align="center" width="25%"><img src="docs/readme/icons/explain.svg" width="48" alt="" /><br /><b>解释与提问</b><br /><sub>回答标明出处，<br />点一下回到原文</sub></td>
+    <td align="center" width="25%"><img src="docs/readme/icons/open.svg" width="48" alt="" /><br /><b>一键打开</b><br /><sub>论文直接打开至插件，<br />自动整理概览</sub></td>
+    <td align="center" width="25%"><img src="docs/readme/icons/translate.svg" width="48" alt="" /><br /><b>对照翻译</b><br /><sub>整篇对照，划选即译；<br />支持大模型或机器翻译</sub></td>
+    <td align="center" width="25%"><img src="docs/readme/icons/explain.svg" width="48" alt="" /><br /><b>解释与提问</b><br /><sub>划选提问<br />回答标明出处</sub></td>
     <td align="center" width="25%"><img src="docs/readme/icons/library.svg" width="48" alt="" /><br /><b>文献库</b><br /><sub>批注、笔记、文件夹，<br />WebDAV 同步</sub></td>
   </tr>
 </table>
 </div>
 
+
 ## 为什么做纸窗
 
 - 浏览器自带的 PDF 阅读器只能看，读到一半想翻译、想查一个概念，就得在好几个窗口之间来回切。
 - 网页翻译插件会把排版打乱，公式和图表也跟着被「翻译」。
-- 问 AI 要先复制、再粘贴、再解释上下文，回答也很难对回原文的哪一句。
+- 普通阅读器对LLM接入不原生，问 AI 要先复制、再粘贴、再解释上下文，回答也很难对回原文的哪一句。
 
-纸窗把这些放进同一个阅读器里：论文始终在中间，翻译、解释、提问和笔记都贴着原文出现。
+纸窗把这些放进同一个阅读器里：保持阅读体验的同时，围绕模型能力打造翻译、解释、提问和笔记等功能，且与论文丝滑融合。
 
 ## 安静的阅读界面
 
 <img src="docs/readme/images/look.png" width="100%" alt="同一页面的浅色与深色外观" />
 
-界面只在需要时出现。工具栏、侧栏和研究区都是半透明的玻璃材质，论文本身始终是主角。浅色、深色跟随系统；深色模式下论文页面也会一起变暗，夜里读不刺眼。
+论文是主角，玻璃材质风格，界面只在需要时出现，支持深浅主题切换。
 
 ## 功能
 
 ### 1. 一键打开，快速了解论文
 
-在 arXiv、Google Scholar、OpenReview 等论文网站，PDF 链接旁会出现「用纸窗打开」。点一下，论文进入阅读器，同时收进文献库，右侧开始整理概览。
+在 arXiv、Google Scholar、OpenReview 等论文网站，PDF 链接旁会出现「用纸窗打开」。点一下，论文进入阅读器，右侧自动整理概览。
 
 <img src="docs/readme/images/f1-open.gif" width="100%" alt="在 arXiv 页面点击「用纸窗打开」，阅读器打开后自动生成概览" />
 
-- **概览**：一段话的总结、关键词、研究问题、方法、结论和要点，每条都带出处编号，点一下跳到原文。
+- **概览**：快速了解一篇论文：一段话的总结、关键词、研究问题、方法、结论和要点，且可以根据需要自行设置调整。
 - **不止 arXiv**：支持十几个常见论文网站，网页里的普通 PDF 链接和嵌入的 PDF 也能打开；本地 PDF 可以直接导入。
-- **自动识别目录**：没有书签的论文也会按章节生成目录。
 
 ### 2. 对照翻译
 
@@ -71,9 +72,8 @@
 <img src="docs/readme/images/f2-translate.gif" width="100%" alt="翻译一页，切换到对照模式，再划选一句话翻译" />
 
 - **划选即译**：选中一句话，点「翻译」，结果出现在原文旁边的小窗里。
-- **两种引擎**：大模型译得更通顺；谷歌、DeepL、微软、百度等翻译服务更快、更便宜。全文和划选可以分开选择引擎。
-- **公式和图表不动**：公式、图表保持原样，点「查看原文」回到论文。
-- **可以自动翻译**：添加或打开论文时自动翻译全文，默认关闭；会请求模型或翻译服务时，会先告诉你可能产生费用。
+- **两种引擎**：大模型译得更通顺；传统机器翻译服务更快、更便宜。全文和划选可以分开选择引擎。
+- **公式和图表不乱翻译**：公式、图表保持原样，点「查看原文」回到论文。
 
 ### 3. 一键解释，划选提问
 
@@ -86,7 +86,7 @@
 - **回答有出处**：句末的小数字指向论文原文，点一下就能对照。
 - **结合整篇论文**：模型会先读论文，再回答，不只看你选中的那几行。
 - **框选提问**：图表、流程图也能问，框选一块区域即可。
-- **每个功能可用不同的模型**：比如提问用推理强的模型，解释用便宜快速的模型。
+- **每个功能可单独指定模型**：比如提问用推理强的模型，解释用便宜快速的模型。
 
 ### 4. 元素自动识别，公式一键复制
 
@@ -94,8 +94,8 @@
 
 <img src="docs/readme/images/f4-formula.gif" width="100%" alt="鼠标移到公式上，点击复制，粘贴到笔记里显示为排版好的公式" />
 
-- **识别在本机完成**：版面识别模型随扩展一起安装，不上传论文。
-- **公式转写更准**：公式由支持图片的模型转写成 LaTeX，可以在打开论文时提前转写，复制时立即可用。
+- **识别在本机完成**：版面识别采用本地小模型。
+- **公式转写更准**：公式转写调用大模型，公式由支持图片的模型转写成 LaTeX，可以在打开论文时提前转写，复制时立即可用。
 - **格式随你**：LaTeX 的定界符（`\( \)`、`$ $` 或不加）可以在设置里选。
 
 ### 5. 批注与笔记
@@ -227,4 +227,4 @@ pnpm build
 
 截图中的论文为 Rafailov 等人的 [Direct Preference Optimization](https://arxiv.org/abs/2305.18290)，采用 CC BY 4.0 许可。
 
-纸窗的许可证待定。
+纸窗采用 [GNU AGPL v3.0](LICENSE) 许可证：可以自由使用、修改，也可以用于商业用途；但分发修改后的版本，或者以网络服务的形式提供给他人使用时，必须以同样的许可证公开完整源代码。
