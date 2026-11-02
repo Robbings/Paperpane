@@ -31,10 +31,10 @@
 <div align="center">
 <table>
   <tr>
-    <td align="center" width="25%"><img src="docs/readme/icons/open.svg" width="48" alt="" /><br /><b>一键打开</b><br /><sub>论文直接打开至插件，<br />自动整理概览</sub></td>
-    <td align="center" width="25%"><img src="docs/readme/icons/translate.svg" width="48" alt="" /><br /><b>对照翻译</b><br /><sub>整篇对照，划选即译；<br />支持大模型或机器翻译</sub></td>
-    <td align="center" width="25%"><img src="docs/readme/icons/explain.svg" width="48" alt="" /><br /><b>解释与提问</b><br /><sub>划选提问<br />回答标明出处</sub></td>
-    <td align="center" width="25%"><img src="docs/readme/icons/library.svg" width="48" alt="" /><br /><b>文献库</b><br /><sub>批注、笔记、文件夹，<br />WebDAV 同步</sub></td>
+    <td align="center" valign="top" width="25%"><img src="docs/readme/icons/open.svg" width="48" alt="" /><br /><b>一键打开</b><br /><sub>论文网页一键打开<br />自动整理概览</sub></td>
+    <td align="center" valign="top" width="25%"><img src="docs/readme/icons/translate.svg" width="48" alt="" /><br /><b>对照翻译</b><br /><sub>整篇对照，划选即译<br />大模型或机器翻译</sub></td>
+    <td align="center" valign="top" width="25%"><img src="docs/readme/icons/explain.svg" width="48" alt="" /><br /><b>解释与提问</b><br /><sub>划选提问<br />回答标明出处</sub></td>
+    <td align="center" valign="top" width="25%"><img src="docs/readme/icons/library.svg" width="48" alt="" /><br /><b>文献库</b><br /><sub>批注、笔记、文件夹<br />WebDAV 同步</sub></td>
   </tr>
 </table>
 </div>
