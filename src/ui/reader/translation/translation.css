@@ -266,3 +266,29 @@
 .pp-tr__all:hover {
   background: var(--pp-accent-soft);
 }
+
+/* The engine, at the top of the task popover. */
+.pp-tr__task-engine {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  margin: 10px 0 4px;
+  color: var(--pp-text-2);
+}
+.pp-tr__task-engine .pp-select { max-width: 160px; }
+
+/* A page translated by another engine than the current one. */
+.pp-tr__page-engine {
+  flex-shrink: 1;
+  min-width: 0;
+  max-width: 10em;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  padding: 0 6px;
+  border-radius: var(--pp-radius-pill);
+  background: var(--pp-fill);
+  color: var(--pp-text-2);
+  letter-spacing: 0;
+}

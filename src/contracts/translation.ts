@@ -9,7 +9,12 @@ export interface TranslationSentence {
 export interface ExtractedPaper extends DocumentRef {
   version: string; pageCount: number; sentences: TranslationSentence[]; warnings: string[];
 }
-export interface SentenceTranslation { format?: 'markdown-math-v1'; inferredMath?: boolean; text: string; state: 'pending' | 'streaming' | 'partial' | 'done' | 'failed'; error?: string }
+export type TranslationEngineKey = string;
+export type TranslationEngineRef = { kind: 'llm'; key: TranslationEngineKey } |
+  { kind: 'machine'; key: TranslationEngineKey; apiId: string; apiKind: string; adapterVersion: string };
+export interface SentenceTranslation { engine?: TranslationEngineKey; format?: 'markdown-math-v1'; inferredMath?: boolean; text: string; state: 'pending' | 'streaming' | 'partial' | 'done' | 'original' | 'failed'; error?: string }
+/** A source-only sentence has exhausted content retries. It stays readable without being recorded as a translation. */
+export const sentenceFinished = (output?: SentenceTranslation) => output?.state === 'done' || output?.state === 'original';
 export interface TranslationAttempt {
   promptVersion?: string; engine?: string; retryRound?: number;
   sessionId?: string; finishedAt?: string; diagnostics?: TranslationDiagnostics;
@@ -29,7 +34,7 @@ export interface TranslationRun extends DocumentRef {
   /** Stable for this user task, including pause/resume/retry. Legacy runs use id. */
   sessionId?: string; scope?: TranslationScope;
   id: string; revision: string; extractionVersion: string; createdAt: string; updatedAt: string;
-  profile: { modelId: string; modelName: string; endpointId: string; endpointUrl: string; protocol: string; configRevision: string; language: string; sourceLanguage?: string; promptVersion: string };
+  profile: { engine?: TranslationEngineRef; modelId: string; modelName: string; endpointId: string; endpointUrl: string; protocol: string; configRevision: string; language: string; sourceLanguage?: string; promptVersion: string };
   phase: 'idle' | 'running' | 'pausing' | 'paused' | 'interrupted' | 'failed' | 'completed';
   requested: string[]; outputs: Record<string, SentenceTranslation>; attempts: TranslationAttempt[];
   error?: string;

@@ -13,9 +13,10 @@ export async function runTranslationQueue<T>(items: readonly T[], options: {
   execute: (item: T, attempt: number, signal: AbortSignal) => Promise<void>;
   onRetry: (item: T, attempt: number, delay: number, error: string) => Promise<void>;
   split?: (item: T) => T[];
+  onContentExhausted: (item: T, error: string) => Promise<void>;
   maxRetries?: number; baseDelay?: number; minInterval?: number; maxRecoveryProbes?: number; rateLimitDelay?: number;
 }): Promise<{ errors: string[] }> {
-  type Job = { item: T; attempt: number; contentRetries: number; readyAt: number };
+  type Job = { item: T; attempt: number; contentRetries: number; serviceRetry?: boolean; readyAt: number };
   const pending: Job[] = items.map(item => ({ item, attempt: 0, contentRetries: 0, readyAt: 0 }));
   const stop = new AbortController(), signal = AbortSignal.any([options.signal, stop.signal]);
   const active = new Set<Promise<void>>(), errors: string[] = [];
@@ -23,15 +24,14 @@ export async function runTranslationQueue<T>(items: readonly T[], options: {
   const baseDelay = options.baseDelay ?? 5000, interval = options.minInterval ?? 750;
   const retryBudget = Math.max(8, Math.min(24, Math.ceil(items.length * .3)));
   let effectiveInterval = interval;
-  let nextDispatch = 0, cooldownUntil = 0, recovering = false, recoveryProbes = 0, retries = 0, consecutiveContentFailures = 0;
+  let nextDispatch = 0, cooldownUntil = 0, recovering = false, recoveryProbes = 0, serviceRetries = 0;
   const halt = (message: string) => { errors.push(message); stop.abort(new DOMException('任务已停止发送新请求', 'AbortError')); };
   const launch = (job: Job, probe: boolean) => {
-    if (job.attempt > 0 && ++retries > retryBudget) { halt('本次任务已达到自动重试总上限，已保留译文。请检查接口后继续。'); return; }
+    if (job.serviceRetry && ++serviceRetries > retryBudget) { halt('本次任务已达到自动重试总上限，已保留译文。请检查接口后继续。'); return; }
     nextDispatch = Date.now() + effectiveInterval;
     const work = (async () => {
       try {
         await options.execute(job.item, job.attempt, signal);
-        consecutiveContentFailures = 0;
         if (probe) { recovering = false; recoveryProbes = 0; cooldownUntil = 0; }
       } catch (error) {
         if (signal.aborted) return;
@@ -50,19 +50,17 @@ export async function runTranslationQueue<T>(items: readonly T[], options: {
           const recoveryDelay = rateLimited ? (options.rateLimitDelay ?? 60000) : baseDelay;
           const delay = Math.max(policy.retryAfterMs, Math.min(rateLimited ? 300000 : 60000, recoveryDelay * 2 ** recoveryProbes) + Math.floor(Math.random() * Math.max(1, recoveryDelay * .1)));
           cooldownUntil = Math.max(cooldownUntil, Date.now() + delay);
-          pending.unshift({ ...job, attempt: job.attempt + 1, readyAt: cooldownUntil });
+          pending.unshift({ ...job, serviceRetry: true, attempt: job.attempt + 1, readyAt: cooldownUntil });
           await options.onRetry(job.item, recoveryProbes + 1, delay, `${policy.message} 整个任务冷却后仅发送一个恢复请求。${rateLimited ? `恢复后请求间隔至少 ${Math.ceil(effectiveInterval / 1000)} 秒。` : ''}`);
         } else {
-          consecutiveContentFailures++;
           if (job.contentRetries >= (options.maxRetries ?? 2)) {
-            errors.push(policy.message);
-            if (consecutiveContentFailures >= 5) halt('连续多个分块无法生成有效译文，已停止任务，请检查模型输出。');
+            await options.onContentExhausted(job.item, policy.message);
             return;
           }
           const delay = Math.max(policy.retryAfterMs, baseDelay * 2 ** job.contentRetries);
           const parts = options.split?.(job.item) ?? [job.item];
           pending.push(...parts.map(item => ({ item, attempt: job.attempt + 1, contentRetries: job.contentRetries + 1, readyAt: Date.now() + delay })));
-          await options.onRetry(job.item, job.contentRetries + 1, delay, policy.message);
+          // Missing sentence content is retried silently; other batches keep running.
         }
       }
     })().catch(error => { if (!signal.aborted) halt(retryPolicy(error).message); });

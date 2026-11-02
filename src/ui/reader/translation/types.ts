@@ -35,6 +35,8 @@ export interface TranslationPageView {
   state: 'untranslated' | 'translating' | 'partial' | 'done' | 'failed';
   sentences: readonly TranslationSentenceView[];
   error?: string;
+  /** Set when this page's translation came, all or in part, from another engine than the current one: its name, e.g. "DeepL". */
+  engineLabel?: string;
 }
 
 /** The translation task as a whole, shown in the collapsed toolbar status control. */
@@ -52,3 +54,5 @@ export interface TranslationTaskView {
 
 /** Only the translation, or each translated sentence under its original. */
 export type TranslationMode = 'translation' | 'parallel';
+
+export type { TranslationEngineOption, TranslationEngineView } from '@/ui/settings/engine-options';

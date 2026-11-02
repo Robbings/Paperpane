@@ -1,3 +1,4 @@
+import { networkFailure } from '@/translation/problems';
 import { chatRequestOptions } from './model-providers';
 import { supportsModelOperation } from '@/ai/model-configuration';
 import { modelSlot, coolModel } from '@/ai/limit';
@@ -29,7 +30,7 @@ async function streamTranslationAttempt(connection: Connection, messages: { role
     try { return await action(); }
     catch (e) {
       if (signal.aborted) throw signal.reason;
-      const text = timeout.aborted ? '模型请求超时。' : '网络连接失败或响应中断；浏览器未提供 HTTP 状态。';
+      const text = networkFailure;
       report({ category: timeout.aborted ? 'timeout' : 'network', message: text });
       throw new TranslationError(text, true, false, 0, 'service', diagnostics);
     }
@@ -52,6 +53,7 @@ async function streamTranslationAttempt(connection: Connection, messages: { role
     const text = [fallback, code ? `错误码：${code}` : '', msg ?? '', diagnostics.requestId ? `请求标识：${diagnostics.requestId}` : ''].filter(Boolean).join(' ');
     return new TranslationError(text, retryable, fatal, diagnostics.retryAfterMs ?? 0, length ? 'content' : retryable ? 'service' : 'none', diagnostics);
   };
+  const missingContent = (message: string) => new TranslationError(message, true, false, 0, 'content', diagnostics);
   const limit = outputLimit(connection.model,connection.view.runtime.maxOutputTokens);
   if(connection.model.reasoning.kind==='budget'&&connection.model.defaultReasoning&&Number(connection.model.defaultReasoning)>=limit)throw new TranslationError('思考预算必须小于本次最大输出。',false,true);
   const thinking=reasoningBody(connection.endpoint.protocol,connection.model,connection.model.defaultReasoning,connection.endpoint.presetId);
@@ -80,13 +82,14 @@ async function streamTranslationAttempt(connection: Connection, messages: { role
     try { detail = JSON.parse(raw); } catch { detail = {}; }
     throw failure(detail, `模型接口返回 HTTP ${response.status}。`, response.status);
   }
-  if (!response.body) throw failure({}, '模型接口没有返回正文。');
+  if (!response.body) throw missingContent('模型接口没有返回正文。');
   if (!response.headers.get('content-type')?.includes('text/event-stream')) {
     const raw = await readBounded(2_000_000); let data;
-    try { data = JSON.parse(raw); } catch { throw failure({}, '模型响应不是有效 JSON。'); }
+    try { data = JSON.parse(raw); } catch { throw missingContent('模型响应不是有效 JSON。'); }
+    if (!data || typeof data !== 'object') throw missingContent('模型未返回译文。');
     if (data.error || data.status === 'failed') throw failure(data, '模型接口报告请求失败。');
     const text = responses ? responseText(data) : data?.choices?.[0]?.message?.content;
-    if (typeof text !== 'string' || !text) throw failure(data, '模型未返回译文。');
+    if (typeof text !== 'string' || !text) throw missingContent('模型未返回译文。');
     await onText(text);
     if (responses ? data.status !== 'completed' : data?.choices?.[0]?.finish_reason !== 'stop')
       throw failure(data, '模型输出未正常完成，部分结果已保留。', undefined, data.incomplete_details?.reason ?? data?.choices?.[0]?.finish_reason);
@@ -104,7 +107,7 @@ async function streamTranslationAttempt(connection: Connection, messages: { role
   const event = async (block: string) => {
     const data = block.split('\n').filter(l => l.startsWith('data:')).map(l => l.slice(5).trimStart()).join('\n'); if (!data) return;
     if (data === '[DONE]') { if (!responses) finished = true; return; }
-    let obj; try { obj = JSON.parse(data); } catch { throw failure({}, '流式响应格式无效，已接收内容仍会保留。'); }
+    let obj; try { obj = JSON.parse(data); } catch { throw missingContent('流式响应格式无效，已接收内容仍会保留。'); }
     if (responses) {
       if (typeof obj.sequence_number === 'number') { if (seenSequences.has(obj.sequence_number)) return; seenSequences.add(obj.sequence_number); }
       if (obj.response?.id) report({ responseId: clean(obj.response.id) });
@@ -117,7 +120,7 @@ async function streamTranslationAttempt(connection: Connection, messages: { role
         await reconcile(obj.response ?? {});
         throw failure(obj, '模型输出未完成，部分结果已保留。', undefined, obj.response?.incomplete_details?.reason);
       } else if (obj.type === 'response.failed' || obj.type === 'error' || obj.error) throw failure(obj, 'Responses 接口报告请求失败，已接收内容仍会保留。');
-      else if (obj.type === 'response.refusal.delta') throw new TranslationError('模型拒绝了翻译请求。', false, true, 0, 'none', diagnostics);
+      else if (obj.type === 'response.refusal.delta') throw missingContent('模型没有返回这一段的译文。');
     } else {
       if (obj.error) throw failure(obj, '模型接口报告请求失败。');
       const c = obj.choices?.[0]; if (typeof c?.delta?.content === 'string') await emit(c.delta.content); if (c?.finish_reason) finishReason = c.finish_reason;

@@ -1,7 +1,7 @@
 import { Fragment, useEffect, useRef, useState, type ReactNode } from 'react';
-import { Button, Icon, IconButton, Popover, ProgressBar, ScrollArea, Segmented, Tooltip } from '@/ui/components';
+import { Button, Icon, IconButton, Popover, ProgressBar, ScrollArea, Segmented, Select, Tooltip } from '@/ui/components';
 import { useTranslationDock } from './dock';
-import type { TranslationMode, TranslationPageView, TranslationSentenceView, TranslationTaskView } from './types';
+import type { TranslationEngineView, TranslationMode, TranslationPageView, TranslationSentenceView, TranslationTaskView } from './types';
 import './translation.css';
 
 interface TranslationPaneProps {
@@ -28,13 +28,19 @@ interface TranslationPaneProps {
   onRetryPage: (pageIndex: number) => void;
   onRetranslatePage?: (pageIndex: number) => void;
   onRetranslateAll?: () => void;
+  /**
+   * What translates this paper from now on. Picking another one applies to later translations in
+   * this reader only; it does not change the settings, and pages already translated stay as they are.
+   */
+  engine?: TranslationEngineView;
+  onEngine?: (value: string) => void;
   /** Bring a sentence into view: `key` changes on every request, `smooth` for follow vs. a jump. */
   reveal: { id: string; key: number; smooth: boolean; flash: boolean } | null;
 }
 
 const taskIdle = (task: TranslationTaskView) => task.phase !== 'running' && task.phase !== 'pausing';
 /** Task details stay in an opt-in popover, never between the reader and its text. */
-function TaskStatus({ task, pages, onTranslateAll, onPause, onResume }: Pick<TranslationPaneProps, 'task' | 'pages' | 'onTranslateAll' | 'onPause' | 'onResume'>) {
+function TaskStatus({ task, pages, engine, onEngine, onTranslateAll, onPause, onResume }: Pick<TranslationPaneProps, 'task' | 'pages' | 'engine' | 'onEngine' | 'onTranslateAll' | 'onPause' | 'onResume'>) {
   const [open, setOpen] = useState(false);
   const anchor = useRef<HTMLButtonElement>(null);
   const running = task.phase === 'running' || task.phase === 'pausing';
@@ -49,6 +55,12 @@ function TaskStatus({ task, pages, onTranslateAll, onPause, onResume }: Pick<Tra
       onClick={() => setOpen(value => !value)} />
     <Popover anchorRef={anchor} open={open} onClose={() => setOpen(false)} label="翻译任务详情" placement="bottom" width={280} className="pp-tr__task">
       <div className="pp-tr__task-heading"><strong>{title}</strong><IconButton icon="close" label="收起翻译状态" size="md" shape="pill" onClick={() => setOpen(false)} /></div>
+      {engine && onEngine && (
+        <label className="pp-tr__task-engine">
+          <span>翻译引擎</span>
+          <Select label="翻译引擎" size="sm" value={engine.value} options={engine.options} disabled={running} onChange={onEngine} />
+        </label>
+      )}
       <p>{task.totalSentences ? `本次任务已完成 ${task.completedSentences ?? 0} / ${task.totalSentences} 句` : `已有 ${pages.filter(p => p.state === 'done').length} / ${pages.length} 页译文`}</p>
       {task.totalSentences !== undefined && <ProgressBar label="翻译进度" value={progress} />}
       {task.current && running && <p>{task.current}</p>}
@@ -181,7 +193,7 @@ export function TranslationPane(props: TranslationPaneProps) {
           </button>
         )}
         <span className="pp-tr__spacer" />
-        <TaskStatus task={props.task} pages={pages} onTranslateAll={props.onTranslateAll} onPause={props.onPause} onResume={props.onResume} />
+        <TaskStatus task={props.task} pages={pages} engine={props.engine} onEngine={props.onEngine} onTranslateAll={props.onTranslateAll} onPause={props.onPause} onResume={props.onResume} />
         <IconButton
           icon="link"
           label={props.follow ? '跟随阅读：开' : '跟随阅读：关'}
@@ -212,6 +224,11 @@ export function TranslationPane(props: TranslationPaneProps) {
             <Fragment key={page.pageIndex}>
               <div className="pp-tr__page" aria-label={`第 ${page.pageIndex + 1} 页`}>
                 <span>第 {page.pageIndex + 1} 页</span>
+                {page.engineLabel && (
+                  <span className="pp-tr__page-engine" title={`这一页的译文来自 ${page.engineLabel}`}>
+                    {page.engineLabel}
+                  </span>
+                )}
                 <span className="pp-tr__page-rule" aria-hidden="true" />
                 <Button size="sm" variant="quiet" disabled={!taskIdle(props.task) || (!!page.error && !page.sentences.some(s => s.kind !== 'formula'))}
                   onClick={() => page.state === 'failed' ? props.onRetryPage(page.pageIndex) : page.sentences.some(s => s.kind !== 'formula' && !!s.text) && props.onRetranslatePage ? props.onRetranslatePage(page.pageIndex) : props.onTranslatePage(page.pageIndex)}>

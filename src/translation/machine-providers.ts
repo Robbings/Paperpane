@@ -1,7 +1,19 @@
 import { MACHINE_TRANSLATION_DEFAULTS, type MachineTranslationConfig, type RuntimeConfig } from '@/ui/settings/types';
+import type { TranslationLanguage } from './languages';
 
-// 机器翻译服务目录：每种服务的名称、需要填写的字段和单次请求的字数上限。
-// 设置页按这里生成表单；请求适配器按 kind 实现 MachineTranslator，对外只暴露统一的 translate()。
+// 机器翻译服务目录：每种服务的名称、需要填写的字段、单次请求的上限和语言代码。
+// 设置页按这里生成表单、提示不支持的语言；请求适配器按 kind 实现 MachineTranslator，对外只暴露统一的 translate()。
+// 无公开条数上限的服务使用保守批量值；供应商的字节限制在发送前另行计算。
+
+/** Our language code → the service's. A language missing here cannot be translated into. */
+export type LanguageCodes = Readonly<Partial<Record<TranslationLanguage, string>>>;
+
+const sameCodes: LanguageCodes = {
+  'zh-CN': 'zh-CN', 'zh-TW': 'zh-TW', en: 'en', ja: 'ja', ko: 'ko', fr: 'fr', de: 'de', es: 'es',
+  pt: 'pt', it: 'it', ru: 'ru', ar: 'ar', hi: 'hi', id: 'id', vi: 'vi', tr: 'tr',
+};
+/** The usual short codes, with the two Chinese variants spelled per service. */
+const shortCodes = (zh: string, zhTw: string, overrides: LanguageCodes = {}): LanguageCodes => ({ ...sameCodes, 'zh-CN': zh, 'zh-TW': zhTw, ...overrides });
 
 export interface MachineField {
   key: string;
@@ -25,6 +37,15 @@ export interface MachineProvider {
   fields: readonly MachineField[];
   /** Characters one request may carry; the effective limit is the smaller of this and the setting. */
   maxCharacters: number;
+  /** Texts one request may carry. */
+  maxTexts: number;
+  maxTextLength?: number;
+  /** The service takes one text: several are sent joined by line breaks and split again on return. */
+  joinLines?: boolean;
+  /** Target language codes. */
+  languages: LanguageCodes;
+  /** Source language codes, where they differ from the target ones. Without a source, the service detects it. */
+  sourceLanguages?: LanguageCodes;
   /** Takes a glossary of fixed term translations. */
   glossary?: boolean;
   /** Works without an account; may stop working without notice. */
@@ -32,7 +53,7 @@ export interface MachineProvider {
 }
 
 export const machineProviders: readonly MachineProvider[] = [
-  { kind: 'google-free', name: '谷歌翻译', vendor: 'Google · 免密钥', color: '#4285f4', fields: [], maxCharacters: 5000, unofficial: true },
+  { kind: 'google-free', name: '谷歌翻译', vendor: 'Google · 免密钥', color: '#4285f4', fields: [], maxCharacters: 5000, maxTexts: 50, joinLines: true, languages: sameCodes, unofficial: true },
   {
     kind: 'google-cloud',
     name: 'Google Cloud 翻译',
@@ -40,7 +61,8 @@ export const machineProviders: readonly MachineProvider[] = [
     color: '#4285f4',
     fields: [{ key: 'apiKey', label: 'API Key', secret: true }],
     maxCharacters: 30000,
-    glossary: true,
+    maxTexts: 128,
+    languages: sameCodes,
   },
   {
     kind: 'microsoft',
@@ -52,6 +74,8 @@ export const machineProviders: readonly MachineProvider[] = [
       { key: 'region', label: '区域', placeholder: 'eastasia', default: 'global' },
     ],
     maxCharacters: 50000,
+    maxTexts: 1000,
+    languages: shortCodes('zh-Hans', 'zh-Hant'),
     glossary: true,
   },
   {
@@ -64,6 +88,9 @@ export const machineProviders: readonly MachineProvider[] = [
       { key: 'plan', label: '套餐', choices: [{ value: 'free', label: 'Free' }, { value: 'pro', label: 'Pro' }], default: 'free' },
     ],
     maxCharacters: 100000,
+    maxTexts: 50,
+    languages: { 'zh-CN': 'ZH-HANS', 'zh-TW': 'ZH-HANT', en: 'EN-US', ja: 'JA', ko: 'KO', fr: 'FR', de: 'DE', es: 'ES', pt: 'PT-BR', it: 'IT', ru: 'RU', ar: 'AR', hi: 'HI', vi: 'VI', id: 'ID', tr: 'TR' },
+    sourceLanguages: { 'zh-CN': 'ZH', 'zh-TW': 'ZH', en: 'EN', ja: 'JA', ko: 'KO', fr: 'FR', de: 'DE', es: 'ES', pt: 'PT', it: 'IT', ru: 'RU', ar: 'AR', hi: 'HI', vi: 'VI', id: 'ID', tr: 'TR' },
     glossary: true,
   },
   {
@@ -76,6 +103,9 @@ export const machineProviders: readonly MachineProvider[] = [
       { key: 'secretKey', label: '密钥', secret: true },
     ],
     maxCharacters: 6000,
+    maxTexts: 50,
+    joinLines: true,
+    languages: shortCodes('zh', 'cht', { ja: 'jp', ko: 'kor', fr: 'fra', es: 'spa', ar: 'ara', vi: 'vie' }),
   },
   {
     kind: 'tencent',
@@ -87,7 +117,9 @@ export const machineProviders: readonly MachineProvider[] = [
       { key: 'secretKey', label: 'SecretKey', secret: true },
       { key: 'region', label: '地域', placeholder: 'ap-guangzhou', default: 'ap-guangzhou' },
     ],
-    maxCharacters: 6000,
+    maxCharacters: 5999,
+    maxTexts: 50,
+    languages: shortCodes('zh', 'zh-TW'),
   },
   {
     kind: 'alibaba',
@@ -99,7 +131,10 @@ export const machineProviders: readonly MachineProvider[] = [
       { key: 'accessKeySecret', label: 'AccessKey Secret', secret: true },
       { key: 'region', label: '地域', placeholder: 'cn-hangzhou', default: 'cn-hangzhou' },
     ],
-    maxCharacters: 5000,
+    maxCharacters: 8000,
+    maxTextLength: 1000,
+    maxTexts: 50,
+    languages: shortCodes('zh', 'zh-tw'),
   },
   {
     kind: 'youdao',
@@ -111,6 +146,8 @@ export const machineProviders: readonly MachineProvider[] = [
       { key: 'appSecret', label: '应用密钥', secret: true },
     ],
     maxCharacters: 5000,
+    maxTexts: 50,
+    languages: shortCodes('zh-CHS', 'zh-CHT'),
   },
   {
     kind: 'volcengine',
@@ -122,10 +159,15 @@ export const machineProviders: readonly MachineProvider[] = [
       { key: 'secretAccessKey', label: 'Secret Access Key', secret: true },
     ],
     maxCharacters: 5000,
+    maxTexts: 16,
+    languages: shortCodes('zh', 'zh-Hant'),
   },
 ];
 
 export const machineProvider = (kind: string) => machineProviders.find((p) => p.kind === kind);
+
+/** The target languages a service can translate into, in our codes. */
+export const machineTargets = (kind: string) => Object.keys(machineProvider(kind)?.languages ?? {}) as TranslationLanguage[];
 
 /** The one shape every machine translation service is called through; adapters hide each API's format and signing. */
 export interface MachineTranslator {

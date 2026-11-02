@@ -11,3 +11,7 @@
 .pp-selection-translation__body > p:last-child { margin-bottom: 0; }
 
 .pp-selection-translation__footer { flex-shrink: 0; padding-right: 18px; }
+
+/* Which engine the text above came from. */
+.pp-selection-translation__engine { display: block; margin-top: 8px; text-align: end; color: var(--pp-text-3); font-size: var(--pp-text-xs); user-select: none; }
+.pp-selection-translation__options .pp-selection-translation__error { padding: 0; }

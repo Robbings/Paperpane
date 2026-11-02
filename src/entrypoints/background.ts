@@ -1,5 +1,6 @@
 import { defineBackground } from 'wxt/utils/define-background';
 import { installBrowserEntry } from '@/browser-entry/background';
 
+import { installImportTranslation } from '@/translation/import-background';
 import { installSync } from '@/sync/background';
-export default defineBackground(()=>{installBrowserEntry();installSync();});
+export default defineBackground(()=>{installBrowserEntry();installSync();installImportTranslation();});

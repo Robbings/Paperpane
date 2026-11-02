@@ -1,20 +1,26 @@
+import { useTranslationProblem } from './translation-notices';
+import { sentenceFinished } from '@/contracts/translation';
 import { useEffect, useRef, useState, type CSSProperties } from 'react';
 import { createPortal } from 'react-dom';
 import { useSelectionTranslation } from './use-selection-translation';
 import { TranslationPane } from '@/ui/reader/translation/TranslationPane';
 import type { TranslationMode, TranslationPageView, TranslationSentenceView } from '@/ui/reader/translation/types';
-import { Button, Dialog, EmptyState, IconButton, ProgressBar, toast } from '@/ui/components';
+import { EmptyState, IconButton, ProgressBar } from '@/ui/components';
 import { TranslationMarkdown } from './translation-markdown';
 import { TranslationSession } from '@/translation/session';
 import type { ReaderController } from './reader-controller';
-import type { Preferences } from '@/ui/settings/types';
+import { concreteKey, savedEngineKey } from '@/translation/resolve';
+import { engineName, engineOptions, paperEngineValue } from '@/ui/settings/engine-options';
+import { literalTranslation } from '@/translation/machine/text';
+import type { Preferences, SettingsView } from '@/ui/settings/types';
 import type { TranslationSentence } from '@/contracts/translation';
-export function useTranslation(owner:ReaderController|undefined,preferences:Preferences){
+export function useTranslation(owner:ReaderController|undefined,preferences:Preferences,settings:SettingsView,settingsReady:boolean,preferencesReady:boolean){
   const [open,setOpen]=useState(false),[mode,setMode]=useState<TranslationMode>('translation'),[follow,setFollow]=useState(true);
   const [session,setSession]=useState<TranslationSession>(),[,render]=useState(0),[active,setActive]=useState<string|null>(null);
   const [reveal,setReveal]=useState<{id:string;key:number;smooth:boolean;flash:boolean}|null>(null);
-  const [confirm,setConfirm]=useState<{page?:number;ids?:string[];replace?:boolean}|null>(null);
-  const selectionWindow=useSelectionTranslation(owner,preferences);
+  const [override,setOverride]=useState<string>();
+  const options=engineOptions(settings), value=override ?? paperEngineValue(settings), key=concreteKey(settings,value);
+  const selectionWindow=useSelectionTranslation(owner,preferences,settings,settingsReady);
   const current=useRef({open,follow,active});current.current={open,follow,active};
   const followGuard=useRef({suppressUntil:0,manualUntil:0});
   const document=owner?.reader.getSnapshot().data.document;const phase=owner?.reader.getSnapshot().data.phase;
@@ -29,6 +35,21 @@ export function useTranslation(owner:ReaderController|undefined,preferences:Pref
   useEffect(()=>{
     if(session&&phase==='ready'&&session.ref.documentId===document?.documentId&&session.ref.fileVersion===document?.fileVersion)void session.load();
   },[session,phase,document?.documentId,document?.fileVersion]);
+  const attemptedOpen=useRef<TranslationSession>(undefined);
+  useEffect(()=>{
+    if (!session || phase!=='ready' || !preferencesReady || !settingsReady || session.ref.documentId!==document?.documentId ||
+        session.ref.fileVersion!==document?.fileVersion || attemptedOpen.current===session) return;
+    let live=true;
+    void session.load().then(()=>{
+      if (!live || !session.paper || attemptedOpen.current===session) return;
+      attemptedOpen.current=session;
+      if (preferences.autoTranslate==='on-open') return session.startAutomatic(preferences.translationLanguage);
+    });
+    return ()=>{live=false;};
+  },[session,phase,document?.documentId,document?.fileVersion,preferencesReady,settingsReady,preferences.autoTranslate,preferences.translationLanguage]);
+  useEffect(()=>{
+    if (preferencesReady && preferences.autoTranslate!=='on-open') void session?.pauseAutomatic();
+  },[session,preferencesReady,preferences.autoTranslate]);
   const sentences=session?.paper?.sentences??[];
   const rects=(s:TranslationSentence)=>s.anchor.pages.flatMap(p=>{const result=owner?.reader.project({...s.anchor,pages:[p]},'viewport');return result?.state==='ready'?result.rects.map(r=>r.rect):[];});
   useEffect(()=>{
@@ -85,16 +106,38 @@ export function useTranslation(owner:ReaderController|undefined,preferences:Pref
   const pages:TranslationPageView[]=Array.from({length:pageCount},(_,pageIndex)=>{
     const owned=sentences.filter(s=>s.anchor.pages[0]?.pageIndex===pageIndex);
     const covered=sentences.filter(s=>s.kind!=='formula'&&s.anchor.pages.some(p=>p.pageIndex===pageIndex));
-    const view:TranslationSentenceView[]=owned.map((s,i)=>{const out=session!.output(s.id);return {id:s.id,pageIndex,endsOnPage:s.anchor.pages.at(-1)!.pageIndex,kind:s.kind,source:`${s.source} `,inferredMath:out.inferredMath,text:s.kind==='formula'?'公式 · 查看原文':out.text,state:s.kind==='formula'?'done':out.state,approximate:s.approximate,paragraphStart:i===0||owned[i-1]?.paragraphId!==s.paragraphId};});
+    const view:TranslationSentenceView[]=owned.map((s,i)=>{
+      const out=session?.run?.outputs[s.id];
+      const showOriginal=s.kind!=='formula' && !!out && !out.text;
+      return {
+        id:s.id, pageIndex, endsOnPage:s.anchor.pages.at(-1)!.pageIndex, kind:s.kind,
+        source:showOriginal && mode==='parallel' ? '' : s.source+' ',
+        text:s.kind==='formula' ? '公式 · 查看原文' : showOriginal ? s.source : out?.text ?? '',
+        state:s.kind==='formula' || out?.state==='original' ? 'done' : showOriginal ? 'pending' : out?.state ?? 'pending',
+        inferredMath:out?.inferredMath, approximate:s.approximate,
+        paragraphStart:i===0 || owned[i-1]?.paragraphId!==s.paragraphId
+      };
+    });
     const started=covered.some(s=>session?.run?.outputs[s.id]);
-    return {pageIndex,sentences:view,state:!covered.length?'failed':covered.every(s=>session?.output(s.id).state==='done')?'done':covered.some(s=>session?.output(s.id).state==='streaming')?'translating':started?'partial':'untranslated',error:!covered.length?'此页没有可翻译的文字，扫描件暂不支持。':undefined};
+    const counts=new Map<string,number>();
+    for (const s of covered) {
+      const out=session?.run?.outputs[s.id];
+      if (out?.state!=='done') continue;
+      const source=out.engine ?? savedEngineKey(session!.run!.profile);
+      if (source!==key) counts.set(source,(counts.get(source) ?? 0)+1);
+    }
+    const other=[...counts].sort((a,b)=>b[1]-a[1])[0]?.[0];
+    const engineLabel=other ? (options.some(o=>o.value===other) ? engineName(options,other) : '其他引擎') : undefined;
+    return {pageIndex,engineLabel,sentences:view,state:!covered.length?'failed':covered.every(s=>sentenceFinished(session?.output(s.id)))?'done':covered.some(s=>session?.output(s.id).state==='streaming')?'translating':started?'partial':'untranslated',error:!covered.length?'此页没有可翻译的文字，扫描件暂不支持。':undefined};
   });
   const run=session?.run;
-  const failureMessage=session?.error ?? (run?.phase==='failed'?run.error:undefined);
-  useEffect(()=>{if(failureMessage)toast.show({message:'翻译未能完成，可在译文栏的任务状态中查看原因并重试。',tone:'warning',duration:5000});},[failureMessage]);
-  const start=(page?:number,retry=false,ids?:string[])=>{
-    if(!session)return;if(retry&&session.needsRepeat(page)){setConfirm({page,ids});return;}
-    void session.start(preferences.translationLanguage,page,retry,ids);
+  useTranslationProblem(session);
+  const progressRun=session?.failure?.beforeRun ? undefined : run;
+  const start=(page?:number,retry=false,ids?:string[],replace=false,language:string=preferences.translationLanguage)=>{
+    if (!session) return;
+    if (!settingsReady) { owner?.report('翻译设置尚未就绪，请稍后再试。'); return; }
+    session.engineOverride=key;
+    void session.start(language,page,retry,ids,replace);
   };
   const activeSentence=sentences.find(s=>s.id===active);
   const viewport=owner?.reader.translationViewport();
@@ -111,12 +154,16 @@ export function useTranslation(owner:ReaderController|undefined,preferences:Pref
   </div>,owner.reader.translationScrollElement()):null;
   const overlay=<>{highlightOverlay}{pageActions}{selectionWindow}</>;
   const loading=session?.loading;
-  const panel=loading?<EmptyState icon="file" title="正在整理原文" description={`已读取 ${session.extractProgress} / ${pageCount} 页，不会调用模型。`} actions={<ProgressBar label="整理原文" value={pageCount?session.extractProgress/pageCount:undefined}/>}/>:
+  const panel=loading?<EmptyState icon="file" title="正在整理原文" description={`已读取 ${session.extractProgress} / ${pageCount} 页，还没有发出翻译请求。`} actions={<ProgressBar label="整理原文" value={pageCount?session.extractProgress/pageCount:undefined}/>}/>:
     !session?.paper?<EmptyState icon="file" title="原文尚未就绪" description={session?.error??'请先打开 PDF。'}/>:
     <div style={{display:'contents','--pp-text-read':`${(preferences.translationFontSize??preferences.uiFontSize)*.875/16}rem`} as CSSProperties}>
-      <TranslationPane renderText={s=><TranslationMarkdown text={s.text} inferredMath={s.inferredMath}/>} pages={pages} mode={mode} onMode={setMode} follow={follow} onFollow={setFollow} onClose={()=>{setOpen(false);setActive(null);}} activeId={active} onHover={setActive} onLocate={id=>{const s=sentences.find(x=>x.id===id);if(s){followGuard.current.suppressUntil=Date.now()+1500;setActive(id);void owner?.reader.locate(s.anchor);}}} reveal={reveal}
-        task={{saveFailed:session.saveFailed,completedSentences:run?.requested.filter(id=>run.outputs[id]?.state==='done').length,totalSentences:run?.requested.length,phase:session.error?'failed':run?.phase??'idle',completedPages:pages.filter(p=>p.state==='done').length,totalPages:pageCount,current:session.retrying.size?`${session.activeRequests} 个请求进行中，${session.retrying.values().next().value}`:session.activeRequests?`${session.activeRequests} 个请求并发`:undefined,error:session.error??run?.error}}
-        onTranslatePage={p=>start(p,session.needsRepeat(p))} onTranslateAll={()=>start()} onPause={()=>void session.pause()} onResume={()=>session.saveFailed?void session.retrySave():void session.resume(run?.profile.language??preferences.translationLanguage)} onRetryPage={p=>start(p,true)} onRetranslatePage={page=>setConfirm({page,replace:true})} onRetranslateAll={()=>setConfirm({replace:true})}/>
+      <TranslationPane engine={{value,options}} onEngine={setOverride} renderText={s=>{
+          const out=session.output(s.id);
+          if (!out.text) return s.text;
+          return out.engine?.startsWith('mt:') ? literalTranslation(s.text) : <TranslationMarkdown text={s.text} inferredMath={s.inferredMath}/>;
+        }} pages={pages} mode={mode} onMode={setMode} follow={follow} onFollow={setFollow} onClose={()=>{setOpen(false);setActive(null);}} activeId={active} onHover={setActive} onLocate={id=>{const s=sentences.find(x=>x.id===id);if(s){followGuard.current.suppressUntil=Date.now()+1500;setActive(id);void owner?.reader.locate(s.anchor);}}} reveal={reveal}
+        task={{saveFailed:session.saveFailed,completedSentences:progressRun?.requested.filter(id=>sentenceFinished(progressRun.outputs[id])).length,totalSentences:progressRun?.requested.length,phase:session.error?'failed':run?.phase??'idle',completedPages:pages.filter(p=>p.state==='done').length,totalPages:pageCount,current:session.retrying.size?`${session.activeRequests} 个请求进行中，${session.retrying.values().next().value}`:session.activeRequests?`${session.activeRequests} 个请求并发`:undefined,error:busy && run?.error ? '正在等待重试' : undefined}}
+        onTranslatePage={p=>start(p,session.needsRepeat(p))} onTranslateAll={()=>start()} onPause={()=>void session.pauseFromReader()} onResume={()=>session.failure?void session.retryLast():session.saveFailed?void session.retrySave():start(run?.scope?.page,true,run?.requested,false,run?.profile.language??preferences.translationLanguage)} onRetryPage={p=>start(p,true)} onRetranslatePage={page=>start(page,false,undefined,true)} onRetranslateAll={()=>start(undefined,false,undefined,true)}/>
     </div>;
-  return {shell:{open,onToggle:()=>setOpen(o=>!o),pane:panel},overlay,confirmation:<Dialog open={!!confirm} onClose={()=>setConfirm(null)} title={confirm?.replace?(confirm.page===undefined?"重新翻译全文":"重新翻译本页"):"重试未完成的译文"} description={confirm?.replace?"会再次请求模型并计费，用当前提示词生成新版本。旧译文记录仍保留；当前尚无历史版本浏览界面。":"会再次请求模型，可能再次计费。此前收到的内容仍保留，已完成的句子不会重复请求。"} footer={<><Button onClick={()=>setConfirm(null)}>取消</Button><Button variant="primary" onClick={()=>{const c=confirm;setConfirm(null);if(c)void session?.start(preferences.translationLanguage,c.page,true,c.ids,c.replace);}}>{confirm?.replace?"重新翻译":"重试未完成部分"}</Button></>}/>};
+  return {shell:{open,onToggle:()=>setOpen(o=>!o),pane:panel},overlay};
 }

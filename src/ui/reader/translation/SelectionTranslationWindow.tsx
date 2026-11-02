@@ -2,6 +2,8 @@ import { useEffect, useRef, useState, type ReactNode } from 'react';
 import { Button, Icon, IconButton, Popover, Select, Spinner, Switch } from '@/ui/components';
 import { TRANSLATION_LANGUAGES, type TranslationLanguage } from '@/translation/languages';
 import { PassageWindow, type PassageRect } from '../windows/PassageWindow';
+import { engineName, unsupportedLanguage } from '@/ui/settings/engine-options';
+import type { TranslationEngineView } from './types';
 import './selection-translation.css';
 
 interface Props {
@@ -11,14 +13,20 @@ interface Props {
   subscribeGeometry:(listener:()=>void)=>()=>void;
   text:string;sourceLanguage:string;targetLanguage:TranslationLanguage;
   busy:boolean;paused:boolean;retrying:boolean;error?:string;saveFailed:boolean;hasOutput:boolean;children:ReactNode;
-  onTranslate:(source:string,target:TranslationLanguage)=>void;onClose:()=>void;onPause:()=>void;onRetry:()=>void;onLocate:()=>void;
+  /** What translates this selection; picking another one takes effect with 翻译 / 重新翻译 and only for this window. */
+  engine?:TranslationEngineView;
+  onTranslate:(source:string,target:TranslationLanguage,engine?:string)=>void;onClose:()=>void;onPause:()=>void;onRetry:()=>void;onLocate:()=>void;
 }
 /** Translation content and commands; all passage-window behavior is shared with future explanation UI. */
 export function SelectionTranslationWindow(props:Props){
   const [settings,setSettings]=useState(false),[showSource,setShowSource]=useState(false);
-  const [source,setSource]=useState(props.sourceLanguage),[target,setTarget]=useState(props.targetLanguage);
+  const [source,setSource]=useState(props.sourceLanguage),[target,setTarget]=useState(props.targetLanguage),[engine,setEngine]=useState(props.engine?.value);
   const gear=useRef<HTMLButtonElement>(null);
   useEffect(()=>{setSource(props.sourceLanguage);setTarget(props.targetLanguage);},[props.sourceLanguage,props.targetLanguage]);
+  useEffect(()=>setEngine(props.engine?.value),[props.engine?.value]);
+  const options=props.engine?.options??[];
+  const targets=TRANSLATION_LANGUAGES.map(l=>({...l,disabled:!!engine&&unsupportedLanguage(options,engine,l.value)}));
+  const blocked=!!engine&&unsupportedLanguage(options,engine,target);
   const summary=props.busy?(props.retrying?'等待恢复':'正在翻译'):props.error?'翻译需要处理':props.paused?'已暂停':'选区翻译';
   return <>
     <PassageWindow container={props.container} label="选区翻译" collapsedTitle="翻译" anchorPoint={props.anchorPoint} sourceRects={props.sourceRects} subscribeGeometry={props.subscribeGeometry}
@@ -29,6 +37,7 @@ export function SelectionTranslationWindow(props:Props){
           {showSource&&<p className="pp-selection-translation__source" dir="auto">{props.text}</p>}
           {props.children}
           {!props.hasOutput&&!props.busy&&!props.error&&<span className="pp-selection-translation__hint">选择语言后翻译。</span>}
+          {props.hasOutput&&props.engine&&<span className="pp-selection-translation__engine">{engineName(options,props.engine.value)}</span>}
         </div>
         {(props.busy||props.error||props.paused||!props.hasOutput)&&<footer className="pp-selection-translation__footer">
           <span className="pp-selection-translation__hint" role="status">{props.busy&&<Spinner size={12}/>} {summary}</span>
@@ -39,9 +48,11 @@ export function SelectionTranslationWindow(props:Props){
     </PassageWindow>
     <Popover anchorRef={gear} open={settings} onClose={()=>setSettings(false)} label="选区翻译选项" placement="bottom-end" width={260} className="pp-selection-translation__options">
       <label>原文语言<Select label="原文语言" value={source} options={[{value:'auto',label:'自动检测'},...TRANSLATION_LANGUAGES]} disabled={props.busy} onChange={setSource} block size="sm"/></label>
-      <label>翻译到<Select label="翻译到" value={target} options={TRANSLATION_LANGUAGES} disabled={props.busy} onChange={setTarget} block size="sm"/></label>
+      <label>翻译到<Select label="翻译到" value={target} options={targets} disabled={props.busy} onChange={setTarget} block size="sm"/></label>
+      {props.engine&&engine&&<label>翻译引擎<Select label="翻译引擎" value={engine} options={options} disabled={props.busy} onChange={setEngine} block size="sm"/></label>}
+      {blocked&&<p className="pp-selection-translation__error">{engineName(options,engine!)}不支持这个语言</p>}
       <Switch label="显示原文" checked={showSource} onChange={setShowSource}/>
-      <div className="pp-selection-translation__options-actions"><Button size="sm" disabled={props.busy} onClick={()=>{setSettings(false);props.onTranslate(source,target);}}>{props.hasOutput?'重新翻译':'翻译'}</Button></div>
+      <div className="pp-selection-translation__options-actions"><Button size="sm" disabled={props.busy||blocked} onClick={()=>{setSettings(false);props.onTranslate(source,target,engine);}}>{props.hasOutput?'重新翻译':'翻译'}</Button></div>
     </Popover>
   </>;
 }

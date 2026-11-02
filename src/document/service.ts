@@ -12,6 +12,7 @@ type JobReceipt = ImportReceipt & { browserSource?: BrowserPdfSource };
 
 type Run = {
   source: ImportSource; controller: AbortController; saving: boolean; epoch: number;
+  unlockPassword?: string;
   password?: { requestId: string; submit: (password: string) => void };
 };
 function freeze<T>(value: T): T {
@@ -96,6 +97,12 @@ export function createDocumentService(database = new PaperDatabase(), options: {
       const receipt = await database.commitImport({ blob: run.source.kind === 'local' ? run.source.file : new Blob([bytes], { type: 'application/pdf' }), sha256, filename, pageCount, sourceUrl, bibliography,
         syncScope: run.source.kind === 'url' && run.source.intent === 'browse' ? 'record-only' : 'record-and-file' });
       receipts.set(id, { ...receipt, browserSource });
+      if(receipt.translationQueued){
+        // Translation is a separate, durable job. Its startup must not turn a saved PDF into a failed import.
+        await import('../translation/import-trigger')
+          .then(({wakeImportedTranslation})=>wakeImportedTranslation(receipt.document.id,receipt.document.fileVersion,run.unlockPassword))
+          .catch(()=>{});
+      }
       if (active()) patchJob(id, { phase: 'readable', document: { documentId: receipt.document.id, fileVersion: receipt.document.fileVersion }, progress: undefined, error: undefined });
       // Completed jobs cannot be retried; release their original File/URL owner.
       runs.delete(id);
@@ -114,7 +121,7 @@ export function createDocumentService(database = new PaperDatabase(), options: {
         }
       }
       patchJob(id, { phase: detail.code === 'CANCELLED' ? 'cancelled' : 'failed', error: detail, passwordRequest: undefined, progress: undefined });
-    } finally { if (run.epoch === epoch) { run.password = undefined; run.saving = false; } }
+    } finally { if (run.epoch === epoch) { run.password = undefined; run.unlockPassword = undefined; run.saving = false; } }
   }
   const service: DocumentService = {
     getSnapshot: () => snapshot,
@@ -145,7 +152,7 @@ export function createDocumentService(database = new PaperDatabase(), options: {
     async submitPassword(id, requestId, password) {
       const run = runs.get(id);
       if (!run?.password || run.password.requestId !== requestId || run.controller.signal.aborted) return failure('INVALID_INPUT', '此密码请求已结束');
-      const submit = run.password.submit; run.password = undefined;
+      const submit = run.password.submit; run.password = undefined; run.unlockPassword = password;
       patchJob(id, { phase: 'validating', passwordRequest: undefined, error: undefined });
       submit(password); return success(undefined);
     },

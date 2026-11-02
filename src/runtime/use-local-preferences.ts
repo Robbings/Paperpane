@@ -1,3 +1,6 @@
+import { showTranslationProblem } from './translation-notices';
+import { allowTranslation, translationCostAccepted } from '@/translation/consent';
+import { toast } from '@/ui/components';
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { isTranslationLanguage } from '@/translation/languages';
 import { PreferenceStore } from '@/data/preference-store';
@@ -102,6 +105,13 @@ export function useLocalPreferences() {
         }
       }
     };
+    const translations=new BroadcastChannel('paperpane-import-translations');
+    translations.onmessage=({data})=>{
+      if (data?.type==='error' && document.visibilityState==='visible')
+        showTranslationProblem(data.message,data.engine,()=>{void import('@/translation/import-trigger')
+          .then(({retryImportedTranslation})=>retryImportedTranslation(data))
+          .catch(()=>showTranslationProblem('未能启动重试。'));});
+    };
     session.channel.onmessage = () => {
       void session.tail.then(session.refresh);
     };
@@ -113,6 +123,7 @@ export function useLocalPreferences() {
     return () => {
       session.active = false;
       session.channel.close();
+      translations.close();
       document.removeEventListener('visibilitychange', visible);
       if (current.current === session) current.current = null;
       void session.tail.then(() => session.db.close()).catch(() => {});
@@ -127,12 +138,21 @@ export function useLocalPreferences() {
     });
   }, [state.preferences]);
 
-  const setPreference = useCallback(<K extends keyof Preferences>(key: K, value: Preferences[K]) => {
+  const autoChoice = useRef(0);
+  const setPreference = useCallback(async <K extends keyof Preferences>(key: K, value: Preferences[K]) => {
     const session = current.current;
     if (!session?.active) return;
     if (!valid(key, value)) {
       setState((previous) => ({ ...previous, local: 'failed', error: '偏好值无效，请重新选择。' }));
       return;
+    }
+    const choice = key==='autoTranslate' ? ++autoChoice.current : 0;
+    if (key==='autoTranslate' && (value==='on-add' || value==='on-open')) {
+      const when=value==='on-add'?'导入新论文时':'打开论文时';
+      const notice=when+'会自动翻译全文，批量处理可能增加用量和费用。';
+      if (translationCostAccepted()) toast.show({tone:'warning',message:notice});
+      else if (!await allowTranslation(undefined,notice)) return;
+      if (!session.active || choice!==autoChoice.current) return;
     }
     const ticket = ++session.generation;
     session.writes++;
