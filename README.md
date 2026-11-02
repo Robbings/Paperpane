@@ -1,97 +1,230 @@
-# Paperpane
+<div align="center">
 
-Paperpane（纸窗）是 Chrome / Edge 论文阅读扩展，使用 WXT、React 和 TypeScript。
+<img src="docs/readme/logo.svg" width="96" alt="纸窗" />
 
-## 开发与构建
+<h1>纸窗 Paperpane</h1>
 
-Node.js 版本见 `.node-version`，pnpm 版本见 `package.json`。
+<p><b>在浏览器里读论文：对照翻译，随手提问。</b></p>
 
-```sh
+<p>
+  <img alt="Chrome" src="https://img.shields.io/badge/Chrome-支持-2f5fd9?logo=googlechrome&logoColor=white" />
+  <img alt="Edge" src="https://img.shields.io/badge/Edge-支持-2f5fd9?logo=microsoftedge&logoColor=white" />
+  <img alt="Manifest V3" src="https://img.shields.io/badge/Manifest-V3-6b7280" />
+  <img alt="本地优先" src="https://img.shields.io/badge/数据-保存在本机-2f8a4e" />
+  <a href="LICENSE"><img alt="许可证 AGPL-3.0" src="https://img.shields.io/badge/许可证-AGPL--3.0-6b7280" /></a>
+</p>
+
+<p>
+  <a href="#功能">功能</a> ·
+  <a href="#安装">安装</a> ·
+  <a href="#隐私与费用">隐私与费用</a> ·
+  <a href="#常见问题">常见问题</a> ·
+  <a href="docs/DEVELOPMENT.md">参与开发</a>
+</p>
+
+<img src="docs/readme/images/hero.png" width="100%" alt="纸窗阅读器：左侧是论文，右侧是逐段对照的中文译文" />
+
+</div>
+
+<br />
+
+<div align="center">
+<table>
+  <tr>
+    <td align="center" width="25%"><img src="docs/readme/icons/open.svg" width="48" alt="" /><br /><b>一键打开</b><br /><sub>论文直接打开至插件，<br />自动整理概览</sub></td>
+    <td align="center" width="25%"><img src="docs/readme/icons/translate.svg" width="48" alt="" /><br /><b>对照翻译</b><br /><sub>整篇对照，划选即译；<br />支持大模型或机器翻译</sub></td>
+    <td align="center" width="25%"><img src="docs/readme/icons/explain.svg" width="48" alt="" /><br /><b>解释与提问</b><br /><sub>划选提问<br />回答标明出处</sub></td>
+    <td align="center" width="25%"><img src="docs/readme/icons/library.svg" width="48" alt="" /><br /><b>文献库</b><br /><sub>批注、笔记、文件夹，<br />WebDAV 同步</sub></td>
+  </tr>
+</table>
+</div>
+
+
+## 为什么做纸窗
+
+- 浏览器自带的 PDF 阅读器只能看，读到一半想翻译、想查一个概念，就得在好几个窗口之间来回切。
+- 网页翻译插件会把排版打乱，公式和图表也跟着被「翻译」。
+- 普通阅读器对LLM接入不原生，问 AI 要先复制、再粘贴、再解释上下文，回答也很难对回原文的哪一句。
+
+纸窗把这些放进同一个阅读器里：保持阅读体验的同时，围绕模型能力打造翻译、解释、提问和笔记等功能，且与论文丝滑融合。
+
+## 安静的阅读界面
+
+<img src="docs/readme/images/look.png" width="100%" alt="同一页面的浅色与深色外观" />
+
+论文是主角，玻璃材质风格，界面只在需要时出现，支持深浅主题切换。
+
+## 功能
+
+### 1. 一键打开，快速了解论文
+
+在 arXiv、Google Scholar、OpenReview 等论文网站，PDF 链接旁会出现「用纸窗打开」。点一下，论文进入阅读器，右侧自动整理概览。
+
+<img src="docs/readme/images/f1-open.gif" width="100%" alt="在 arXiv 页面点击「用纸窗打开」，阅读器打开后自动生成概览" />
+
+- **概览**：快速了解一篇论文：一段话的总结、关键词、研究问题、方法、结论和要点，且可以根据需要自行设置调整。
+- **不止 arXiv**：支持十几个常见论文网站，网页里的普通 PDF 链接和嵌入的 PDF 也能打开；本地 PDF 可以直接导入。
+
+### 2. 对照翻译
+
+翻译以页为单位进行，译文排在右侧的译文栏，跟着你的阅读位置走。可以只看译文，也可以切到「对照」，一句原文配一句译文。
+
+<img src="docs/readme/images/f2-translate.gif" width="100%" alt="翻译一页，切换到对照模式，再划选一句话翻译" />
+
+- **划选即译**：选中一句话，点「翻译」，结果出现在原文旁边的小窗里。
+- **两种引擎**：大模型译得更通顺；传统机器翻译服务更快、更便宜。全文和划选可以分开选择引擎。
+- **公式和图表不乱翻译**：公式、图表保持原样，点「查看原文」回到论文。
+
+### 3. 一键解释，划选提问
+
+读不懂的段落，选中后点「解释」；想追问，就点「提问」，选中的文字会作为引用带进对话。
+
+<img src="docs/readme/images/f3-explain.gif" width="100%" alt="选中一段，点击解释，得到带出处的逐句说明" />
+
+<img src="docs/readme/images/f3-ask.gif" width="100%" alt="选中一句话提问，模型结合全文回答" />
+
+- **回答有出处**：句末的小数字指向论文原文，点一下就能对照。
+- **结合整篇论文**：模型会先读论文，再回答，不只看你选中的那几行。
+- **框选提问**：图表、流程图也能问，框选一块区域即可。
+- **每个功能可单独指定模型**：比如提问用推理强的模型，解释用便宜快速的模型。
+
+### 4. 元素自动识别，公式一键复制
+
+纸窗在本机识别论文里的公式、表格和图片。鼠标移上去就能复制：公式复制为 LaTeX，表格复制为 Markdown、LaTeX 或 Excel，图片复制为图片。
+
+<img src="docs/readme/images/f4-formula.gif" width="100%" alt="鼠标移到公式上，点击复制，粘贴到笔记里显示为排版好的公式" />
+
+- **识别在本机完成**：版面识别采用本地小模型。
+- **公式转写更准**：公式转写调用大模型，公式由支持图片的模型转写成 LaTeX，可以在打开论文时提前转写，复制时立即可用。
+- **格式随你**：LaTeX 的定界符（`\( \)`、`$ $` 或不加）可以在设置里选。
+
+### 5. 批注与笔记
+
+五种颜色的高亮、贴在原文旁的旁注便签，以及每篇论文一份 Markdown 笔记。
+
+<img src="docs/readme/images/annotations.png" width="100%" alt="论文上的彩色高亮和旁注便签，右侧是批注列表" />
+
+- **旁注跟着论文走**：便签贴在原文旁，缩放、翻页、换布局都不会跑位。
+- **批注列表**：按颜色和类型筛选，点一条回到原文。
+- **笔记支持公式**：所见即所得的 Markdown，粘贴的公式会直接排版。
+- **导出**：批注可以导出为 Markdown 或 CSV，也可以连同批注一起打印。
+
+### 6. 文献库与同步
+
+读过的论文都在文献库里，可以按文件夹、标签、星标整理，按标题、作者、摘要搜索。
+
+<img src="docs/readme/images/library.png" width="100%" alt="文献库：文件夹、标签和论文详情" />
+
+- **WebDAV 同步**：连接坚果云、Nextcloud 等 WebDAV 服务，在多台电脑之间同步论文、批注和笔记；服务器不支持可靠同步时可以只做云备份。
+- **完整备份**：一键导出包含 PDF、书目、批注和笔记的备份包，可以在新的浏览器里恢复。
+- **Zotero 往返**：从 Zotero 个人库导入论文和批注，也可以把论文和高亮导出回 Zotero。
+
+## 安装
+
+**从 Release 安装**
+
+1. 下载最新的 [Release](https://github.com/Robbings/Paperpane/releases) 压缩包并解压。
+2. 在地址栏打开 `chrome://extensions`（Edge 为 `edge://extensions`）。
+3. 打开右上角的「开发者模式」。
+4. 点击「加载已解压的扩展程序」，选择解压后的文件夹。
+
+**应用商店**：Chrome 应用商店和 Edge 加载项正在准备中。
+
+第一次打开纸窗时会有一段简短的配置引导，带你添加模型和翻译服务。
+
+## 隐私与费用
+
+- **数据保存在本机**：论文、批注、笔记和设置都保存在浏览器里，不经过纸窗的服务器（纸窗没有服务器）。
+- **密钥不离开本机**：API 密钥只保存在本机，不会写进备份，也不会同步。
+- **论文只发给你选的服务**：只有在你使用概览、翻译、解释、提问等功能时，相关内容才会发给你配置的模型或翻译服务。
+- **扩展本身不收费**：模型和翻译服务按你自己的账号计费。谷歌翻译免费版不需要密钥。
+
+## 支持的服务
+
+**模型**：OpenAI、Claude、Gemini、Grok、通义千问、DeepSeek、Kimi、智谱 GLM、MiniMax、豆包、阶跃星辰、Mistral、OpenRouter、硅基流动、Groq，以及任何 OpenAI 兼容的服务。
+
+**翻译服务**：谷歌翻译（免费）、Google Cloud 翻译、微软翻译、DeepL、百度翻译、腾讯翻译、阿里翻译、有道翻译、火山翻译。
+
+<details>
+<summary><b>支持「用纸窗打开」的论文网站</b></summary>
+
+<br />
+
+arXiv、Google Scholar、Semantic Scholar、OpenReview、ACL Anthology、CVF Open Access、NeurIPS Proceedings、PMLR、Hugging Face Papers、bioRxiv、medRxiv、HAL、PubMed Central、Zenodo、Frontiers、PLOS。
+
+此外，任何网页里的 PDF 链接和嵌入的 PDF 都会出现打开按钮；浏览器直接打开的 PDF 页面也可以从工具栏图标打开。
+
+</details>
+
+## 常见问题
+
+<details>
+<summary><b>没有 API 密钥能用吗？</b></summary>
+
+<br />
+
+可以。阅读、高亮、旁注、笔记、文献库、元素识别和谷歌免费翻译都不需要密钥。概览、解释、提问、大模型翻译和公式转写需要配置一个模型。
+
+</details>
+
+<details>
+<summary><b>本地的 PDF 怎么打开？</b></summary>
+
+<br />
+
+点击浏览器工具栏里的纸窗图标，选择「打开文件」；或者在文献库里点「导入」。
+
+</details>
+
+<details>
+<summary><b>换了电脑，数据怎么带过去？</b></summary>
+
+<br />
+
+在「设置 → 同步与备份」里连接同一个 WebDAV，两台电脑会自动同步；也可以导出完整备份，在新电脑上恢复。
+
+</details>
+
+<details>
+<summary><b>和 Zotero 是什么关系？</b></summary>
+
+<br />
+
+纸窗可以单独使用，也可以和 Zotero 配合：填写 Zotero API Key 后，能从 Zotero 个人库导入论文和批注，也能把纸窗里的论文和高亮导出回 Zotero。
+
+</details>
+
+<details>
+<summary><b>支持哪些浏览器？</b></summary>
+
+<br />
+
+Chrome 和 Edge 的最新版本。其他基于 Chromium 的浏览器通常也能使用，但没有专门测试。
+
+</details>
+
+## 路线图
+
+- 上架 Chrome 应用商店和 Edge 加载项
+- 英文界面和英文 README
+- 适配更多论文网站
+
+欢迎在 [Issues](https://github.com/Robbings/Paperpane/issues) 里告诉我们你需要什么。
+
+## 参与开发
+
+```bash
 pnpm install --frozen-lockfile
-pnpm typecheck
 pnpm dev
 pnpm build
-pnpm build:edge
 ```
 
-开发模式不会自动启动浏览器。在 Chrome 扩展管理页加载 `.output/chrome-mv3-dev`；Edge 使用 `pnpm dev:edge` 和 `.output/edge-mv3-dev`。
+开发环境、目录结构和测试方式见 [开发说明](docs/DEVELOPMENT.md)。
 
-生产产物分别位于 `.output/chrome-mv3` 与 `.output/edge-mv3`。使用 `pnpm zip` 或 `pnpm zip:edge` 生成扩展 ZIP。生产扩展不需要本地开发服务器。
+## 致谢与许可
 
-## 模型服务设置
+纸窗使用了 [PDF.js](https://github.com/mozilla/pdf.js)、[WXT](https://wxt.dev)、[React](https://react.dev)、[Vditor](https://github.com/Vanessa219/vditor)、[ONNX Runtime Web](https://github.com/microsoft/onnxruntime)、[PP-PicoDet 版面模型](https://huggingface.co/PaddlePaddle/PicoDet-S_layout_17cls)、[models.dev](https://models.dev) 和 [Lobe Icons](https://github.com/lobehub/lobe-icons)，各自的许可证见 `public/licenses/`。
 
-打开设置的「模型」页，选择供应商模板、填写 API 密钥，再从常用目录或端点返回的列表批量添加模型。支持 OpenAI、Anthropic、Gemini、xAI、Qwen 的模板及自定义兼容端点；Qwen 模板区分中国内地与国际地址。供应商详情和模型抽屉共用页面草稿，点击底部「保存」后生效。
+截图中的论文为 Rafailov 等人的 [Direct Preference Optimization](https://arxiv.org/abs/2305.18290)，采用 CC BY 4.0 许可。
 
-模型显示名称、请求 ID、图片能力、思考设置、上下文与输出上限可独立编辑；未知能力会明确标注。离线目录来自 models.dev，在线更新失败时仍可继续使用。获取模型列表不代表账号调用已通过；「测试」会向当前草稿的端点发送一次可能计费的测试请求，不包含论文内容。真实密钥仅保存在本机，不回填到页面，也不会发送给模型目录。
-
-模型设置测试命令为 `pnpm test:models`。
-
-## 浏览器 PDF 入口
-
-加载或重新加载扩展后，刷新 arXiv 论文详情页，在右侧 PDF 链接下点击「在 Paperpane 中打开」。扩展会在新标签页下载并显示该论文，同时加入本机文献库；可以从阅读器左上角返回文献库。刷新阅读器会读取已保存的 PDF，重复导入同一文件不会创建重复条目。
-
-网页中的 PDF 链接和嵌入 PDF 会出现打开按钮；支持的 Chrome 原生 PDF 页面左下角也有悬浮按钮。扩展图标弹窗会识别当前页面，提供打开 PDF、最近阅读、文献库及设置入口。
-
-弹窗使用真实标签页和文献库数据：已入库标记、最近三篇论文的编辑后标题、阅读位置和时间会随数据变化更新。模型状态读取已保存的默认/翻译模型与关联接口；「已配置」表示配置完整，不表示刚刚测试过网络连接。同步引擎尚未实现，状态栏会明确显示尚未接入或配置不完整，不会宣称已同步。
-
-Google Scholar 搜索结果会逐条显示打开按钮：优先右侧标注的 PDF，可退回已知开放平台的标题链接；HTML-only 和引用条目不会添加误导入口。已增加 ACL Anthology、OpenReview、CVF、NeurIPS、PMLR、Hugging Face Papers、bioRxiv/medRxiv、HAL、Semantic Scholar、PubMed Central、Zenodo、Frontiers、PLOS 适配。
-
-弹窗及「设置 → 通用 → 浏览器入口」提供「自动打开 PDF」和「显示网页打开按钮」两个独立开关。自动打开默认关闭，按钮默认显示。自动打开依据顶层响应的 PDF 类型判断，支持没有 `.pdf` 后缀和重定向的地址；下载附件和嵌入页面不会自动接管。
-
-阅读器工具栏的「返回原 PDF」按钮返回本次打开的网址；即使启用了自动打开，返回原件和刷新也会保留原生查看方式。切换到其他页面后恢复自动打开。失败时可重试或导入本地文件。
-
-通用识别需要 HTTP/HTTPS 网页访问及 `webRequest`、`scripting`、`storage` 权限；更新后按浏览器提示重新启用扩展并刷新原网页。原生 PDF 页面若被浏览器限制注入，仍可使用扩展图标弹窗。`file:`、`blob:` 和需要登录的下载请先保存到本机再导入。
-
-`pnpm test` 运行入口单元测试。
-
-## 工程结构
-
-- `src/entrypoints/`：扩展页面入口。
-- `src/runtime/`：页面挂载与运行时支持。
-- `src/ui/`：界面与组件。
-
-演示页面中的示例内容不代表真实 PDF、数据保存或模型功能已接通。
-
-## 阅读器开发入口
-
-**阅读器功能统一在真实 PDF 上开发。** `reader.html` 始终挂载 `src/runtime/reader-page.tsx` 的 `LiveReaderPage`，复用 `ReaderShell` 和现有 UI；PDF.js、选区、投影、批注、翻译及偏好通过正式运行时接合。
-
-| 页面 | 用途 |
-|---|---|
-| `library.html` | 导入本机 PDF，从真实文献记录打开阅读器 |
-| `reader.html` | 正式阅读器；读取本机已导入的论文，无数据时展示选择论文入口 |
-| `reader.html?documentId=<本机文档ID>` | 打开对应真实 PDF；旧 `item` 参数兼容并归一为 `documentId` |
-| `reader.html?open=import` | 正式阅读器中打开选择/导入论文对话框 |
-| `component-gallery.html` | 按钮、菜单、弹窗等独立组件预览，不作为阅读器功能验收 |
-| `component-gallery.html?view=selbar` | 选区栏的样式比较 |
-| `component-gallery.html?view=reader-archive` | 历史虚拟论文存档，仅供回看旧界面；不继续接入功能或作为验收入口 |
-
-兼容旧书签：`reader-proof.html` 跳转正式阅读器并保留文档参数；`reader.html?view=sample` 也进入真实阅读器。旧 `?view=gallery` / `?view=selbar` 跳转组件预览页。正式阅读器不再实例化虚拟论文。
-
-### 在自己的工作区开发
-
-1. 先检查分支和工作区状态，基于最新主干接合；不要覆盖别人的工作区或未提交成果。
-2. 在本工作区执行 `pnpm install --frozen-lockfile`、`pnpm dev`（Edge 用 `pnpm dev:edge`），加载**本工作区**的开发输出目录；已经加载了其他目录时先核实扩展管理页的来源。
-3. 打开该扩展的 `library.html`，导入一份本机论文，再从文献库打开阅读器。文档 ID 必须来自当前扩展的数据，不要复制别的浏览器/来源的 ID。
-4. 修改公共 UI 组件后，通过真实阅读器的 props / 回调接上；模型尚未接好时可以替换该服务的输出，但保持真实 PDF、位置锚点和阅读器布局。示例结果必须标注、不伪装为当前论文的分析或已保存数据。
-5. 核查真实文件下的选区、缩放、旋转、侧栏和小窗位置，以及本次涉及的保存/刷新恢复。单页、双页、逐页模式中的定位按改动范围复核。组件 gallery 和构建通过不能代替这些检查。
-6. 交付说明记录工作区/分支、提交、浏览器以及加载的输出目录。生产构建需要重新构建并在扩展管理页重新加载，已有页面也要刷新；不要把旧产物当成当前代码。
-
-开发和测试共用同一个阅读器入口；历史样例代码位于 `src/ui/reader/sample/ArchivedReaderPage.tsx`，不再是功能开发的起点。文档、私有 PDF、模型密钥和浏览器数据不随示例接线提交。
-
-### localhost 预览与扩展验收
-
-本机预览可在工作区执行：
-
-```sh
-pnpm build
-python3 -m http.server 4206 --bind 127.0.0.1 --directory .output/chrome-mv3
-```
-
-然后打开 `http://127.0.0.1:4206/library.html` 导入真实 PDF，或打开 `reader.html` 使用该来源已有的论文。预览服务器只用于静态构建展示，不是产品业务后端。
-
-`http://127.0.0.1:4206`、其他端口、Chrome/Edge 浏览器配置以及 `chrome-extension://<扩展ID>` 各有自己的本机存储。它们的论文、模型配置、密钥和文档 ID 不会因代码相同而自动共享；端口和浏览器保持固定可保留该来源的数据。需要在目标来源分别导入/配置，不搬运浏览器档案或密钥。
-
-localhost 可核查界面和阅读逻辑；扩展权限、浏览器入口和实际扩展网络请求仍应在加载后的 Chrome/Edge 扩展中检查。
-
-当前阅读器里的讨论、概览和解释若标注“示例内容”，仅是现有 UI 的预览：不会请求模型，也不会作为真实会话保存。它们与已实现的真实 PDF、批注和翻译逻辑共用阅读器，但不能据此宣称 AI 功能已经完成。
+纸窗采用 [GNU AGPL v3.0](LICENSE) 许可证：可以自由使用、修改，也可以用于商业用途；但分发修改后的版本，或者以网络服务的形式提供给他人使用时，必须以同样的许可证公开完整源代码。
