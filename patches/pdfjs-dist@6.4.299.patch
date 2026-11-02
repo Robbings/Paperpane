@@ -1234,7 +1234,7 @@ index 3a5c6048d31f4b7246c654d7ac060ae9c4f0325d..51809ef7ea7e97539ccaba91d5422855
      const thickness = data.thickness || this._defaultDrawingOptions.thickness;
      const points = (data.inkLists || data.outlines.points)[0];
 diff --git a/web/pdf_viewer.mjs b/web/pdf_viewer.mjs
-index e4a6b24652d1ed233dc3de1b746188a246e5fb9e..95f91fb3a4b5463743b59959d29dabe0195c4591 100644
+index e4a6b24652d1ed233dc3de1b746188a246e5fb9e..1d7462a58ec12aa39813f121b15ded3ebb33fa8b 100644
 --- a/web/pdf_viewer.mjs
 +++ b/web/pdf_viewer.mjs
 @@ -1,3 +1,4 @@
@@ -1242,7 +1242,18 @@ index e4a6b24652d1ed233dc3de1b746188a246e5fb9e..95f91fb3a4b5463743b59959d29dabe0
  /**
   * @licstart The following is the entire license notice for the
   * JavaScript code in this page
-@@ -7110,6 +7111,7 @@ class PDFPageView extends BasePDFPageView {
+@@ -306,7 +307,9 @@ function approximateFraction(x) {
+     return [x, 1];
+   }
+   const xinv = 1 / x;
+-  const limit = 8;
++  // Paperpane: 20 rather than 8, so that browser zoom ratios such as 1.1 (11/10)
++  // are matched exactly and the canvas is not stretched by a fraction of a pixel.
++  const limit = 20;
+   if (xinv > limit) {
+     return [1, limit];
+   } else if (Math.floor(xinv) === xinv) {
+@@ -7110,6 +7113,7 @@ class PDFPageView extends BasePDFPageView {
      return canvasWrapper;
    }
    _getRenderingContext(canvas, transform, recordOperations, recordImages) {
