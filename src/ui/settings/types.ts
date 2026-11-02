@@ -211,6 +211,11 @@ export interface TranslationApiDraft extends Omit<TranslationApiView, 'hasSecret
 
 /** What translates papers: a language model (the translate route's model), or a machine translation API. */
 export type TranslationEngineChoice = { kind: 'llm' } | { kind: 'machine'; apiId: string };
+/**
+ * What translates a selection. same (or missing): whatever translates papers. llm: a language model
+ * of its own (null: the default model), independent of the translate route.
+ */
+export type SelectionEngineChoice = { kind: 'same' } | { kind: 'llm'; modelId: string | null } | { kind: 'machine'; apiId: string };
 
 export interface SyncConfigView {
   enabled: boolean;
@@ -235,6 +240,7 @@ export interface SettingsView {
   sync: SyncConfigView;
   translationApis?: readonly TranslationApiView[];
   translationEngine?: TranslationEngineChoice;
+  selectionTranslationEngine?: SelectionEngineChoice;
 }
 
 /** What the settings page edits: the snapshot with secrets as edits. */

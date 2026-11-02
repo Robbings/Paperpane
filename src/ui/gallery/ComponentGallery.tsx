@@ -1,3 +1,4 @@
+import { TranslationDemo } from './TranslationDemo';
 import { useEffect, useRef, useState, type CSSProperties, type ReactNode } from 'react';
 import {
   Badge,
@@ -50,6 +51,7 @@ const sections = [
   ['badges', '徽标与快捷键'],
   ['selection', '选区菜单'],
   ['status', '保存状态'],
+  ['translation', '翻译引擎'],
   ['icons', '图标'],
 ] as const;
 
@@ -160,6 +162,9 @@ export function ComponentGallery() {
         <BadgesSection />
         <SelectionSection />
         <StatusSection />
+        <Section id="translation" title="翻译引擎" note="全文与选区可以用不同的引擎；换引擎不清掉已翻译的页。">
+          <TranslationDemo />
+        </Section>
         <IconsSection />
       </main>
       <Toaster top={16} />

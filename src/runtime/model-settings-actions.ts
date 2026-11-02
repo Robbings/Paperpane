@@ -267,3 +267,17 @@ export async function completeCapabilities(items: CatalogModel[], catalog: Catal
   }
   return completed.map(withDefaultFacts);
 }
+
+/**
+ * Translates "Hello, world." with a machine translation service as the draft has it (typed or saved
+ * credentials) and returns the translation. 待逻辑层接入 MachineTranslator 后实现。
+ */
+export async function testTranslationApi(
+  draft: SettingsDraft,
+  apiId: string,
+  signal: AbortSignal,
+): Promise<{ text: string; elapsedMs: number }> {
+  signal.throwIfAborted();
+  if (!draft.translationApis.some((a) => a.id === apiId)) throw new Error("翻译服务不存在。");
+  throw new Error("翻译服务还没有接入，暂时无法检查。");
+}

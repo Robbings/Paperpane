@@ -3,7 +3,8 @@ import { createPortal } from 'react-dom';
 import { useSelectionTranslation } from './use-selection-translation';
 import { TranslationPane } from '@/ui/reader/translation/TranslationPane';
 import type { TranslationMode, TranslationPageView, TranslationSentenceView } from '@/ui/reader/translation/types';
-import { Button, Dialog, EmptyState, IconButton, ProgressBar, toast } from '@/ui/components';
+import { EmptyState, IconButton, ProgressBar, toast } from '@/ui/components';
+import { TranslationConfirm } from '@/ui/reader/translation/TranslationConfirm';
 import { TranslationMarkdown } from './translation-markdown';
 import { TranslationSession } from '@/translation/session';
 import type { ReaderController } from './reader-controller';
@@ -111,12 +112,12 @@ export function useTranslation(owner:ReaderController|undefined,preferences:Pref
   </div>,owner.reader.translationScrollElement()):null;
   const overlay=<>{highlightOverlay}{pageActions}{selectionWindow}</>;
   const loading=session?.loading;
-  const panel=loading?<EmptyState icon="file" title="正在整理原文" description={`已读取 ${session.extractProgress} / ${pageCount} 页，不会调用模型。`} actions={<ProgressBar label="整理原文" value={pageCount?session.extractProgress/pageCount:undefined}/>}/>:
+  const panel=loading?<EmptyState icon="file" title="正在整理原文" description={`已读取 ${session.extractProgress} / ${pageCount} 页，还没有发出翻译请求。`} actions={<ProgressBar label="整理原文" value={pageCount?session.extractProgress/pageCount:undefined}/>}/>:
     !session?.paper?<EmptyState icon="file" title="原文尚未就绪" description={session?.error??'请先打开 PDF。'}/>:
     <div style={{display:'contents','--pp-text-read':`${(preferences.translationFontSize??preferences.uiFontSize)*.875/16}rem`} as CSSProperties}>
       <TranslationPane renderText={s=><TranslationMarkdown text={s.text} inferredMath={s.inferredMath}/>} pages={pages} mode={mode} onMode={setMode} follow={follow} onFollow={setFollow} onClose={()=>{setOpen(false);setActive(null);}} activeId={active} onHover={setActive} onLocate={id=>{const s=sentences.find(x=>x.id===id);if(s){followGuard.current.suppressUntil=Date.now()+1500;setActive(id);void owner?.reader.locate(s.anchor);}}} reveal={reveal}
         task={{saveFailed:session.saveFailed,completedSentences:run?.requested.filter(id=>run.outputs[id]?.state==='done').length,totalSentences:run?.requested.length,phase:session.error?'failed':run?.phase??'idle',completedPages:pages.filter(p=>p.state==='done').length,totalPages:pageCount,current:session.retrying.size?`${session.activeRequests} 个请求进行中，${session.retrying.values().next().value}`:session.activeRequests?`${session.activeRequests} 个请求并发`:undefined,error:session.error??run?.error}}
         onTranslatePage={p=>start(p,session.needsRepeat(p))} onTranslateAll={()=>start()} onPause={()=>void session.pause()} onResume={()=>session.saveFailed?void session.retrySave():void session.resume(run?.profile.language??preferences.translationLanguage)} onRetryPage={p=>start(p,true)} onRetranslatePage={page=>setConfirm({page,replace:true})} onRetranslateAll={()=>setConfirm({replace:true})}/>
     </div>;
-  return {shell:{open,onToggle:()=>setOpen(o=>!o),pane:panel},overlay,confirmation:<Dialog open={!!confirm} onClose={()=>setConfirm(null)} title={confirm?.replace?(confirm.page===undefined?"重新翻译全文":"重新翻译本页"):"重试未完成的译文"} description={confirm?.replace?"会再次请求模型并计费，用当前提示词生成新版本。旧译文记录仍保留；当前尚无历史版本浏览界面。":"会再次请求模型，可能再次计费。此前收到的内容仍保留，已完成的句子不会重复请求。"} footer={<><Button onClick={()=>setConfirm(null)}>取消</Button><Button variant="primary" onClick={()=>{const c=confirm;setConfirm(null);if(c)void session?.start(preferences.translationLanguage,c.page,true,c.ids,c.replace);}}>{confirm?.replace?"重新翻译":"重试未完成部分"}</Button></>}/>};
+  return {shell:{open,onToggle:()=>setOpen(o=>!o),pane:panel},overlay,confirmation:<TranslationConfirm request={confirm?{action:confirm.replace?'retranslate':'retry',scope:confirm.page===undefined?'document':'page'}:null} onClose={()=>setConfirm(null)} onConfirm={()=>{const c=confirm;setConfirm(null);if(c)void session?.start(preferences.translationLanguage,c.page,true,c.ids,c.replace);}}/>};
 }

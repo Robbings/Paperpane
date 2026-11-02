@@ -1,0 +1,8 @@
+.tr-demo { display: flex; flex-wrap: wrap; gap: 20px; align-items: flex-start; }
+.tr-demo__frame { display: flex; flex-direction: column; gap: 8px; min-width: 0; }
+.tr-demo__label { color: var(--pp-text-3); font-size: var(--pp-text-xs); }
+.tr-demo__pane { display: flex; width: 380px; max-width: 100%; height: 440px; border: 0.5px solid var(--pp-hairline); border-radius: 12px; overflow: hidden; }
+.tr-demo__pane > * { flex: 1; min-width: 0; }
+.tr-demo__paper { position: relative; width: 420px; max-width: 100%; height: 440px; overflow: auto; border: 0.5px solid var(--pp-hairline); border-radius: 12px; background: var(--pp-surface); }
+.tr-demo__page { width: 300px; margin: 16px 24px; padding: 20px; min-height: 380px; background: #fff; color: #222; font: 14px/1.6 Georgia, serif; box-shadow: 0 1px 3px rgba(0, 0, 0, 0.12); }
+.tr-demo__buttons { display: flex; flex-direction: column; align-items: flex-start; gap: 8px; }

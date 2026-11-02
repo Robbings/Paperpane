@@ -260,6 +260,11 @@ export function ModelsSection({
       features: draft.features.map((f) =>
         ids.includes(f.modelId ?? "") ? { ...f, modelId: null } : f,
       ),
+      selectionTranslationEngine:
+        draft.selectionTranslationEngine?.kind === "llm" &&
+        ids.includes(draft.selectionTranslationEngine.modelId ?? "")
+          ? { kind: "llm", modelId: null }
+          : draft.selectionTranslationEngine,
     });
     if (removing.endpoint) setActive(null);
     setRemoving(null);
