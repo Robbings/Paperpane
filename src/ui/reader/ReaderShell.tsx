@@ -170,14 +170,14 @@ export function ReaderShell(props: ReaderShellProps) {
   const [width, setWidth] = useState(props.initialLayout?.width ?? RESEARCH_WIDTH.default);
   const [height, setHeight] = useState(props.initialLayout?.height ?? RESEARCH_HEIGHT.default);
   const [showTitle, setShowTitle] = useState(props.initialLayout?.showTitle ?? true);
-  const [panel, setPanel] = useState<ResearchPanelId>('annotations');
+  const [panel, setPanel] = useState<ResearchPanelId>('overview');
   const [panelOpen, setPanelOpen] = useState(true);
   // The research area can fill the window (e.g. a narrow browser where only it is read).
   // Layout decisions below still use its normal size, so restoring puts everything back.
   const [maximized, setMaximized] = useState(false);
   useEffect(()=>{const request=props.panelRequest;if(!request)return;setPanel(request.id);setPanelOpen(true);setVisited(current=>new Set([...current,request.id]));},[props.panelRequest]);
   // Panels stay mounted once opened, so drafts and running tasks survive switching.
-  const [visited, setVisited] = useState<ReadonlySet<ResearchPanelId>>(() => new Set(['annotations']));
+  const [visited, setVisited] = useState<ReadonlySet<ResearchPanelId>>(() => new Set([panel]));
   const [sidebarPref, setSidebarPref] = useState<boolean | null>(null);
   const [resizing, setResizing] = useState(false);
   // Dock change phases: 'out' while content fades and the card moves,
