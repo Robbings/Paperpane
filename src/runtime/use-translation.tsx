@@ -5,24 +5,20 @@ import { useSelectionTranslation } from './use-selection-translation';
 import { TranslationPane } from '@/ui/reader/translation/TranslationPane';
 import type { TranslationMode, TranslationPageView, TranslationSentenceView } from '@/ui/reader/translation/types';
 import { EmptyState, IconButton, ProgressBar, toast } from '@/ui/components';
-import { TranslationConfirm } from '@/ui/reader/translation/TranslationConfirm';
 import { TranslationMarkdown } from './translation-markdown';
 import { TranslationSession } from '@/translation/session';
 import type { ReaderController } from './reader-controller';
 import { concreteKey, savedEngineKey } from '@/translation/resolve';
 import { engineName, engineOptions, paperEngineValue } from '@/ui/settings/engine-options';
-import { machineProvider } from '@/translation/machine-providers';
 import { literalTranslation } from '@/translation/machine/text';
-import type { TranslationConfirmRequest, TranslationCost } from '@/ui/reader/translation/TranslationConfirm';
 import type { Preferences, SettingsView } from '@/ui/settings/types';
 import type { TranslationSentence } from '@/contracts/translation';
-export function useTranslation(owner:ReaderController|undefined,preferences:Preferences,settings:SettingsView,settingsReady:boolean){
+export function useTranslation(owner:ReaderController|undefined,preferences:Preferences,settings:SettingsView,settingsReady:boolean,preferencesReady:boolean){
   const [open,setOpen]=useState(false),[mode,setMode]=useState<TranslationMode>('translation'),[follow,setFollow]=useState(true);
   const [session,setSession]=useState<TranslationSession>(),[,render]=useState(0),[active,setActive]=useState<string|null>(null);
   const [reveal,setReveal]=useState<{id:string;key:number;smooth:boolean;flash:boolean}|null>(null);
   const [override,setOverride]=useState<string>();
   const options=engineOptions(settings), value=override ?? paperEngineValue(settings), key=concreteKey(settings,value);
-  const [confirm,setConfirm]=useState<{session:TranslationSession; action:TranslationConfirmRequest['action']; page?:number; ids?:string[]; key:string; label:string; language:string; cost:TranslationCost}|null>(null);
   const selectionWindow=useSelectionTranslation(owner,preferences,settings,settingsReady);
   const current=useRef({open,follow,active});current.current={open,follow,active};
   const followGuard=useRef({suppressUntil:0,manualUntil:0});
@@ -31,13 +27,28 @@ export function useTranslation(owner:ReaderController|undefined,preferences:Pref
     if(!owner||!document)return;
     let alive=true;const s=new TranslationSession(document,(signal,progress)=>owner.reader.extractTranslation(signal,progress),()=>{if(alive)render(n=>n+1);});
     owner.trackTranslation(s);
-    setSession(s);setActive(null);setReveal(null);setConfirm(null);
+    setSession(s);setActive(null);setReveal(null);
     return()=>{alive=false;void owner.releaseTranslation(s);};
   },[owner,document?.documentId,document?.fileVersion]);
   // Loading/render phase changes must not dispose a session holding unsaved text.
   useEffect(()=>{
     if(session&&phase==='ready'&&session.ref.documentId===document?.documentId&&session.ref.fileVersion===document?.fileVersion)void session.load();
   },[session,phase,document?.documentId,document?.fileVersion]);
+  const attemptedOpen=useRef<TranslationSession>(undefined);
+  useEffect(()=>{
+    if (!session || phase!=='ready' || !preferencesReady || !settingsReady || session.ref.documentId!==document?.documentId ||
+        session.ref.fileVersion!==document?.fileVersion || attemptedOpen.current===session) return;
+    let live=true;
+    void session.load().then(()=>{
+      if (!live || !session.paper || attemptedOpen.current===session) return;
+      attemptedOpen.current=session;
+      if (preferences.autoTranslate==='on-open') return session.startAutomatic(preferences.translationLanguage);
+    });
+    return ()=>{live=false;};
+  },[session,phase,document?.documentId,document?.fileVersion,preferencesReady,settingsReady,preferences.autoTranslate,preferences.translationLanguage]);
+  useEffect(()=>{
+    if (preferencesReady && preferences.autoTranslate!=='on-open') void session?.pauseAutomatic();
+  },[session,preferencesReady,preferences.autoTranslate]);
   const sentences=session?.paper?.sentences??[];
   const rects=(s:TranslationSentence)=>s.anchor.pages.flatMap(p=>{const result=owner?.reader.project({...s.anchor,pages:[p]},'viewport');return result?.state==='ready'?result.rects.map(r=>r.rect):[];});
   useEffect(()=>{
@@ -124,17 +135,6 @@ export function useTranslation(owner:ReaderController|undefined,preferences:Pref
   const start=(page?:number,retry=false,ids?:string[],replace=false,language:string=preferences.translationLanguage)=>{
     if (!session) return;
     if (!settingsReady) { owner?.report('翻译设置尚未就绪，请稍后再试。'); return; }
-    const api=settings.translationApis?.find(a=>'mt:'+a.id===key);
-    const paid=api && !machineProvider(api.kind)?.unofficial;
-    const remaining=sentences.filter(s=>s.kind!=='formula' && (!ids || ids.includes(s.id)) &&
-      (page===undefined || s.anchor.pages.some(p=>p.pageIndex===page)) &&
-      (replace || run?.profile.language!==language || !sentenceFinished(run.outputs[s.id]) || (run.outputs[s.id]?.state==='original' && savedEngineKey(run.profile)!==key)));
-    if (replace || retry || (paid && page===undefined)) {
-      const cost:TranslationCost=paid ? {kind:'characters',characters:remaining.reduce((n,s)=>n+[...s.source].length,0)} :
-        api ? {kind:'free'} : {kind:'tokens'};
-      setConfirm({session,page,ids,language,key,label:engineName(options,key),cost,action:replace?'retranslate':retry?'retry':'translate'});
-      return;
-    }
     session.engineOverride=key;
     void session.start(language,page,retry,ids,replace);
   };
@@ -162,18 +162,7 @@ export function useTranslation(owner:ReaderController|undefined,preferences:Pref
           return out.engine?.startsWith('mt:') ? literalTranslation(s.text) : <TranslationMarkdown text={s.text} inferredMath={s.inferredMath}/>;
         }} pages={pages} mode={mode} onMode={setMode} follow={follow} onFollow={setFollow} onClose={()=>{setOpen(false);setActive(null);}} activeId={active} onHover={setActive} onLocate={id=>{const s=sentences.find(x=>x.id===id);if(s){followGuard.current.suppressUntil=Date.now()+1500;setActive(id);void owner?.reader.locate(s.anchor);}}} reveal={reveal}
         task={{saveFailed:session.saveFailed,completedSentences:run?.requested.filter(id=>sentenceFinished(run.outputs[id])).length,totalSentences:run?.requested.length,phase:session.error?'failed':run?.phase??'idle',completedPages:pages.filter(p=>p.state==='done').length,totalPages:pageCount,current:session.retrying.size?`${session.activeRequests} 个请求进行中，${session.retrying.values().next().value}`:session.activeRequests?`${session.activeRequests} 个请求并发`:undefined,error:session.error??run?.error}}
-        onTranslatePage={p=>start(p,session.needsRepeat(p))} onTranslateAll={()=>start()} onPause={()=>void session.pause()} onResume={()=>session.saveFailed?void session.retrySave():start(run?.scope?.page,true,run?.requested,false,run?.profile.language??preferences.translationLanguage)} onRetryPage={p=>start(p,true)} onRetranslatePage={page=>start(page,false,undefined,true)} onRetranslateAll={()=>start(undefined,false,undefined,true)}/>
+        onTranslatePage={p=>start(p,session.needsRepeat(p))} onTranslateAll={()=>start()} onPause={()=>void session.pauseFromReader()} onResume={()=>session.saveFailed?void session.retrySave():start(run?.scope?.page,true,run?.requested,false,run?.profile.language??preferences.translationLanguage)} onRetryPage={p=>start(p,true)} onRetranslatePage={page=>start(page,false,undefined,true)} onRetranslateAll={()=>start(undefined,false,undefined,true)}/>
     </div>;
-  const confirmation = <TranslationConfirm
-    engineLabel={confirm?.label} cost={confirm?.cost}
-    request={confirm && confirm.session===session ? {action:confirm.action,scope:confirm.page===undefined?'document':'page'} : null}
-    onClose={()=>setConfirm(null)}
-    onConfirm={()=>{
-      setConfirm(null);
-      if (!confirm || confirm.session!==session) return;
-      session.engineOverride=confirm.key;
-      void session.start(confirm.language,confirm.page,confirm.action==='retry',confirm.ids,confirm.action==='retranslate');
-    }}
-  />;
-  return {shell:{open,onToggle:()=>setOpen(o=>!o),pane:panel},overlay,confirmation};
+  return {shell:{open,onToggle:()=>setOpen(o=>!o),pane:panel},overlay};
 }

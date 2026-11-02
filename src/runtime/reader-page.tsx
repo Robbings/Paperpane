@@ -39,7 +39,7 @@ export function LiveReaderPage() {
     return ()=>{live=false;void controller.dispose();};
   },[container,surface]);
   const modelSettings=useModelSettings();
-  const translation=useTranslation(owner,preferences.state.preferences,modelSettings.settings,!modelSettings.loading && !modelSettings.error);
+  const translation=useTranslation(owner,preferences.state.preferences,modelSettings.settings,!modelSettings.loading && !modelSettings.error,preferences.state.local==='saved');
   const state=owner?.reader.getSnapshot().data;
   const renderThumbnail=useCallback((index:number,signal:AbortSignal)=>owner?owner.reader.thumbnail(index,signal):Promise.reject(new Error('尚未就绪')),[owner,state?.sessionId]);
   const research=useResearch(owner,preferences.state.preferences,modelSettings.settings.revision,preferences.state.local!=='unmodified'&&preferences.state.local!=='failed');
@@ -131,7 +131,7 @@ export function LiveReaderPage() {
       onLocateAnnotation={id=>{const row=owner?.item(id);if(row)void owner?.reader.locate(row.anchor).then(()=>owner.reader.showAnnotation(id));}}
       onTool={tool=>{if(tool==='region')research.startCapture();else if(tool==='fit-width'){const r=owner?.reader.fitWidth();if(r&&!r.ok)report(r.error.message);}else if(tool==='copy-annotations'||tool==='export-annotations')tool==='copy-annotations'?void owner?.exportAnnotations(true):setExportAnnotationsOpen(true);else if(tool==='open'||tool==='library')setOpenFiles(true);else report('该工具将在后续阅读能力接入时提供。');}}
     />
-    {translation.overlay}{translation.confirmation}{research.overlay}
+    {translation.overlay}{research.overlay}
     <Dialog open={!!research.service?.saveError&&!!research.service?.unsaved} title="AI 内容尚未保存" description={research.service?.saveError} onClose={()=>{}} footer={<Button onClick={()=>void research.service?.flush()}>重试保存</Button>}/>
     <Dialog open={exportAnnotationsOpen} onClose={()=>setExportAnnotationsOpen(false)} title="导出高亮和旁注" footer={<><Button onClick={()=>{setExportAnnotationsOpen(false);void owner?.exportAnnotations(false,'markdown');}}>Markdown</Button><Button onClick={()=>{setExportAnnotationsOpen(false);void owner?.exportAnnotations(false,'csv');}}>CSV</Button></>}/>
     <Dialog open={!!saved?.error} onClose={()=>{}} title="批注未能保存" description={saved?.error?.message} footer={<><Button onClick={()=>void owner?.annotations?.retry()}>重试保存</Button><Button onClick={()=>void owner?.annotations?.discardDrafts()}>放弃草稿，载入最新</Button></>}/>

@@ -13,5 +13,7 @@ export async function requestImportOrigin(rawUrl: string): Promise<boolean> {
 export async function hasImportOrigin(rawUrl: string): Promise<boolean> {
   const url = parseSourceUrl(rawUrl);
   if (!browser.runtime?.id) return true;
+  // Offscreen extension documents can use runtime messaging but cannot call permissions directly.
+  if (!browser.permissions?.contains) return (await browser.runtime.sendMessage({type:'CHECK_TRANSLATION_ORIGIN',url:url.origin}))===true;
   return browser.permissions.contains({ origins: [`${url.protocol}//${url.hostname}/*`] });
 }

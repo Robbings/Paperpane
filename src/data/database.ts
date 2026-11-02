@@ -23,7 +23,8 @@ export interface ImportCommit {
   sourceUrl?: string; syncScope: DocumentRecord['syncScope'];
   bibliography?: PdfBibliography;
 }
-export interface ImportReceipt { document: StoredDocument; duplicate: boolean }
+export const importJobKey = (ref:DocumentRef) => 'auto-translate-import:' + ref.documentId + ':' + ref.fileVersion;
+export interface ImportReceipt { document: StoredDocument; duplicate: boolean; translationQueued?: boolean }
 export class StorageFault extends Error {
   constructor(readonly kind: 'missing' | 'invalid' | 'blocked', message: string) { super(message); }
 }
@@ -138,6 +139,16 @@ export class PaperDatabase {
         const items = tx.objectStore(LIBRARY);
         const libraryItem = items.index('byDocument').get(id);
         libraryItem.onsuccess = () => {
+          const newToLibrary=!libraryItem.result || !libraryItem.result.inLibrary || !!libraryItem.result.deletedAt || !!previous?.deletedAt;
+          if (newToLibrary && input.syncScope==='record-and-file') {
+            const prefs=meta.get('readerPreferences');
+            prefs.onsuccess=()=>{
+              if (prefs.result?.value?.autoTranslate!=='on-add') return;
+              const ref={documentId:id,fileVersion:input.sha256};
+              meta.put({key:importJobKey(ref),value:ref});
+              receipt!.translationQueued=true;
+            };
+          }
           if (!libraryItem.result) {
             const item = itemFromDocument(document); items.put(item);
             tx.objectStore(CHANGES).add({ entity: LIBRARY, entityId: item.id, revision: item.revision, deviceId, operation: 'upsert', at });
