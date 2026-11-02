@@ -2,7 +2,7 @@
   "name": "paperpane",
   "description": "Paperpane（纸间）论文阅读扩展",
   "private": true,
-  "version": "0.0.1",
+  "version": "0.1.0",
   "license": "AGPL-3.0-only",
   "type": "module",
   "packageManager": "pnpm@11.25.0",
