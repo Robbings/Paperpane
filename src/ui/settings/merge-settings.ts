@@ -44,7 +44,12 @@ function merge3(base: Json, latest: Json, mine: Json, path: string, conflicts: s
 }
 
 export function mergeOnto(latest: SettingsSnapshot, base: SettingsSnapshot, draft: SettingsDraft): { merged: SettingsDraft; conflicts: string[] } {
+  return mergeDrafts(toDraft(base), toDraft(latest), draft);
+}
+
+/** The same merge between drafts: what mine changed since base, laid onto latest. */
+export function mergeDrafts(base: SettingsDraft, latest: SettingsDraft, mine: SettingsDraft): { merged: SettingsDraft; conflicts: string[] } {
   const conflicts: string[] = [];
-  const merged = merge3(toDraft(base), toDraft(latest), draft, '', conflicts) as SettingsDraft;
+  const merged = merge3(base, latest, mine, '', conflicts) as SettingsDraft;
   return { merged, conflicts };
 }

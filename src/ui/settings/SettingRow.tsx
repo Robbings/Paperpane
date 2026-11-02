@@ -9,6 +9,7 @@ export function SettingGroup({
   hint,
   actions,
   collapsible,
+  tour,
 }: {
   title?: string;
   description?: ReactNode;
@@ -17,12 +18,14 @@ export function SettingGroup({
   actions?: ReactNode;
   /** Folded away until opened: for settings few people change. */
   collapsible?: boolean;
+  /** Where the setup guide points. */
+  tour?: string;
 }) {
   const id = useId();
   const [open, setOpen] = useState(false);
   if (collapsible && title)
     return (
-      <section className="pp-set-group pp-set-group--fold" data-open={open ? "true" : undefined} aria-labelledby={id}>
+      <section className="pp-set-group pp-set-group--fold" data-tour={tour} data-open={open ? "true" : undefined} aria-labelledby={id}>
         <h2 className="pp-set-group__title">
           <button type="button" id={id} className="pp-set-fold" aria-expanded={open} onClick={() => setOpen(!open)}>
             <Icon name="chevronRight" size={13} strokeWidth={2} />
@@ -33,7 +36,7 @@ export function SettingGroup({
       </section>
     );
   return (
-    <section className="pp-set-group" aria-labelledby={title ? id : undefined}>
+    <section className="pp-set-group" data-tour={tour} aria-labelledby={title ? id : undefined}>
       {title && (hint || actions) ? (
         <div className="pp-set-group__head">
           <h2 id={id} className="pp-set-group__title">
@@ -69,6 +72,8 @@ interface SettingRowProps {
   children: ReactNode;
   /** Put the control under the text, for wide controls. */
   stacked?: boolean;
+  /** Where the setup guide points. */
+  tour?: string;
 }
 
 /** One setting: its name and a line of explanation on the left, the control on the right. */
@@ -80,10 +85,12 @@ export function SettingRow({
   error,
   children,
   stacked,
+  tour,
 }: SettingRowProps) {
   return (
     <div
       className="pp-set-row"
+      data-tour={tour}
       data-stacked={stacked ? "true" : undefined}
       data-invalid={error ? "true" : undefined}
     >

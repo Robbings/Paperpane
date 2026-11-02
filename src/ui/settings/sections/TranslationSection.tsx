@@ -10,16 +10,20 @@ import { SettingsHeader } from '../SettingsHeader';
 import { RUNTIME_LIMITS } from './AdvancedSection';
 import { TranslatorList, TranslatorLogo, TranslatorPicker } from './translation/TranslatorParts';
 import { FONT_SIZE, type Preferences, type SettingsDraft, type TranslationApiDraft } from '../types';
+import type { ServicePage } from '../service-page';
 import './models/models.css';
 import './models/model-detail.css';
 
 interface TranslationSectionProps {
+  /** Saved as it changes: engines and request limits. */
   draft: SettingsDraft;
   onChange: (draft: SettingsDraft) => void;
+  /** A translation service's page: its name and keys wait for its own save. */
+  page: ServicePage;
+  note: ReactNode;
   problems: ReadonlyMap<string, string>;
   preferences: Preferences;
   onPreference: <K extends keyof Preferences>(key: K, value: Preferences[K]) => void;
-  renderSaveBar: (layout: 'floating' | 'inline') => ReactNode;
 }
 
 const autoOptions = [
@@ -39,11 +43,12 @@ const typedSecrets = (api: TranslationApiDraft): Record<string, string> => {
 };
 
 /** Translation: the engine, when to translate on its own, request limits, and the machine translation services. */
-export function TranslationSection({ draft, onChange, problems, preferences, onPreference, renderSaveBar }: TranslationSectionProps) {
+export function TranslationSection({ draft, onChange, page, note, problems, preferences, onPreference }: TranslationSectionProps) {
   const [active, setActive] = useState<string | null>(null);
   const [adding, setAdding] = useState(false);
   const [removing, setRemoving] = useState(false);
-  const api = draft.translationApis.find((a) => a.id === active);
+  const view = page.value;
+  const api = view.translationApis.find((a) => a.id === active);
 
   const route = draft.features.find((f) => f.feature === 'translate') ?? {
     feature: 'translate' as const,
@@ -78,15 +83,19 @@ export function TranslationSection({ draft, onChange, problems, preferences, onP
   const setMachine = (patch: Partial<typeof machine>) => onChange({ ...draft, runtime: { ...draft.runtime, machineTranslation: { ...machine, ...patch } } });
 
   const patchApi = (patch: Partial<TranslationApiDraft>) =>
-    onChange({ ...draft, translationApis: draft.translationApis.map((a) => (a.id === active ? { ...a, ...patch } : a)) });
+    page.edit({ ...view, translationApis: view.translationApis.map((a) => (a.id === active ? { ...a, ...patch } : a)) });
   const addApi = (provider: MachineProvider) => {
     const id = crypto.randomUUID();
     const options = Object.fromEntries(provider.fields.filter((f) => !f.secret && f.default).map((f) => [f.key, f.default!]));
-    onChange({ ...draft, translationApis: [...draft.translationApis, { id, kind: provider.kind, name: provider.name, options, hadSecret: false, secret: { kind: 'keep' } }] });
+    // A new service is this page's draft until it is saved.
+    page.edit({ ...view, translationApis: [...view.translationApis, { id, kind: provider.kind, name: provider.name, options, hadSecret: false, secret: { kind: 'keep' } }] });
     setAdding(false);
     setActive(id);
   };
   const removeApi = () => {
+    page.discard();
+    // A service that was never saved only drops the draft.
+    if (draft.translationApis.some((a) => a.id === active))
     onChange({
       ...draft,
       translationApis: draft.translationApis.filter((a) => a.id !== active),
@@ -110,12 +119,12 @@ export function TranslationSection({ draft, onChange, problems, preferences, onP
           title={api.name || provider?.name || '翻译服务'}
           leading={
             <>
-              <IconButton icon="chevronLeft" label="返回翻译" size="md" onClick={() => setActive(null)} />
+              <IconButton icon="chevronLeft" label="返回翻译" size="md" onClick={() => page.leave(() => setActive(null))} />
               <TranslatorLogo kind={api.kind} size="sm" />
             </>
           }
           actions={<IconButton icon="trash" label="移除此服务" size="md" className="pp-model-remove" onClick={() => setRemoving(true)} />}
-          saveBar={renderSaveBar('inline')}
+          saveBar={page.bar}
         />
         <SettingGroup title="连接">
           <SettingRow label="服务名称">
@@ -156,7 +165,7 @@ export function TranslationSection({ draft, onChange, problems, preferences, onP
               </SettingRow>
             ),
           )}
-          <ConnectionCheck draft={draft} apiId={api.id} />
+          <ConnectionCheck draft={view} apiId={api.id} />
           {provider?.fields.some((f) => f.secret) && api.hadSecret && (
             <SettingRow label="清除密钥">
               <Button size="sm" variant="quiet" onClick={() => patchApi({ secret: { kind: 'clear' } })}>
@@ -169,7 +178,7 @@ export function TranslationSection({ draft, onChange, problems, preferences, onP
           open={removing}
           onClose={() => setRemoving(false)}
           title={`移除「${api.name}」`}
-          description="保存后生效；如果它是默认翻译引擎，会改用默认模型。"
+          description="会立即移除；如果它是翻译引擎，会改用默认模型。"
           footer={
             <>
               <Button onClick={() => setRemoving(false)}>取消</Button>
@@ -185,10 +194,10 @@ export function TranslationSection({ draft, onChange, problems, preferences, onP
 
   return (
     <>
-      <SettingsHeader title="翻译" saveBar={renderSaveBar('inline')} />
+      <SettingsHeader title="翻译" saveBar={note} />
 
       <SettingGroup title="翻译">
-        <SettingRow label="全文翻译引擎" hint="翻译本页和全文；可以选大模型，也可以选下面添加的翻译服务" error={languageProblem(engineValue)}>
+        <SettingRow tour="paper-engine" label="全文翻译引擎" hint="翻译本页和全文；可以选大模型，也可以选下面添加的翻译服务" error={languageProblem(engineValue)}>
           <Select label="全文翻译引擎" value={engineValue} options={options} onChange={setEngine} />
         </SettingRow>
         <SettingRow label="选区翻译引擎" hint="划选文字后的翻译" error={selectionValue === SAME_ENGINE ? undefined : languageProblem(selectionValue)}>
@@ -199,10 +208,10 @@ export function TranslationSection({ draft, onChange, problems, preferences, onP
             onChange={(value) => onChange({ ...draft, selectionTranslationEngine: selectionChoice(value) })}
           />
         </SettingRow>
-        <SettingRow label="默认翻译到">
+        <SettingRow tour="translate-to" label="默认翻译到">
           <Select label="默认翻译到" value={preferences.translationLanguage} options={TRANSLATION_LANGUAGES} onChange={(v) => onPreference('translationLanguage', v)} />
         </SettingRow>
-        <SettingRow label="自动翻译" hint="自动翻译会请求模型或翻译服务，可能产生费用">
+        <SettingRow tour="auto-translate" label="自动翻译" hint="自动翻译会请求模型或翻译服务，可能产生费用">
           <Segmented label="自动翻译" size="sm" options={autoOptions} value={preferences.autoTranslate} onChange={(v) => onPreference('autoTranslate', v)} />
         </SettingRow>
         <SettingRow label="译文字号跟随内容字号">
@@ -260,7 +269,7 @@ export function TranslationSection({ draft, onChange, problems, preferences, onP
       <SettingGroup
         title="翻译服务"
         actions={
-          <Button size="sm" variant="quiet" icon="plus" onClick={() => setAdding(true)}>
+          <Button size="sm" variant="quiet" icon="plus" data-tour="add-translator" onClick={() => setAdding(true)}>
             添加翻译服务
           </Button>
         }

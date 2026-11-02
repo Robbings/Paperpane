@@ -125,7 +125,7 @@ function WebDavGroup() {
   );
 
   return (
-    <SettingGroup title="WebDAV 同步" actions={badge}>
+    <SettingGroup title="WebDAV 同步" actions={badge} tour="webdav">
       {!dav || editing ? (
         <>
           <SettingRow label="地址">

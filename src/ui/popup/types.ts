@@ -57,5 +57,9 @@ export interface PopupViewProps {
   /** A local PDF: opens the reader with its file picker (a picker inside the popup would close it). */
   onOpenFile: () => void;
   onOpenSettings: (section?: SettingsSection) => void;
+  /** Nothing set up to translate or answer yet (no model, no translation service): offer the guide. */
+  setupNeeded?: boolean;
+  /** Opens the settings page with the setup guide running. */
+  onOpenGuide?: () => void;
   status: StatusSummary;
 }

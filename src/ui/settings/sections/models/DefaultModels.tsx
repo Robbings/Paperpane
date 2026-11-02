@@ -29,7 +29,7 @@ export function DefaultModels({ draft, onChange }: { draft: SettingsDraft; onCha
 
   return (
     <SettingGroup title="默认模型">
-      <SettingRow label="默认模型" hint="下面未单独指定的功能都用它">
+      <SettingRow label="默认模型" hint="下面未单独指定的功能都用它" tour="default-model">
         <Select
           label="默认模型"
           value={draft.defaultModelId ?? ''}
