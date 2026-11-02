@@ -339,7 +339,8 @@ function ZoteroGroup() {
       const result = await new ZoteroClient(secret).connection();
       await db.saveZotero(secret, String(result.userID), !!result.access.user?.write);
       setKey('');
-      if (!result.access.user?.files) toast.show({ tone: 'warning', message: 'Zotero 已连接，但这个 API Key 不能读取附件' });
+      const missing = [!result.access.user?.files && '附件', !result.access.user?.notes && '笔记'].filter(Boolean);
+      if (missing.length) toast.show({ tone: 'warning', message: `Zotero 已连接，但这个密钥不能读取${missing.join('和')}，它们不会导入` });
     } catch (error) {
       failed(error, '连接失败');
     } finally {

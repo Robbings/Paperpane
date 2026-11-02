@@ -22,7 +22,7 @@ export function ZoteroSetupSteps({ defaultOpen = false }: { defaultOpen?: boolea
             </a>
             页面。
           </li>
-          <li>勾选「Allow library access」；要导出到 Zotero，再勾选「Allow write access」。</li>
+          <li>勾选「Allow library access」和「Allow notes access」；要导出到 Zotero，再勾选「Allow write access」。</li>
           <li>保存后复制密钥，粘贴到纸窗「设置 › 同步与备份 › Zotero」。</li>
         </ol>
       )}
