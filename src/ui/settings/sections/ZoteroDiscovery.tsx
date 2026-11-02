@@ -127,6 +127,8 @@ export function ZoteroDiscovery() {
   };
   const selectedRows = rows.filter((r) => selected.has(r.key) && r.status === 'ready');
   const canPreserve = !!connections.zotero && selectedRows.every((row) => !!row.paper);
+  // When some chosen attachments carry no collections, a folder is the only destination, whatever was chosen before.
+  const target = canPreserve ? mode : 'folder';
 
   const run = async () => {
     if (operation.current || !selectedRows.length) return;
@@ -152,8 +154,8 @@ export function ZoteroDiscovery() {
       const dav = new WebDavClient(connection),
         key = await settings.zotero();
       const client = key && connections.zotero ? new ZoteroClient(key, connections.zotero.userId) : undefined;
-      if (mode === 'collections' && (!client || !canPreserve)) throw new Error('部分附件没有分类信息，请选择导入到的文件夹');
-      const destination: ImportDestination = mode === 'collections' ? { kind: 'collections', collections } : { kind: 'folder', folderId: folder === 'root' ? null : folder };
+      if (target === 'collections' && !client) throw new Error('请先连接 Zotero');
+      const destination: ImportDestination = target === 'collections' ? { kind: 'collections', collections } : { kind: 'folder', folderId: folder === 'root' ? null : folder };
       const grouped = new Map<string, DiscoveredPaper[]>();
       for (const row of selectedRows) {
         const id = row.paper?.key ?? row.key;
@@ -268,7 +270,7 @@ export function ZoteroDiscovery() {
             >
               {busy ? '停止' : '关闭'}
             </Button>
-            <Button variant="primary" disabled={busy || loading || !selectedRows.length || (mode === 'collections' && !canPreserve)} onClick={() => void run()}>
+            <Button variant="primary" disabled={busy || loading || !selectedRows.length} onClick={() => void run()}>
               导入
             </Button>
           </>
@@ -343,7 +345,7 @@ export function ZoteroDiscovery() {
               ))}
             </div>
           </div>
-          <ZoteroDestination mode={mode} onMode={setMode} folder={folder} onFolder={setFolder} folders={folders} canPreserve={canPreserve} disabled={busy} />
+          <ZoteroDestination mode={target} onMode={setMode} folder={folder} onFolder={setFolder} folders={folders} canPreserve={canPreserve} disabled={busy} />
           {failures.length > 0 && (
             <ul className="pp-zotero-problems">
               {failures.map((text) => (
