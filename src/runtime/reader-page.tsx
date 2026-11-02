@@ -76,6 +76,8 @@ export function LiveReaderPage() {
     onScrollContainer:setContainer, menuTarget, onDismissMenu:()=>owner?.reader.dismissMenu(),
     tool:state?.tool??'select',onToolChange:tool=>owner?.reader.setTool(tool),
     onCreateHighlight:(id,color)=>owner?.createHighlight(id,color)??Promise.resolve(null),
+    onCreateComment:id=>owner?.createComment(id)??Promise.resolve(null),
+    onAnnotationHighlight:(id,color)=>owner?.highlightAnnotation(id,color)??Promise.resolve(null),
     onSelectionAction:(id,action)=>{if(action==='explain'||action==='ask'){const selection=owner?.reader.resolveSelection(id);if(selection?.ok)void research.selected(selection.value,action);else if(selection&&!selection.ok)report(selection.error.message);}else owner?.selectionAction(id,action);},
     onAnnotationAction:(id,action)=>{const row=owner?.item(id);if(row){if(action==='explain'||action==='ask')void research.selected({anchor:row.anchor,text:row.quote},action);else if(action==='translate'&&owner?.translateSelection)owner.translateSelection(row.anchor,row.quote);else owner?.textAction(row.quote,action);}},
     onAnnotationColor:(id,color)=>owner?.colorAnnotation(id,color),
@@ -93,11 +95,11 @@ export function LiveReaderPage() {
   const notice = saved?.error?.message || owner?.message || state?.error?.message || failedJob?.error?.message || (job ? '正在导入…' : '');
   useEffect(()=>{if(notice&&!saved?.error)toast.show({message:notice});},[notice,saved?.error]);
   const local=!saved?'unmodified':saved.error?'failed':saved.pending?'saving':'saved';
-  const unavailable=<EmptyState icon="file" title="尚未接入" description="本轮完成 PDF 阅读、高亮和评论保存，其余研究功能将在后续接入。"/>;
+  const unavailable=<EmptyState icon="file" title="尚未接入" description="本轮完成 PDF 阅读、高亮和旁注保存，其余研究功能将在后续接入。"/>;
   return <>
     <ReaderShell header={{title:owner?.document?.title??'打开论文',sourceLabel:owner?.document?.sourceUrl?new URL(owner.document.sourceUrl).hostname:'本地文件',pageCount:state?.pageCount??0}}
       outline={(state?.outline??[]).filter(item=>item.pageIndex!==undefined).map(item=>({id:item.id,label:item.title,level:item.depth,pageIndex:item.pageIndex!}))} navigationPending={state?.phase!=='ready'||state?.outlineStatus==='loading'} navigationMessage={state?.outlineStatus==='generated'?'按版面自动生成，可能存在识别偏差':state?.outlineStatus==='failed'?'目录读取失败，请重新打开论文。':state?.outlineStatus==='empty'?'未识别到标题；扫描件需先进行文字识别。':undefined} renderThumbnail={renderThumbnail} onOutlineNavigate={id=>void owner?.reader.navigateOutline(id).catch(()=>report('目录位置暂不可用。'))} pageIndex={state?.position.pageIndex??0} zoomPercent={Math.round((state?.position.zoom??1)*100)}
-      annotations={(saved?.items??[]).filter(row=>!row.deletedAt).map(row=>({id:row.id,kind:row.kind==='page-comment'?'comment':'highlight',color:row.color,pageIndex:row.anchor.pages[0]!.pageIndex,quote:row.quote,note:row.comment}))}
+      annotations={(saved?.items??[]).filter(row=>!row.deletedAt).map(row=>({id:row.id,kind:row.kind==='page-comment'?'comment':'highlight',highlighted:row.kind==='highlight',color:row.color,pageIndex:row.anchor.pages[0]!.pageIndex,quote:row.quote,note:row.comment}))}
       annotationStatus={{local,sync:'unconfigured'}}
       notes={{value:'',onChange:()=>report('整篇笔记将在后续接入。'),local:'unmodified',sync:'unconfigured'}}
       panelRequest={research.panelRequest}
@@ -120,7 +122,7 @@ export function LiveReaderPage() {
       translation={translation.shell}
       onBack={()=>void owner?.leaveForLibrary()}
       onOriginalPdf={owner?.originalPdfUrl||owner?.document?.sourceUrl?()=>void owner?.returnToOriginal():undefined}
-      exports={[{id:'original',label:'导出原 PDF',disabled:!owner?.document},{id:'annotated',label:'下载带标注的 PDF',disabled:state?.phase!=='ready'||owner?.annotations?.getSnapshot().state!=='ready'},{id:'print',label:'打印带标注的 PDF',disabled:state?.phase!=='ready'||owner?.annotations?.getSnapshot().state!=='ready'},{id:'markdown',label:'导出高亮和评论 · Markdown',disabled:owner?.annotations?.getSnapshot().state!=='ready'},{id:'csv',label:'导出高亮和评论 · CSV',disabled:owner?.annotations?.getSnapshot().state!=='ready'},...(owner?.document?.sourceUrl?[{id:'source',label:'返回原 PDF'}]:[])]}
+      exports={[{id:'original',label:'导出原 PDF',disabled:!owner?.document},{id:'annotated',label:'下载带标注的 PDF',disabled:state?.phase!=='ready'||owner?.annotations?.getSnapshot().state!=='ready'},{id:'print',label:'打印带标注的 PDF',disabled:state?.phase!=='ready'||owner?.annotations?.getSnapshot().state!=='ready'},{id:'markdown',label:'导出高亮和旁注 · Markdown',disabled:owner?.annotations?.getSnapshot().state!=='ready'},{id:'csv',label:'导出高亮和旁注 · CSV',disabled:owner?.annotations?.getSnapshot().state!=='ready'},...(owner?.document?.sourceUrl?[{id:'source',label:'返回原 PDF'}]:[])]}
       onExport={id=>{if(id==='annotated'||id==='print')void owner?.exportPdf(id==='print');else if(id==='markdown'||id==='csv')void owner?.exportAnnotations(false,id);else if(id==='source')void owner?.returnToOriginal();else if(owner?.document)void owner.db.readFile(owner.document).then(blob=>downloadFile(blob,`${owner.document!.title}.pdf`)).catch(()=>report('原文件导出失败，请重试。'));}}
       settings={{preferences:preferences.state.preferences,onPreference:preferences.setPreference,models:modelSettings.settings.models.map(m=>({value:m.id,label:m.label||m.modelId})),defaultModelId:modelSettings.settings.defaultModelId,onDefaultModel:id=>void modelSettings.save({...toDraft(modelSettings.settings),defaultModelId:id},modelSettings.settings.revision).then(r=>{if(!r.ok)report('默认模型没有保存，请到设置页重试。');}),status:{...modelSettings.status,local:preferences.state.local},onOpenSettings:section=>window.open(`options.html${section?'#'+section:''}`,'_blank','noopener')}}
       onNavigate={index=>{void owner?.reader.navigate(index).then(r=>{if(!r.ok)report(r.error.message);});}}
@@ -131,7 +133,7 @@ export function LiveReaderPage() {
     />
     {translation.overlay}{translation.confirmation}{research.overlay}
     <Dialog open={!!research.service?.saveError&&!!research.service?.unsaved} title="AI 内容尚未保存" description={research.service?.saveError} onClose={()=>{}} footer={<Button onClick={()=>void research.service?.flush()}>重试保存</Button>}/>
-    <Dialog open={exportAnnotationsOpen} onClose={()=>setExportAnnotationsOpen(false)} title="导出高亮和评论" footer={<><Button onClick={()=>{setExportAnnotationsOpen(false);void owner?.exportAnnotations(false,'markdown');}}>Markdown</Button><Button onClick={()=>{setExportAnnotationsOpen(false);void owner?.exportAnnotations(false,'csv');}}>CSV</Button></>}/>
+    <Dialog open={exportAnnotationsOpen} onClose={()=>setExportAnnotationsOpen(false)} title="导出高亮和旁注" footer={<><Button onClick={()=>{setExportAnnotationsOpen(false);void owner?.exportAnnotations(false,'markdown');}}>Markdown</Button><Button onClick={()=>{setExportAnnotationsOpen(false);void owner?.exportAnnotations(false,'csv');}}>CSV</Button></>}/>
     <Dialog open={!!saved?.error} onClose={()=>{}} title="批注未能保存" description={saved?.error?.message} footer={<><Button onClick={()=>void owner?.annotations?.retry()}>重试保存</Button><Button onClick={()=>void owner?.annotations?.discardDrafts()}>放弃草稿，载入最新</Button></>}/>
     <Dialog open={openFiles} onClose={()=>setOpenFiles(false)} title="打开论文" description="复用文献库的 PDF 文件；导入的文件与批注保存在本机数据库。" footer={<><Button onClick={()=>{setOpenFiles(false);input.current?.click();}}>导入本地 PDF</Button><Button onClick={()=>void owner?.leaveForLibrary()}>文献库</Button></>}>
       {documents.length?documents.map(doc=><div key={doc.id}><Button onClick={()=>{setOpenFiles(false);void owner?.open(doc.id);}}>{doc.title}</Button></div>):<p>还没有导入论文。</p>}

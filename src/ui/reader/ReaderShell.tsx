@@ -4,6 +4,7 @@ import {
   GlassSurface,
   SelectionMenu,
   toast,
+  type HighlightColor,
   type LocalSaveState,
   type SelectionMenuAction,
   type SyncState,
@@ -122,7 +123,7 @@ export interface ReaderLibraryProps extends ReaderLibraryData {
 }
 
 const selectionActions: readonly SelectionMenuAction[] = [
-  { id: 'comment', label: '评论', icon: 'comment' },
+  { id: 'comment', label: '旁注', icon: 'comment' },
   { id: 'translate', label: '翻译', icon: 'translate' },
   { id: 'explain', label: '解释', icon: 'explain' },
   { id: 'ask', label: '提问', icon: 'ask' },
@@ -171,6 +172,9 @@ export function ReaderShell(props: ReaderShellProps) {
   const [showTitle, setShowTitle] = useState(props.initialLayout?.showTitle ?? true);
   const [panel, setPanel] = useState<ResearchPanelId>('annotations');
   const [panelOpen, setPanelOpen] = useState(true);
+  // The research area can fill the window (e.g. a narrow browser where only it is read).
+  // Layout decisions below still use its normal size, so restoring puts everything back.
+  const [maximized, setMaximized] = useState(false);
   useEffect(()=>{const request=props.panelRequest;if(!request)return;setPanel(request.id);setPanelOpen(true);setVisited(current=>new Set([...current,request.id]));},[props.panelRequest]);
   // Panels stay mounted once opened, so drafts and running tasks survive switching.
   const [visited, setVisited] = useState<ReadonlySet<ResearchPanelId>>(() => new Set(['annotations']));
@@ -230,6 +234,11 @@ export function ReaderShell(props: ReaderShellProps) {
             w: RAIL_ROW_LENGTH,
             h: RAIL_THICKNESS,
           };
+
+  const filled = maximized && panelOpen;
+  const researchWidth = filled && effectivePlacement === 'right' ? viewport.width - 2 * GAP - RAIL_THICKNESS : effectiveWidth;
+  const researchHeight = filled && effectivePlacement === 'bottom' ? viewport.height - 2 * GAP - RAIL_THICKNESS : effectiveHeight;
+  if (filled) Object.assign(card, { x: GAP, y: GAP, w: viewport.width - 2 * GAP, h: viewport.height - 2 * GAP });
 
   // While the card changes dock its content and rail fade out, the card
   // morphs to the new place, then they fade back in (see reader.css).
@@ -384,6 +393,7 @@ export function ReaderShell(props: ReaderShellProps) {
   const selectPanel = (id: ResearchPanelId) => {
     if (panelOpen && id === panel) {
       setPanelOpen(false);
+      setMaximized(false);
       return;
     }
     setPanel(id);
@@ -482,18 +492,25 @@ export function ReaderShell(props: ReaderShellProps) {
       return [...current, { id, dx, dy: first ? bottom - first.top + 10 : 0, width: NOTE_SIZE.width, height: NOTE_SIZE.height, zoom: zoomPercent, collapsed: false, open: true, z }];
     });
 
+  const highlighted = (id: string) => annotations.find((a) => a.id === id)?.highlighted !== false;
   const removeComment = async (id: string) => {
+    // A comment without a highlight is all there is: removing it removes the annotation.
+    if (!highlighted(id)) {
+      setNoteLayouts((current) => current.map((n) => (n.id === id ? { ...n, open: false } : n)));
+      await deleteAnnotation(id, '已删除旁注');
+      return;
+    }
     const undo = interaction.onAnnotationCommentDelete
       ? await interaction.onAnnotationCommentDelete(id)
       : (interaction.onAnnotationComment(id, ''), undefined);
     if (undo === null) return;
     setNoteLayouts(current=>current.map(n=>n.id===id?{...n,open:false}:n));
-    toast.show({message:'已删除评论，高亮保留',action:undo?{label:'撤销',onAction:undo}:undefined});
+    toast.show({message:'已删除旁注，高亮保留',action:undo?{label:'撤销',onAction:undo}:undefined});
   };
-  const deleteAnnotation = async (id: string) => {
+  const deleteAnnotation = async (id: string, message = '已删除高亮') => {
     if (await interaction.onAnnotationDelete(id) === false) return;
     toast.show({
-      message: '已删除批注',
+      message,
       action: interaction.onAnnotationRestore ? { label: '撤销', onAction: () => interaction.onAnnotationRestore?.(id) } : undefined,
     });
   };
@@ -503,6 +520,19 @@ export function ReaderShell(props: ReaderShellProps) {
       () => toast.show({ message: '已复制' }),
       () => toast.show({ message: '无法访问剪贴板', tone: 'warning' }),
     );
+
+  /** Sets or removes a highlight; the comment is never removed with it. */
+  const setHighlight = async (id: string, color: HighlightColor | null) => {
+    if (!interaction.onAnnotationHighlight) {
+      if (color) interaction.onAnnotationColor(id, color);
+      else void deleteAnnotation(id);
+      return;
+    }
+    const result = await interaction.onAnnotationHighlight(id, color);
+    if (result === 'removed') toast.show({ message: '已取消高亮，旁注保留' });
+    else if (result === 'deleted')
+      toast.show({ message: '已取消高亮', action: interaction.onAnnotationRestore ? { label: '撤销', onAction: () => interaction.onAnnotationRestore?.(id) } : undefined });
+  };
 
   // ---- Find --------------------------------------------------------------------
   // ⌘F / Ctrl+F opens the bar (with the selected words, if any); ⌘G steps while it is open.
@@ -534,6 +564,13 @@ export function ReaderShell(props: ReaderShellProps) {
   latestFind.current = { openFind, step: interaction.onSearchStep, open: Boolean(find) };
   useEffect(() => {
     const onKey = (event: KeyboardEvent) => {
+      // F3 opens find, then steps through the matches (Shift+F3 backwards).
+      if (event.key === 'F3' && !event.metaKey && !event.ctrlKey && !event.altKey) {
+        event.preventDefault();
+        if (latestFind.current.open) latestFind.current.step(event.shiftKey ? -1 : 1);
+        else latestFind.current.openFind();
+        return;
+      }
       if (!(event.metaKey || event.ctrlKey) || event.altKey) return;
       const key = event.key.toLowerCase();
       if (key === 'f') {
@@ -574,8 +611,8 @@ export function ReaderShell(props: ReaderShellProps) {
     '--pp-edge-right': px(paperRight),
     '--pp-trans-right': px(edges.right),
     '--pp-edge-bottom': px(edges.bottom),
-    '--pp-research-w': px(effectiveWidth),
-    '--pp-research-h': px(effectiveHeight),
+    '--pp-research-w': px(researchWidth),
+    '--pp-research-h': px(researchHeight),
     '--pp-gap': px(GAP),
     '--pp-rail': px(RAIL_THICKNESS),
     '--pp-rail-gap': px(RAIL_GAP),
@@ -596,6 +633,7 @@ export function ReaderShell(props: ReaderShellProps) {
     <div
       className="pp-reader"
       data-placement={effectivePlacement}
+      data-maximized={filled ? 'true' : undefined}
       data-switching={switching ?? undefined}
       data-resizing={resizing || windowResizing || translationDrag ? 'true' : undefined}
       data-translation={translationOpen ? (translationFloating ? 'floating' : 'docked') : undefined}
@@ -685,6 +723,11 @@ export function ReaderShell(props: ReaderShellProps) {
         onZoom={props.onZoom}
         onZoomTo={props.onZoomTo}
         onTogglePlacement={togglePlacement}
+        onMaximizeResearch={() => {
+          setPanelOpen(true);
+          setVisited((current) => (current.has(panel) ? current : new Set(current).add(panel)));
+          setMaximized(true);
+        }}
         onToggleAutoHighlight={() => interaction.onToolChange(interaction.tool === 'auto-highlight' ? 'select' : 'auto-highlight')}
         findOpen={Boolean(find)}
         onFind={() => (find ? closeFind() : openFind())}
@@ -715,19 +758,34 @@ export function ReaderShell(props: ReaderShellProps) {
         />
       )}
 
-      {panelOpen && (
-        <Splitter
-          placement={effectivePlacement}
-          value={effectivePlacement === 'right' ? effectiveWidth : effectiveHeight}
-          min={(effectivePlacement === 'right' ? RESEARCH_WIDTH.min : RESEARCH_HEIGHT.min) * uiScale}
-          max={effectivePlacement === 'right' ? clampWidth(Infinity, viewport.width / uiScale) * uiScale : clampHeight(Infinity, viewport.height / uiScale) * uiScale}
-          sizeFromPointer={(x, y) => (effectivePlacement === 'right' ? window.innerWidth - rail - x : window.innerHeight - rail - y)}
-          onDragChange={setResizing}
-          onResize={(size) =>
-            effectivePlacement === 'right' ? setWidth(clampWidth(size / uiScale, viewport.width / uiScale)) : setHeight(clampHeight(size / uiScale, viewport.height / uiScale))
-          }
-        />
-      )}
+      {panelOpen && (() => {
+        // Dragged past 90% of the window, the edge snaps to fill it; dragging back restores.
+        // Between the normal limit and that point the area simply stays at its widest.
+        const right = effectivePlacement === 'right';
+        const normalMax = right ? clampWidth(Infinity, viewport.width / uiScale) * uiScale : clampHeight(Infinity, viewport.height / uiScale) * uiScale;
+        const fullSize = right ? viewport.width - 2 * GAP - RAIL_THICKNESS : viewport.height - 2 * GAP - RAIL_THICKNESS;
+        const snapAt = (right ? viewport.width : viewport.height) * 0.9;
+        return (
+          <Splitter
+            placement={effectivePlacement}
+            value={right ? researchWidth : researchHeight}
+            min={(right ? RESEARCH_WIDTH.min : RESEARCH_HEIGHT.min) * uiScale}
+            max={Math.max(normalMax, fullSize)}
+            sizeFromPointer={(x, y) => (right ? window.innerWidth - rail - x : window.innerHeight - rail - y)}
+            onDragChange={setResizing}
+            onDoubleClick={() => setMaximized((value) => !value)}
+            onResize={(size) => {
+              if (size > Math.max(snapAt, normalMax)) {
+                setMaximized(true);
+                return;
+              }
+              setMaximized(false);
+              if (right) setWidth(clampWidth(size / uiScale, viewport.width / uiScale));
+              else setHeight(clampHeight(size / uiScale, viewport.height / uiScale));
+            }}
+          />
+        );
+      })()}
 
       {/* One card: the panel body plus the function rail along its outer edge.
           Collapsed, the card shrinks to just the rail. */}
@@ -751,9 +809,9 @@ export function ReaderShell(props: ReaderShellProps) {
                     sync={annotationStatus.sync}
                     simulated={annotationStatus.simulated}
                     onLocate={props.onLocateAnnotation}
-                    onColor={interaction.onAnnotationColor}
+                    onColor={(id, color) => void setHighlight(id, color)}
                     onComment={interaction.onAnnotationComment}
-                    onDelete={deleteAnnotation}
+                    onDelete={(id) => void setHighlight(id, null)}
                     onRemoveComment={removeComment}
                     onCopyAll={() => props.onTool('copy-annotations')}
                     onExport={() => props.onTool('export-annotations')}
@@ -807,8 +865,8 @@ export function ReaderShell(props: ReaderShellProps) {
               }}
               onAction={(action) => {
                 if (action === 'comment') {
-                  // A comment starts as a highlight in the last colour, with its note open.
-                  void interaction.onCreateHighlight(target.id).then((id) => id && openNote(id));
+                  // A comment starts without a highlight (a colour can be added later), with its note open.
+                  void (interaction.onCreateComment ?? interaction.onCreateHighlight)(target.id).then((id) => id && openNote(id));
                 } else {
                   interaction.onSelectionAction(target.id, action);
                 }
@@ -822,9 +880,10 @@ export function ReaderShell(props: ReaderShellProps) {
               look={bar.look}
               layout={barLayout}
               // The same actions as a fresh selection, with the comment opening its note.
-              actions={selectionActions.map((action) => (action.id === 'comment' && targetAnnotation?.note ? { ...action, label: '查看评论' } : action))}
-              currentColor={targetAnnotation?.color}
-              onColor={(color) => interaction.onAnnotationColor(target.annotationId, color)}
+              actions={selectionActions.map((action) => (action.id === 'comment' && targetAnnotation?.note ? { ...action, label: '查看旁注' } : action))}
+              currentColor={targetAnnotation?.highlighted === false ? undefined : targetAnnotation?.color}
+              // Its own colour again takes the highlight off.
+              onColor={(color) => void setHighlight(target.annotationId, color)}
               onAction={(action) => {
                 if (action === 'comment') openNote(target.annotationId);
                 else if (action === 'copy') {
@@ -833,7 +892,9 @@ export function ReaderShell(props: ReaderShellProps) {
                 dismiss();
               }}
               onDelete={() => {
-                deleteAnnotation(target.annotationId);
+                // Deleting from the highlight removes the highlight only; a comment stays.
+                if (highlighted(target.annotationId)) void setHighlight(target.annotationId, null);
+                else void removeComment(target.annotationId);
                 dismiss();
               }}
               onDismiss={dismiss}
@@ -853,9 +914,15 @@ export function ReaderShell(props: ReaderShellProps) {
         subscribeGeometry={interaction.subscribeGeometry}
         onChange={(note) => setNoteLayouts((current) => current.map((n) => (n.id === note.id ? note : n)))}
         onRaise={(id) => setNoteLayouts((current) => current.map((n) => (n.id === id && n.z !== topZ.current ? { ...n, z: ++topZ.current } : n)))}
-        onClose={(id) => setNoteLayouts((current) => current.map((n) => (n.id === id ? { ...n, open: false } : n)))}
+        onClose={(id) => {
+          setNoteLayouts((current) => current.map((n) => (n.id === id ? { ...n, open: false } : n)));
+          // An empty comment without a highlight would leave nothing to see: drop it.
+          const row = annotations.find((a) => a.id === id);
+          if (row && row.highlighted === false && !row.note?.trim()) void interaction.onAnnotationDelete(id);
+        }}
         onComment={interaction.onAnnotationComment}
         onRemoveComment={removeComment}
+        onHighlight={(id, color) => void setHighlight(id, color)}
         onLocate={props.onLocateAnnotation}
       />
     </div>

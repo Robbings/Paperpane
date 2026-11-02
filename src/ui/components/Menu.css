@@ -62,3 +62,10 @@
   margin: 4px 8px;
   background: var(--pp-hairline-strong);
 }
+
+.pp-menu__shortcut {
+  margin-left: auto;
+  padding-left: 16px;
+  color: var(--pp-text-3);
+  font-size: var(--pp-text-xs);
+}

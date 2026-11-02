@@ -61,13 +61,14 @@ export class AnnotationDatabase extends PaperDatabase {
       return this.write(tx, 'annotations', ref, row, 'upsert');
     });
   }
-  async mutate(ref: DocumentRef, id: string, expected: string, patch: { color?: Annotation['color']; comment?: string }, operation: 'update' | 'delete' | 'restore' = 'update'): Promise<Annotation> {
+  async mutate(ref: DocumentRef, id: string, expected: string, patch: { color?: Annotation['color']; comment?: string; kind?: 'highlight' | 'selection-comment' }, operation: 'update' | 'delete' | 'restore' = 'update'): Promise<Annotation> {
     return this.run('readwrite', async tx => {
       await this.document(tx, ref);
       const row = await request(tx.objectStore('annotations').get(id)) as Annotation | undefined;
       if (!row || row.anchor.documentId !== ref.documentId || row.anchor.fileVersion !== ref.fileVersion) throw new AnnotationFault('NOT_FOUND', '批注不存在。');
       if (row.revision !== expected) throw new AnnotationFault('CONFLICT', '此批注已在其他窗口修改。你的草稿仍保留，请先核对最新内容。');
       if ((operation === 'restore') !== Boolean(row.deletedAt)) throw new AnnotationFault('CONFLICT', '批注状态已改变。');
+      if (patch.kind !== undefined && (row.kind === 'page-comment' || !['highlight', 'selection-comment'].includes(patch.kind))) throw new AnnotationFault('INVALID_INPUT', '这条批注不能切换高亮。');
       if ((patch.color !== undefined && !colors.has(patch.color)) || (patch.comment !== undefined && (typeof patch.comment !== 'string' || patch.comment.length > 200000))) throw new AnnotationFault('INVALID_INPUT', '批注内容无效或过长。');
       const at = new Date().toISOString();
       const next: Annotation = { ...row, ...patch, revision: crypto.randomUUID(), updatedAt: at, deletedAt: operation === 'delete' ? at : undefined, save: { local: 'saved', sync: row.save.sync === 'unconfigured' ? 'unconfigured' : 'pending' } };

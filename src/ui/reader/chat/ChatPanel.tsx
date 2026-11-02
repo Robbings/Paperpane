@@ -30,7 +30,10 @@ export interface ChatPanelProps {
   placeholder?: string;
   /** For explanations: the passage or screenshot being explained, shown above the answers. */
   source?: ReactNode;
-  /** A pending switch to another provider that needs the reader's OK. */
+  /**
+   * A pending switch to another provider. Changing models is an ordinary act in a chat, so it is
+   * confirmed at once without a dialog; the answers keep their own model record.
+   */
   modelChange: ModelChangeView | null;
 
   /** Draft edits; quick questions and suggested follow-ups also land here, to send or adjust. */
@@ -91,6 +94,10 @@ export function ChatPanel(props: ChatPanelProps) {
   const { session, models } = props;
   const [sessionsOpen, setSessionsOpen] = useState(false);
   const [removing, setRemoving] = useState<SessionSummary | null>(null);
+  // Never interrupts: a switch the logic layer asks about is taken as chosen.
+  useEffect(() => {
+    if (props.modelChange) props.onConfirmModelChange();
+  }, [props.modelChange]);
   const titleRef = useRef<HTMLButtonElement>(null);
   const inputRef = useRef<HTMLTextAreaElement>(null);
   const messages = session?.messages ?? [];
@@ -278,30 +285,6 @@ export function ChatPanel(props: ChatPanelProps) {
         onRemove={(id) => setRemoving(props.sessions.find((s) => s.id === id) ?? null)}
       />}
 
-      <Dialog
-        open={props.modelChange !== null}
-        onClose={props.onCancelModelChange}
-        title={props.modelChange ? `换用 ${props.modelChange.target.providerName} 的 ${props.modelChange.target.displayName}？` : ''}
-        description={props.modelChange ? `接下来提问时，下面这些内容可能会发送到 ${props.modelChange.target.endpointOrigin}。已有的回答保留原来的模型记录。` : undefined}
-        footer={
-          <>
-            <Button onClick={props.onCancelModelChange}>保持原模型</Button>
-            <Button variant="primary" onClick={props.onConfirmModelChange}>
-              换用
-            </Button>
-          </>
-        }
-      >
-        {props.modelChange && (
-          <ul className="pp-chat-disclosure">
-            <li>本次对话中的 {props.modelChange.messageCount} 条消息，以及还没发送的草稿</li>
-            {props.modelChange.imageCount > 0 && <li>{props.modelChange.imageCount} 张截图</li>}
-            {props.modelChange.documents.map((title) => (
-              <li key={title}>《{title}》中与问题相关的段落</li>
-            ))}
-          </ul>
-        )}
-      </Dialog>
 
       <Dialog
         open={removing !== null}

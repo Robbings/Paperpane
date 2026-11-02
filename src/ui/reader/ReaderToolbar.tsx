@@ -33,6 +33,8 @@ interface ReaderToolbarProps {
   /** A typed percentage, already limited to 25–400. */
   onZoomTo: (percent: number) => void;
   onTogglePlacement: () => void;
+  /** Lets the research area fill the window; dragging its edge back or double-clicking it restores. */
+  onMaximizeResearch?: () => void;
   onToggleAutoHighlight: () => void;
   findOpen: boolean;
   /** Opens or closes the find bar. */
@@ -62,6 +64,8 @@ export interface ExportOption {
   disabled?: boolean;
 }
 
+const FIND_SHORTCUT = /Mac|iPhone|iPad/.test(navigator.platform) ? '⌘F' : 'F3';
+
 type OpenMenu = { kind: 'context' | 'more' | 'export'; x: number; y: number; align: 'start' | 'end' } | null;
 
 export function ReaderToolbar(props: ReaderToolbarProps) {
@@ -86,19 +90,20 @@ export function ReaderToolbar(props: ReaderToolbarProps) {
   const showView=()=>{setViewFromMore(true);setViewOpen(true);};
   const entries:MenuEntry[]=[
     ...(!tools?[{id:'sidebar',label:props.sidebarOpen?'隐藏侧栏':'显示侧栏',icon:'sidebar'} as MenuEntry]:[]),
-    ...(!spacious?[{id:'search',label:'查找',icon:'search'},{id:'zoom-in',label:'放大',icon:'plus'},{id:'zoom-out',label:'缩小',icon:'minus'}] as MenuEntry[]:[]),
+    ...(!spacious?[{id:'region',label:'框选提问',icon:'region'},{id:'zoom-in',label:'放大',icon:'plus'},{id:'zoom-out',label:'缩小',icon:'minus'}] as MenuEntry[]:[]),
     ...(!tools&&props.onToggleTranslation?[{id:'translation',label:props.translationOpen?'关闭译文':'译文',icon:'translate'} as MenuEntry]:[]),
     ...(!tools?[{id:'marker',label:'自动高亮',icon:'marker',checked:props.autoHighlight},{id:'view',label:'页面显示',icon:'pageDisplay'}] as MenuEntry[]:[]),
     ...(!spacious?[{id:'settings',label:'阅读设置',icon:'settings'} as MenuEntry]:[]),
     ...(!spacious&&props.onSave?[{id:'save',label:props.saved?'编辑收藏':'收藏到文献库',icon:'bookmark'} as MenuEntry]:[]),
     ...(!spacious?[{kind:'separator',id:'sep-files'} as MenuEntry]:[]),
-    {id:'region',label:'框选图片',icon:'region'},
+    {id:'search',label:props.findOpen?'关闭查找':'查找',icon:'search',shortcut:FIND_SHORTCUT},
     {id:'open',label:'打开论文',icon:'file'},
     ...(props.onBack?[{id:'back',label:'返回文献库',icon:'chevronLeft'} as MenuEntry]:[]),
     ...(props.onOriginalPdf?[{id:'original-pdf',label:'返回原 PDF',icon:'openExternal'} as MenuEntry]:[]),
     {id:'export',label:'导出',icon:'export'},
     {kind:'separator',id:'sep-layout'},
     {id:'placement',label:props.placement==='right'?'研究区移到下方':'研究区移到右侧',icon:props.placement==='right'?'dockBottom':'dockRight',disabled:props.placement!=='right'&&!props.canDockRight},
+    ...(props.onMaximizeResearch?[{id:'maximize',label:'研究区铺满窗口',icon:'columns'} as MenuEntry]:[]),
     {id:'title',label:'显示论文标题',checked:showTitle},
   ];
   const select=(id:string)=>{
@@ -111,6 +116,7 @@ export function ReaderToolbar(props: ReaderToolbarProps) {
     else if(id==='translation')props.onToggleTranslation?.();
     else if(id==='marker')props.onToggleAutoHighlight();
     else if(id==='placement')props.onTogglePlacement();
+    else if(id==='maximize')props.onMaximizeResearch?.();
     else if(id==='view')showView();
     else if(id==='settings')showSettings();
     else if(id==='back')props.onBack?.();
@@ -136,7 +142,7 @@ export function ReaderToolbar(props: ReaderToolbarProps) {
         <button aria-label="放大" onClick={()=>onZoom('in')}><Icon name="plus" size={15}/></button>
       </div>}
     </div>}
-    {spacious&&<IconButton icon="search" label={props.findOpen?'关闭查找':'查找'} shape="pill" active={props.findOpen} onClick={props.onFind}/>}
+    {spacious&&<IconButton icon="region" label="框选提问" shape="pill" onClick={()=>props.onTool('region')}/>}
     {tools&&props.onToggleTranslation&&<IconButton icon="translate" label={props.translationOpen?'关闭译文':'译文'} shape="pill" active={props.translationOpen} onClick={props.onToggleTranslation}/>}
     {tools&&<IconButton icon="marker" label="自动高亮" shape="pill" active={props.autoHighlight} onClick={props.onToggleAutoHighlight}/>}
     {tools&&<IconButton ref={viewRef} icon="pageDisplay" label="页面显示" shape="pill" active={viewOpen} aria-haspopup="dialog" aria-expanded={viewOpen} tooltip={!viewOpen} onClick={()=>{setViewFromMore(false);setViewOpen(v=>!v);}}/>}

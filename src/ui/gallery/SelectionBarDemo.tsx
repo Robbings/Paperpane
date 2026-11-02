@@ -4,7 +4,7 @@ import './SelectionBarDemo.css';
 // 审阅用：选区浮动条的几种样式并排放在论文页上比较。component-gallery.html?view=selbar 打开。
 
 const actions: SelectionMenuAction[] = [
-  { id: 'comment', label: '评论', icon: 'comment' },
+  { id: 'comment', label: '旁注', icon: 'comment' },
   { id: 'translate', label: '翻译', icon: 'translate' },
   { id: 'explain', label: '解释', icon: 'explain' },
   { id: 'ask', label: '提问', icon: 'ask' },

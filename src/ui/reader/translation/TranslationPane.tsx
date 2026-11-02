@@ -110,10 +110,10 @@ export function TranslationPane(props: TranslationPaneProps) {
     };
     if (s.kind === 'formula') {
       return (
-        <Tooltip key={s.id} label="公式不翻译，点按查看原文" labelsChild>
+        <Tooltip key={s.id} label="公式、图表不翻译，点按在论文中查看" labelsChild>
           <button type="button" className="pp-tr__chip" {...shared}>
-            <Icon name="explain" size={13} />
-            {s.text}
+            <Icon name="region" size={13} />
+            查看原文
           </button>
         </Tooltip>
       );
@@ -174,6 +174,12 @@ export function TranslationPane(props: TranslationPaneProps) {
           value={mode}
           onChange={props.onMode}
         />
+        {/* Until the whole paper is translated, the way to do it sits right here, in words. */}
+        {taskIdle(props.task) && pages.some(p => p.state !== 'done') && (
+          <button type="button" className="pp-tr__all" onClick={['paused', 'interrupted', 'failed'].includes(props.task.phase) ? props.onResume : props.onTranslateAll}>
+            翻译全文
+          </button>
+        )}
         <span className="pp-tr__spacer" />
         <TaskStatus task={props.task} pages={pages} onTranslateAll={props.onTranslateAll} onPause={props.onPause} onResume={props.onResume} />
         <IconButton
@@ -185,7 +191,9 @@ export function TranslationPane(props: TranslationPaneProps) {
           aria-pressed={props.follow}
           onClick={() => props.onFollow(!props.follow)}
         />
-        {props.onRetranslateAll && <IconButton icon="sync" label="重新翻译全文" size="md" shape="pill" disabled={!taskIdle(props.task) || !pages.some(p => p.sentences.some(s => s.kind !== 'formula' && !!s.text))} onClick={props.onRetranslateAll} />}
+        {taskIdle(props.task) && !pages.some(p => p.state !== 'done') && props.onRetranslateAll && pages.some(p => p.sentences.some(s => s.kind !== 'formula' && !!s.text)) && (
+          <IconButton icon="sync" label="重新翻译全文" size="md" shape="pill" onClick={props.onRetranslateAll} />
+        )}
         {dock && (
           <IconButton
             icon={dock.floating ? 'paneRight' : 'float'}

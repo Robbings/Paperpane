@@ -12,12 +12,13 @@ interface SplitterProps {
   sizeFromPointer: (clientX: number, clientY: number) => number;
   /** True while a pointer drag is in progress (layout animation pauses). */
   onDragChange?: (dragging: boolean) => void;
+  onDoubleClick?: () => void;
 }
 
 const STEP = 16;
 const BIG_STEP = 64;
 
-export function Splitter({ placement, value, min, max, onResize, sizeFromPointer, onDragChange }: SplitterProps) {
+export function Splitter({ placement, value, min, max, onResize, sizeFromPointer, onDragChange, onDoubleClick }: SplitterProps) {
   const dragging = useRef(false);
 
   const endDrag = () => {
@@ -64,7 +65,7 @@ export function Splitter({ placement, value, min, max, onResize, sizeFromPointer
     <div
       role="separator"
       tabIndex={0}
-      aria-label={placement === 'right' ? '调整研究区宽度' : '调整研究区高度'}
+      aria-label={placement === 'right' ? '调整研究区宽度，拖到最宽后继续拖可铺满窗口' : '调整研究区高度，拖到最高后继续拖可铺满窗口'}
       aria-orientation={placement === 'right' ? 'vertical' : 'horizontal'}
       aria-valuenow={value}
       aria-valuemin={min}
@@ -77,6 +78,7 @@ export function Splitter({ placement, value, min, max, onResize, sizeFromPointer
       onPointerCancel={endDrag}
       onLostPointerCapture={endDrag}
       onKeyDown={onKeyDown}
+      onDoubleClick={onDoubleClick}
     />
   );
 }
