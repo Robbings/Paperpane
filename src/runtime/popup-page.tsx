@@ -5,6 +5,7 @@ import { useBrowserEntry } from './use-browser-entry';
 import { useLocalPreferences } from './use-local-preferences';
 import { useModelSettings } from './use-model-settings';
 import { usePopupData } from './use-popup-data';
+import { GUIDE_URL, markOnboarding } from './onboarding';
 
 export function LivePopupPage() {
   const preferences = useLocalPreferences(), model = useModelSettings(), entry = useBrowserEntry();
@@ -20,5 +21,7 @@ export function LivePopupPage() {
     onOpenRecent={id=>open(`/reader.html?documentId=${encodeURIComponent(id)}`)}
     onOpenLibrary={()=>open('/library.html')} onOpenFile={()=>open('/reader.html?open=file')}
     onOpenSettings={section=>open(`/options.html${section?'#'+section:''}`)}
+    setupNeeded={!model.loading&&!model.settings.models.length&&!model.settings.translationApis?.length}
+    onOpenGuide={()=>{void markOnboarding({welcomed:true}).catch(()=>{});open(GUIDE_URL);}}
     status={{...model.status,local:preferences.state.local==='failed'?'failed':model.status.local}}/>;
 }

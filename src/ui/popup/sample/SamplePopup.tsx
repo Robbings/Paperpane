@@ -6,7 +6,7 @@ import { PopupView } from '../PopupView';
 import type { ActiveTabView, RecentPaperView } from '../types';
 
 // 示例接线：用示例数据展示弹窗。?state= 切换当前标签页的几种情况，便于审阅：
-// pdf（默认）、checking、not-pdf、restricted、file-access、in-reader、local。
+// pdf（默认）、checking、not-pdf、restricted、file-access、in-reader、local。加 &setup 显示「完成配置」卡片。
 
 const tabs: Record<string, ActiveTabView | null> = {
   pdf: {
@@ -62,6 +62,8 @@ export function SamplePopup() {
         onOpenLibrary={() => open('./library.html')}
         onOpenFile={() => open('./reader.html?open=import')}
         onOpenSettings={(section) => open(`./options.html${section ? `#${section}` : ''}`)}
+        setupNeeded={new URLSearchParams(window.location.search).has('setup')}
+        onOpenGuide={() => open('./options.html?guide=1#models')}
         status={status}
       />
       <Toaster />

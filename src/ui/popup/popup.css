@@ -358,3 +358,45 @@ body[data-page='popup'] {
 .pp-popup__dock button:hover {
   background: var(--pp-fill-hover);
 }
+
+/* ---- Setup ------------------------------------------------------------------------- */
+
+/* Until something can translate or answer: the one card that asks for attention. */
+.pp-popup__setup {
+  display: grid;
+  grid-template-columns: auto 1fr;
+  gap: 10px 10px;
+  padding: 12px;
+}
+
+.pp-popup__setup-icon {
+  display: grid;
+  place-items: center;
+  width: 32px;
+  height: 32px;
+  border-radius: 9px;
+  background: var(--pp-accent-soft);
+  color: var(--pp-accent);
+}
+
+.pp-popup__setup-text h2 {
+  margin: 0;
+  color: var(--pp-text);
+  font-size: 13.5px;
+  font-weight: var(--pp-weight-semibold);
+  line-height: 1.4;
+}
+
+.pp-popup__setup-text p {
+  margin: 2px 0 0;
+  color: var(--pp-text-2);
+  font-size: var(--pp-text-sm);
+  line-height: 1.45;
+}
+
+/* Tinted rather than solid, so "在纸窗中打开" stays the main button. */
+.pp-popup__setup .pp-popup__primary {
+  grid-column: 1 / -1;
+  background: var(--pp-accent-soft);
+  color: var(--pp-accent);
+}

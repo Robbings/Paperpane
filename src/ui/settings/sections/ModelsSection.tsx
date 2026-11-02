@@ -24,6 +24,7 @@ import {
   completeCapabilities,
 } from "@/runtime/model-settings-actions";
 import type { EndpointDraft, ModelConfigView, SettingsDraft } from "../types";
+import type { ServicePage } from "../service-page";
 import { SettingGroup, SettingRow } from "../SettingRow";
 import { ModelSummary } from "./models/ModelSummary";
 import { DefaultModels } from "./models/DefaultModels";
@@ -42,18 +43,23 @@ const capacity = (n?: number) => (n ? `${Math.round(n / 1000)}K` : "待确认");
 export function ModelsSection({
   draft,
   onChange,
-  renderSaveBar,
-  editor,
-  setEditor,
+  page,
+  note,
   problems,
+  addRequest,
 }: {
+  /** Saved as it changes: default models and request limits. */
   draft: SettingsDraft;
   onChange: (v: SettingsDraft) => void;
-  renderSaveBar: (layout: "floating" | "inline") => ReactNode;
-  editor: ModelConfigView | null;
-  setEditor: (model: ModelConfigView | null) => void;
+  /** A provider's page: its connection and models wait for its own save. */
+  page: ServicePage;
+  note: ReactNode;
   problems: ReadonlyMap<string, string>;
+  /** Changes when something outside (the setup guide) asks to add a provider. */
+  addRequest?: number;
 }) {
+  const view = page.value;
+  const [editor, setEditor] = useState<ModelConfigView | null>(null);
   const [active, setActive] = useState<string | null>(null),
     [search, setSearch] = useState(""),
     [adding, setAdding] = useState(false);
@@ -83,10 +89,13 @@ export function ModelsSection({
     endpoint?: string;
     model?: string;
   } | null>(null);
+  useEffect(() => {
+    if (addRequest) setAdding(true);
+  }, [addRequest]);
   const operation = useRef<AbortController | null>(null),
-    endpoint = draft.endpoints.find((e) => e.id === active),
-    models = draft.models.filter((m) => m.endpointId === active);
-  const signature = JSON.stringify([active, draft.endpoints, draft.models]);
+    endpoint = view.endpoints.find((e) => e.id === active),
+    models = view.models.filter((m) => m.endpointId === active);
+  const signature = JSON.stringify([active, view.endpoints, view.models]);
   useEffect(() => {
     operation.current?.abort();
     setBusy(false);
@@ -106,9 +115,9 @@ export function ModelsSection({
     JSON.stringify(endpoint?.key),
   ]);
   const patch = (v: Partial<EndpointDraft>) =>
-    onChange({
-      ...draft,
-      endpoints: draft.endpoints.map((e) =>
+    page.edit({
+      ...view,
+      endpoints: view.endpoints.map((e) =>
         e.id === active ? { ...e, ...v } : e,
       ),
     });
@@ -138,10 +147,11 @@ export function ModelsSection({
   }
   function addEndpoint(p: (typeof presets)[number]) {
     const id = crypto.randomUUID();
-    onChange({
-      ...draft,
+    // A new provider is this page's draft until it is saved.
+    page.edit({
+      ...view,
       endpoints: [
-        ...draft.endpoints,
+        ...view.endpoints,
         {
           id,
           name: p.name,
@@ -159,10 +169,10 @@ export function ModelsSection({
   function copyEndpoint() {
     if (!endpoint) return;
     const id = crypto.randomUUID();
-    onChange({
-      ...draft,
+    page.edit({
+      ...view,
       endpoints: [
-        ...draft.endpoints,
+        ...view.endpoints,
         {
           ...endpoint,
           id,
@@ -172,7 +182,7 @@ export function ModelsSection({
         },
       ],
       models: [
-        ...draft.models,
+        ...view.models,
         ...models.map((m) => ({
           ...m,
           id: crypto.randomUUID(),
@@ -185,16 +195,16 @@ export function ModelsSection({
   function refreshCatalog() {
     void run(updateCatalog, (v) => {
       setCatalog(v);
-      onChange({
-        ...draft,
-        models: draft.models.map((m) => {
+      page.edit({
+        ...view,
+        models: view.models.map((m) => {
           const item = v.models.find(
             (x) =>
               x.provider === m.catalogRef?.provider &&
               x.modelId === m.catalogRef?.modelId &&
               x.protocol ===
                 (m.protocolOverride ??
-                  draft.endpoints.find((e) => e.id === m.endpointId)?.protocol),
+                  view.endpoints.find((e) => e.id === m.endpointId)?.protocol),
           );
           return item ? refreshModel(m, item, v.updatedAt) : m;
         }),
@@ -231,10 +241,10 @@ export function ModelsSection({
       (signal) => completeCapabilities(fresh, catalog, signal),
       (completed) => {
         const added = completed.map((m) => newModel(endpoint.id, m, catalog.updatedAt));
-        onChange({
-          ...draft,
-          models: [...draft.models, ...added],
-          defaultModelId: draft.defaultModelId ?? added[0]?.id ?? null,
+        page.edit({
+          ...view,
+          models: [...view.models, ...added],
+          defaultModelId: view.defaultModelId ?? added[0]?.id ?? null,
         });
         if (keepOpen) onAdded?.();
         else setPicker(false);
@@ -245,28 +255,35 @@ export function ModelsSection({
   }
   function remove() {
     if (!removing) return;
+    // A provider goes at once, unsaved changes and all; a model goes with the page's save.
+    const from = removing.endpoint ? draft : view;
     const ids = removing.endpoint
-      ? draft.models
+      ? from.models
           .filter((m) => m.endpointId === removing.endpoint)
           .map((m) => m.id)
       : [removing.model!];
-    onChange({
-      ...draft,
-      endpoints: draft.endpoints.filter((e) => e.id !== removing.endpoint),
-      models: draft.models.filter((m) => !ids.includes(m.id)),
-      defaultModelId: ids.includes(draft.defaultModelId ?? "")
+    const next: SettingsDraft = {
+      ...from,
+      endpoints: from.endpoints.filter((e) => e.id !== removing.endpoint),
+      models: from.models.filter((m) => !ids.includes(m.id)),
+      defaultModelId: ids.includes(from.defaultModelId ?? "")
         ? null
-        : draft.defaultModelId,
-      features: draft.features.map((f) =>
+        : from.defaultModelId,
+      features: from.features.map((f) =>
         ids.includes(f.modelId ?? "") ? { ...f, modelId: null } : f,
       ),
       selectionTranslationEngine:
-        draft.selectionTranslationEngine?.kind === "llm" &&
-        ids.includes(draft.selectionTranslationEngine.modelId ?? "")
+        from.selectionTranslationEngine?.kind === "llm" &&
+        ids.includes(from.selectionTranslationEngine.modelId ?? "")
           ? { kind: "llm", modelId: null }
-          : draft.selectionTranslationEngine,
-    });
-    if (removing.endpoint) setActive(null);
+          : from.selectionTranslationEngine,
+    };
+    if (removing.endpoint) {
+      page.discard();
+      // Removing a provider that was never saved only drops the draft.
+      if (draft.endpoints.some((e) => e.id === removing.endpoint)) onChange(next);
+      setActive(null);
+    } else page.edit(next);
     setRemoving(null);
   }
   const rawItems =
@@ -305,12 +322,12 @@ export function ModelsSection({
     <div className={`pp-model-settings${endpoint ? " pp-model-detail" : ""}`}>
       {!endpoint ? (
         <>
-          <SettingsHeader title="模型" saveBar={renderSaveBar("inline")} />
+          <SettingsHeader title="模型" saveBar={note} />
           <DefaultModels draft={draft} onChange={onChange} />
           <SettingGroup
             title="模型服务"
             actions={
-              <Button size="sm" variant="quiet" icon="plus" onClick={() => setAdding(true)}>
+              <Button size="sm" variant="quiet" icon="plus" data-tour="add-provider" onClick={() => setAdding(true)}>
                 添加供应商
               </Button>
             }
@@ -353,7 +370,7 @@ export function ModelsSection({
             title={endpoint.name || "未命名服务"}
             leading={
               <>
-                <IconButton icon="chevronLeft" label="返回模型服务" size="md" onClick={() => setActive(null)} />
+                <IconButton icon="chevronLeft" label="返回模型服务" size="md" onClick={() => page.leave(() => setActive(null))} />
                 <ProviderLogo brand={providerBrand(endpoint.presetId)?.id} size="sm" />
               </>
             }
@@ -369,7 +386,7 @@ export function ModelsSection({
                 />
               </>
             }
-            saveBar={renderSaveBar("inline")}
+            saveBar={page.bar}
           />
           <div className="pp-model-detail-content">
             <SettingGroup title="连接">
@@ -741,9 +758,9 @@ export function ModelsSection({
           endpointProtocol={endpoint?.protocol ?? "openai-chat"}
           onClose={() => setEditor(null)}
           onSave={(m) => {
-            onChange({
-              ...draft,
-              models: draft.models.map((x) => (x.id === m.id ? m : x)),
+            page.edit({
+              ...view,
+              models: view.models.map((x) => (x.id === m.id ? m : x)),
             });
             setEditor(null);
           }}
@@ -781,7 +798,7 @@ export function ModelsSection({
                 run(
                   (s) =>
                     testConfiguredModel(
-                      structuredClone(draft),
+                      structuredClone(view),
                       testId,
                       mode,
                       s,
@@ -818,8 +835,12 @@ export function ModelsSection({
       <Dialog
         open={!!removing}
         onClose={() => setRemoving(null)}
-        title="移除模型配置"
-        description="保存后生效；用到它的功能会改用默认模型。"
+        title={removing?.endpoint ? "移除此供应商" : "移除模型配置"}
+        description={
+          removing?.endpoint
+            ? "供应商和它的模型会立即移除；用到它们的功能会改用默认模型。"
+            : "保存后生效；用到它的功能会改用默认模型。"
+        }
         footer={
           <>
             <Button variant="quiet" onClick={() => setRemoving(null)}>

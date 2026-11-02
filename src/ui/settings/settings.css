@@ -74,6 +74,17 @@
   border-top: 0.5px solid var(--pp-hairline);
 }
 
+/* The setup guide, just above the status. */
+.pp-settings__nav-item.pp-settings__guide {
+  margin-top: auto;
+  margin-bottom: 6px;
+  color: var(--pp-text-2);
+}
+
+.pp-settings__guide + .pp-statusline.pp-settings__status {
+  margin-top: 0;
+}
+
 /* ---- Page ------------------------------------------------------------------- */
 
 .pp-settings__main {
@@ -587,6 +598,22 @@
 
 .pp-settings-bar .pp-set-savebar[data-state='ok'] .pp-set-savebar__text {
   color: var(--pp-ok);
+}
+
+/* Saving as it changes: a quick save says nothing; a slow one shows after a moment. */
+.pp-settings-bar__actions > .pp-set-savebar[data-auto='true']:first-child {
+  padding-left: 0;
+  border-left: 0;
+}
+
+.pp-settings-bar .pp-set-savebar[data-auto='true']:not([data-state]) {
+  animation: pp-autosave-in var(--pp-dur-med) var(--pp-ease-out) 600ms both;
+}
+
+@keyframes pp-autosave-in {
+  from {
+    opacity: 0;
+  }
 }
 
 .pp-settings-bar:has(.pp-set-savebar[data-state='warn']) .pp-settings-bar__actions,

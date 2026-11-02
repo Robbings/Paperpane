@@ -1,20 +1,9 @@
-import { Badge, Icon, IconButton } from '@/ui/components';
+import { Badge, Icon, IconButton, LogoMark } from '@/ui/components';
 import { useEffect, useState, type CSSProperties } from 'react';
 import { sinceText } from '@/ui/settings/StatusLine';
 import type { SettingsSection, StatusSummary } from '@/ui/settings/types';
 import type { ActiveTabView, PopupViewProps } from './types';
 import './popup.css';
-
-/** The mark: a sheet of paper seen through a window frame. */
-function LogoMark() {
-  return (
-    <svg className="pp-popup__logo" width="22" height="22" viewBox="0 0 22 22" aria-hidden="true">
-      <rect x="0.5" y="0.5" width="21" height="21" rx="6" fill="var(--pp-accent)" />
-      <path d="M7 5.5h6l3 3v8a.5.5 0 0 1-.5.5h-8.5a.5.5 0 0 1-.5-.5v-10.5a.5.5 0 0 1 .5-.5z" fill="#fff" />
-      <path d="M8.5 10.5h5 M8.5 12.75h5 M8.5 15h3" stroke="var(--pp-accent)" strokeWidth="1" strokeLinecap="round" opacity="0.55" />
-    </svg>
-  );
-}
 
 /** A small first page, standing in for the PDF. */
 function PageThumb() {
@@ -77,10 +66,25 @@ export function PopupView(props: PopupViewProps) {
   return (
     <div className="pp-popup">
       <header className="pp-popup__head">
-        <LogoMark />
+        <LogoMark className="pp-popup__logo" />
         <span className="pp-popup__name">纸窗</span>
         <IconButton icon="settings" label="设置" shape="pill" onClick={() => props.onOpenSettings()} />
       </header>
+
+      {props.setupNeeded && props.onOpenGuide && (
+        <section className="pp-popup__card pp-popup__setup" aria-labelledby="pp-popup-setup">
+          <span className="pp-popup__setup-icon" aria-hidden="true">
+            <Icon name="sliders" size={17} />
+          </span>
+          <div className="pp-popup__setup-text">
+            <h2 id="pp-popup-setup">完成配置</h2>
+            <p>添加模型或翻译服务后，就能翻译和提问。</p>
+          </div>
+          <button type="button" className="pp-popup__primary" onClick={props.onOpenGuide}>
+            开始配置引导
+          </button>
+        </section>
+      )}
 
       {openable && <CurrentTab tab={tab} onOpen={() => props.onOpenInReader(tab.tabId)} onImport={props.onAllowFileAccess} />}
 

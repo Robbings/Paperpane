@@ -1,19 +1,19 @@
 import { SyncPage } from './sections/SyncPage';
-import { mergeOnto } from './merge-settings';
+import { mergeDrafts, mergeOnto } from './merge-settings';
 import { SettingsHeader } from './SettingsHeader';
 import { ModelsSection } from './sections/ModelsSection';
 import { TranslationSection, translationProblems } from './sections/TranslationSection';
-import { useEffect, useMemo, useRef, useState } from 'react';
-import { GlassSurface, Icon, ScrollArea, type IconName } from '@/ui/components';
-import { SaveBar, type SaveBarState } from './SaveBar';
+import { useEffect, useRef, useState } from 'react';
+import { Button, Dialog, GlassSurface, Icon, ScrollArea, type IconName } from '@/ui/components';
+import { AutoSaveNote, SaveBar, type SaveBarState } from './SaveBar';
 import { runtimeProblems } from './sections/AdvancedSection';
 import { GeneralSection } from './sections/GeneralSection';
 import { StatusLine } from './StatusLine';
+import type { ServicePage } from './service-page';
 import {
   toDraft,
   type Preferences,
   type PreferencesState,
-  type ModelConfigView,
   type SaveSettingsResult,
   type SettingsDraft,
   type SettingsSection,
@@ -29,10 +29,14 @@ interface SettingsViewProps {
   preferences: PreferencesState;
   onPreference: <K extends keyof Preferences>(key: K, value: Preferences[K]) => void;
   onRetryPreferences?: () => void;
-  /** B: the saved, redacted snapshot. The page edits a draft of it and saves the whole draft. */
+  /** B: the saved, redacted snapshot. Changes are saved as a whole draft against its revision. */
   settings: SettingsSnapshot;
   onSave: (draft: SettingsDraft, baseRevision: string) => Promise<SaveSettingsResult>;
   status: StatusSummary;
+  /** Starts the setup guide; its entry sits in the sidebar. */
+  onGuide?: () => void;
+  /** Changes when the provider picker should open on the models page. */
+  addProviderRequest?: number;
 }
 
 const sections: { id: SettingsSection; label: string; icon: IconName }[] = [
@@ -44,134 +48,213 @@ const sections: { id: SettingsSection; label: string; icon: IconName }[] = [
 
 /** Draft comparison that tells an emptied number field (NaN) apart from "use the default" (null). */
 const fingerprint = (draft: SettingsDraft) => JSON.stringify(draft, (_key, value: unknown) => (typeof value === 'number' && Number.isNaN(value) ? 'NaN' : value));
-
-const fieldNames: Record<string, string> = {
-  'runtime.timeoutSec': '超时',
-  'runtime.concurrency': '最大并发数',
-  'runtime.maxOutputTokens': '输出长度上限',
-  defaultModelId: '默认模型',
-};
-const fieldName = (path: string) => fieldNames[path] ?? path;
+const same = (a: SettingsDraft, b: SettingsDraft) => fingerprint(a) === fingerprint(b);
 
 /** Problems the page can find before saving; the logic layer checks everything again. */
 const localProblems = (draft: SettingsDraft) => [...runtimeProblems(draft.runtime), ...translationProblems(draft)];
 
+/** Wait after the last change before saving, so a run of clicks on a stepper is one save. */
+const SAVE_DELAY = 400;
+
+type Persisted = { ok: true } | { ok: false; state: SaveBarState };
+
 export function SettingsView(props: SettingsViewProps) {
   const { section, settings } = props;
+  // What is saved, and the settings as shown; they differ only between a change and its save.
+  const [, setBase] = useState(settings);
   const [draft, setDraft] = useState<SettingsDraft>(() => toDraft(settings));
-  const [base, setBase] = useState(settings);
-  // A model drawer has its own draft. Keep its opening revision until it is
-  // completed/cancelled so that cross-window writes still go through the CAS
-  // and three-way merge below, even before the drawer calls edit().
-  const [modelEditor, setModelEditor] = useState<ModelConfigView | null>(null);
-  const [bar, setBar] = useState<SaveBarState | null>(null);
-  const [problems, setProblems] = useState<ReadonlyMap<string, string>>(new Map());
-  // A conflict's newer settings, kept until the reader chooses what to do.
-  const latest = useRef<SettingsSnapshot | null>(null);
-  // The draft as it is now, for a save that finishes after more typing.
+  const base = useRef(settings);
   const draftNow = useRef(draft);
-  draftNow.current = draft;
+  // An open service page's own changes, from the settings it started on.
+  const [held, setHeldState] = useState<{ from: SettingsDraft; value: SettingsDraft } | null>(null);
+  const heldNow = useRef(held);
+  const setHeld = (next: typeof held) => {
+    heldNow.current = next;
+    setHeldState(next);
+  };
+  const [auto, setAuto] = useState<SaveBarState | null>(null);
+  const [pageState, setPageState] = useState<SaveBarState | null>(null);
+  const [problems, setProblems] = useState<ReadonlyMap<string, string>>(new Map());
+  const [leaving, setLeaving] = useState<(() => void) | null>(null);
+  // Bumped to close any open service page, e.g. when the guide starts.
+  const [epoch, setEpoch] = useState(0);
+  // Saves run one after another; a newer settings snapshot waits for them.
+  const queue = useRef<Promise<unknown>>(Promise.resolve());
+  const busy = useRef(0);
+  const timer = useRef<number | undefined>(undefined);
+  const incoming = useRef(settings);
+  incoming.current = settings;
 
-  const dirty = useMemo(() => fingerprint(draft) !== fingerprint(toDraft(base)), [draft, base]);
-
-  // Saved elsewhere (another window, or the reader's quick default-model switch):
-  // an untouched draft simply follows; a draft with changes stays, and saving will ask.
-  useEffect(() => {
-    if (settings.revision === base.revision) return;
-    if (!dirty && !modelEditor) {
-      setDraft(toDraft(settings));
-      setBase(settings);
-    }
-  }, [settings, modelEditor]); // closing an untouched drawer catches up too
-
-  useEffect(() => {
-    if (section !== 'models') setModelEditor(null);
-  }, [section]);
-
-  // The bar shows while there are changes; "已保存" lingers briefly after saving.
-  useEffect(() => {
-    if (!dirty && bar?.kind !== 'saved') setBar(null);
-    else if (dirty && (bar === null || bar.kind === 'saved')) setBar({ kind: 'dirty' });
-  }, [dirty]); // only when dirtiness flips
-  useEffect(() => {
-    if (bar?.kind !== 'saved') return;
-    const timer = window.setTimeout(() => setBar(null), 1600);
-    return () => window.clearTimeout(timer);
-  }, [bar]);
-
-  const edit = (next: SettingsDraft) => {
+  const show = (next: SettingsDraft) => {
+    draftNow.current = next;
     setDraft(next);
-    if (bar && bar.kind !== 'conflict' && bar.kind !== 'saving') setBar({ kind: 'dirty' });
+  };
+  const adopt = (next: SettingsSnapshot) => {
+    base.current = next;
+    setBase(next);
   };
 
-  const save = async (baseRevision: string, toSave: SettingsDraft = draft) => {
-    const found = localProblems(toSave);
-    if (found.length > 0) {
-      setProblems(new Map(found.map((p) => [p.path, p.message])));
-      setBar({ kind: 'invalid', count: found.length });
+  /** Takes settings saved elsewhere when nothing here is waiting to be saved. */
+  const follow = () => {
+    const next = incoming.current;
+    if (busy.current || timer.current !== undefined || next.revision === base.current.revision) return;
+    if (same(draftNow.current, toDraft(base.current))) {
+      adopt(next);
+      show(toDraft(next));
+    }
+  };
+  useEffect(follow, [settings]);
+
+  const run = <T,>(job: () => Promise<T>): Promise<T> => {
+    busy.current++;
+    const done = queue.current.then(job).finally(() => {
+      busy.current--;
+      follow();
+    });
+    queue.current = done.catch(() => {});
+    return done;
+  };
+
+  /** Saves a whole draft; a save from another window in between is merged, this draft's changes kept. */
+  const persist = async (next: SettingsDraft): Promise<Persisted> => {
+    let sending = next;
+    for (let attempt = 0; attempt < 3; attempt++) {
+      const found = localProblems(sending);
+      if (found.length) {
+        setProblems(new Map(found.map((p) => [p.path, p.message])));
+        return { ok: false, state: { kind: 'invalid', count: found.length } };
+      }
+      const result = await props.onSave(sending, base.current.revision);
+      if (result.ok) {
+        adopt(result.value);
+        setProblems(new Map());
+        return { ok: true };
+      }
+      if (result.reason === 'conflict') {
+        sending = mergeOnto(result.latest, base.current, sending).merged;
+        adopt(result.latest);
+        continue;
+      }
+      if (result.reason === 'invalid') {
+        setProblems(new Map(result.problems.map((p) => [p.path, p.message])));
+        // Problems the page has no field for are still said, in the header.
+        const known = result.problems.filter((p) => p.path.startsWith('runtime.') || p.path.startsWith('translationApis.'));
+        return { ok: false, state: { kind: 'invalid', count: result.problems.length, message: known.length < result.problems.length ? result.problems[0]?.message : undefined } };
+      }
+      return { ok: false, state: { kind: 'failed', message: result.message } };
+    }
+    return { ok: false, state: { kind: 'failed', message: '设置在其他窗口接连改动，请稍后重试。' } };
+  };
+
+  const autoSave = () =>
+    run(async () => {
+      window.clearTimeout(timer.current);
+      timer.current = undefined;
+      const sent = draftNow.current;
+      if (same(sent, toDraft(base.current))) {
+        setAuto(null);
+        return;
+      }
+      setAuto({ kind: 'saving' });
+      const result = await persist(sent);
+      if (!result.ok) {
+        setAuto(result.state);
+        return;
+      }
+      setAuto(null);
+      const saved = toDraft(base.current);
+      // Changed again while saving: keep the newer changes on top of what was saved.
+      show(same(draftNow.current, sent) ? saved : mergeDrafts(sent, saved, draftNow.current).merged);
+    });
+
+  /** Settings outside service pages: shown at once, saved a moment later. */
+  const edit = (next: SettingsDraft) => {
+    show(next);
+    window.clearTimeout(timer.current);
+    timer.current = undefined;
+    const found = localProblems(next);
+    setProblems(new Map(found.map((p) => [p.path, p.message])));
+    if (found.length) {
+      setAuto({ kind: 'invalid', count: found.length });
       return;
     }
-    setProblems(new Map());
-    setBar({ kind: 'saving' });
-    const result = await props.onSave(toSave, baseRevision);
-    if (result.ok) {
-      latest.current = null;
-      setBase(result.value);
-      // Typed on while saving: keep the newer draft, still unsaved.
-      if (fingerprint(draftNow.current) === fingerprint(toSave)) {
-        setDraft(toDraft(result.value));
-        setBar({ kind: 'saved' });
-      } else {
-        setBar({ kind: 'dirty' });
+    if (auto?.kind === 'invalid') setAuto(null);
+    timer.current = window.setTimeout(() => void autoSave(), SAVE_DELAY);
+  };
+
+  const pageDirty = !!held && !same(held.from, held.value);
+
+  const savePage = () =>
+    run(async () => {
+      const page = heldNow.current;
+      if (!page) return true;
+      window.clearTimeout(timer.current);
+      timer.current = undefined;
+      const shown = draftNow.current;
+      setPageState({ kind: 'saving' });
+      const result = await persist(mergeDrafts(page.from, shown, page.value).merged);
+      if (!result.ok) {
+        setPageState(result.state);
+        return false;
       }
-    } else if (result.reason === 'conflict') {
-      latest.current = result.latest;
-      const { conflicts } = mergeOnto(result.latest, base, draftNow.current);
-      setBar({ kind: 'conflict', fields: conflicts.map(fieldName) });
-    } else if (result.reason === 'invalid') {
-      setProblems(new Map(result.problems.map((p) => [p.path, p.message])));
-      // Problems the page has no field for still get said, at the bar.
-      const known = result.problems.filter((p) => p.path.startsWith('runtime.') || p.path.startsWith('translationApis.'));
-      setBar({ kind: 'invalid', count: result.problems.length, message: known.length < result.problems.length ? result.problems[0]?.message : undefined });
-    } else {
-      setBar({ kind: 'failed', message: result.message });
-    }
-  };
+      setHeld(null);
+      setPageState({ kind: 'saved' });
+      setAuto(null);
+      show(toDraft(base.current));
+      return true;
+    });
 
-  const discard = () => {
-    setDraft(toDraft(base));
+  const discardPage = () => {
+    setHeld(null);
+    setPageState(null);
     setProblems(new Map());
-    setBar(null);
   };
 
+  const leave = (then: () => void) => {
+    if (pageDirty) {
+      setLeaving(() => then);
+      return;
+    }
+    discardPage();
+    then();
+  };
+
+  useEffect(() => {
+    if (pageState?.kind !== 'saved') return;
+    const id = window.setTimeout(() => setPageState(null), 1600);
+    return () => window.clearTimeout(id);
+  }, [pageState]);
+
+  // Closing the tab: a change still waiting is saved now; a service page with changes asks.
+  useEffect(() => {
+    const beforeUnload = (event: BeforeUnloadEvent) => {
+      if (timer.current !== undefined) void autoSave();
+      if (pageDirty || timer.current !== undefined) event.preventDefault();
+    };
+    window.addEventListener('beforeunload', beforeUnload);
+    return () => window.removeEventListener('beforeunload', beforeUnload);
+  });
+
+  const page: ServicePage = {
+    value: held?.value ?? draft,
+    dirty: pageDirty,
+    edit: (next) => {
+      setHeld({ from: heldNow.current?.from ?? draftNow.current, value: next });
+      if (pageState?.kind !== 'saving') setPageState(null);
+    },
+    leave,
+    discard: discardPage,
+    bar: (
+      <SaveBar
+        state={pageState ?? (pageDirty ? { kind: 'dirty' } : { kind: 'clean' })}
+        onSave={() => void savePage()}
+        onDiscard={discardPage}
+      />
+    ),
+  };
+
+  const note = <AutoSaveNote state={auto} onRetry={() => void autoSave()} />;
   const current = sections.find((item) => item.id === section)!;
-
-  const renderSaveBar = (layout: "floating" | "inline") => (
-    <SaveBar
-      state={bar}
-      layout={layout}
-      onSave={() => void save(base.revision)}
-      onDiscard={discard}
-      onReload={() => {
-        const next = latest.current ?? settings;
-        latest.current = null;
-        setBase(next);
-        setDraft(toDraft(next));
-        setProblems(new Map());
-        setBar(null);
-      }}
-      onOverwrite={() => {
-        const next = latest.current;
-        if (!next) return;
-        const { merged } = mergeOnto(next, base, draftNow.current);
-        latest.current = null;
-        setBase(next);
-        setDraft(merged);
-        void save(next.revision, merged);
-      }}
-    />
-  );
-
 
   return (
     <div className="pp-settings">
@@ -183,42 +266,52 @@ export function SettingsView(props: SettingsViewProps) {
               key={item.id}
               type="button"
               className="pp-settings__nav-item"
+              data-tour={`nav-${item.id}`}
               aria-current={item.id === section ? 'page' : undefined}
-              onClick={() => props.onSection(item.id)}
+              onClick={() => leave(() => props.onSection(item.id))}
             >
               <Icon name={item.icon} size={16} />
               <span>{item.label}</span>
             </button>
           ))}
         </nav>
-        <StatusLine status={props.status} className="pp-settings__status" onOpen={(target) => props.onSection(target)} />
+        {props.onGuide && (
+          <button
+            type="button"
+            className="pp-settings__nav-item pp-settings__guide"
+            onClick={() =>
+              leave(() => {
+                setEpoch((n) => n + 1);
+                props.onGuide?.();
+              })
+            }
+          >
+            <Icon name="sliders" size={16} />
+            <span>配置引导</span>
+          </button>
+        )}
+        <StatusLine status={props.status} className="pp-settings__status" onOpen={(target) => leave(() => props.onSection(target))} />
       </GlassSurface>
 
       <main className="pp-settings__main">
         <ScrollArea className="pp-settings__scroll" viewportClassName="pp-settings__viewport">
           <div className="pp-settings__content">
             {section === 'models' ? (
-              <ModelsSection
-                draft={draft}
-                onChange={edit}
-                renderSaveBar={renderSaveBar}
-                editor={modelEditor}
-                setEditor={setModelEditor}
-                problems={problems}
-              />
+              <ModelsSection key={epoch} draft={draft} onChange={edit} page={page} note={note} problems={problems} addRequest={props.addProviderRequest} />
             ) : section === 'translation' ? (
               <TranslationSection
+                key={epoch}
                 draft={draft}
                 onChange={edit}
+                page={page}
+                note={note}
                 problems={problems}
                 preferences={props.preferences.preferences}
                 onPreference={props.onPreference}
-                renderSaveBar={renderSaveBar}
               />
             ) : (
               <>
-                {/* Pages that apply at once show saving only while the shared draft has changes. */}
-                <SettingsHeader title={current.label} saveBar={bar ? renderSaveBar('inline') : undefined} />
+                <SettingsHeader title={current.label} saveBar={note} />
                 {section === 'general' ? (
                   <GeneralSection state={props.preferences} onPreference={props.onPreference} onRetry={props.onRetryPreferences} />
                 ) : (
@@ -229,6 +322,40 @@ export function SettingsView(props: SettingsViewProps) {
           </div>
         </ScrollArea>
       </main>
+
+      <Dialog
+        open={!!leaving}
+        onClose={() => setLeaving(null)}
+        title="保存这个服务的更改？"
+        description="连接、密钥和模型的改动还没有保存。"
+        footer={
+          <>
+            <Button variant="quiet" onClick={() => setLeaving(null)}>
+              继续编辑
+            </Button>
+            <Button
+              onClick={() => {
+                const then = leaving;
+                setLeaving(null);
+                discardPage();
+                then?.();
+              }}
+            >
+              放弃更改
+            </Button>
+            <Button
+              variant="primary"
+              onClick={() => {
+                const then = leaving;
+                setLeaving(null);
+                void savePage().then((ok) => ok && then?.());
+              }}
+            >
+              保存
+            </Button>
+          </>
+        }
+      />
     </div>
   );
 }

@@ -1,4 +1,5 @@
 import { TranslationDemo } from './TranslationDemo';
+import { OnboardingDemo } from './OnboardingDemo';
 import { useEffect, useRef, useState, type CSSProperties, type ReactNode } from 'react';
 import {
   Badge,
@@ -52,6 +53,7 @@ const sections = [
   ['selection', '选区菜单'],
   ['status', '保存状态'],
   ['translation', '翻译引擎'],
+  ['onboarding', '首次使用'],
   ['icons', '图标'],
 ] as const;
 
@@ -164,6 +166,9 @@ export function ComponentGallery() {
         <StatusSection />
         <Section id="translation" title="翻译引擎" note="全文与选区可以用不同的引擎；换引擎不清掉已翻译的页。">
           <TranslationDemo />
+        </Section>
+        <Section id="onboarding" title="首次使用" note="欢迎弹窗只出现一次；配置引导从 popup、欢迎弹窗或设置侧栏进入。">
+          <OnboardingDemo />
         </Section>
         <IconsSection />
       </main>

@@ -13,5 +13,5 @@ if (view === 'gallery' || view === 'selbar') {
     url.searchParams.delete('view');
     history.replaceState(null, '', url);
   }
-  mountPage(<LiveReaderPage />);
+  mountPage(<LiveReaderPage />, { welcome: true });
 }

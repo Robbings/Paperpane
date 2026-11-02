@@ -7,6 +7,7 @@ export { HintLabel } from './HintLabel';
 export { Icon, iconNames, type IconName } from './Icon';
 export { IconButton } from './IconButton';
 export { Kbd } from './Kbd';
+export { LogoMark } from './LogoMark';
 export { Markdown, MarkdownInline } from './Markdown';
 export { Menu, type MenuEntry } from './Menu';
 export { Popover } from './Popover';

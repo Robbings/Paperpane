@@ -1,0 +1,307 @@
+/* ---- Welcome ------------------------------------------------------------------ */
+
+.pp-welcome {
+  width: 600px;
+}
+
+.pp-welcome__panel {
+  --pp-glass-bg: var(--pp-glass-float-solid);
+
+  display: flex;
+  flex-direction: column;
+  max-height: calc(100vh - 48px);
+  border-radius: 18px;
+  overflow: hidden;
+}
+
+/* A page and its translation, side by side, on the window wash. */
+.pp-welcome__preview {
+  position: relative;
+  display: flex;
+  justify-content: center;
+  align-items: flex-end;
+  gap: 14px;
+  height: 168px;
+  padding: 0 24px;
+  overflow: hidden;
+  background: var(--pp-backdrop);
+  border-bottom: 0.5px solid var(--pp-hairline);
+}
+
+.pp-welcome__sheet {
+  display: flex;
+  flex-direction: column;
+  gap: 7px;
+  width: 176px;
+  height: 134px;
+  padding: 16px 16px 0;
+  border-radius: 8px 8px 0 0;
+  background: var(--pp-reading-surface);
+  box-shadow: 0 0 0 0.5px var(--pp-hairline), 0 6px 20px rgba(0, 0, 0, 0.08);
+  animation: pp-welcome-rise 520ms var(--pp-ease-out) both;
+}
+
+.pp-welcome__sheet[data-side='translation'] {
+  animation-delay: 90ms;
+}
+
+.pp-welcome__line {
+  flex-shrink: 0;
+  height: 5px;
+  border-radius: 3px;
+  background: var(--pp-fill-press);
+}
+
+.pp-welcome__line[data-w='title'] {
+  width: 62%;
+  height: 7px;
+  margin-bottom: 4px;
+  background: var(--pp-text-3);
+  opacity: 0.55;
+}
+
+.pp-welcome__line[data-w='short'] {
+  width: 48%;
+}
+
+/* The sentence being read, lit on both sides. */
+.pp-welcome__line[data-mark='true'] {
+  background: var(--pp-accent);
+  opacity: 0.38;
+}
+
+.pp-welcome__figure {
+  flex-shrink: 0;
+  height: 26px;
+  margin: 2px 0;
+  border-radius: 4px;
+  background: var(--pp-fill);
+  box-shadow: inset 0 0 0 0.5px var(--pp-hairline);
+}
+
+.pp-welcome__mark {
+  position: absolute;
+  top: 54px;
+  left: 50%;
+  translate: -50% 0;
+  border-radius: 11px;
+  box-shadow: 0 6px 18px rgba(42, 91, 215, 0.32);
+  animation: pp-welcome-pop 480ms var(--pp-ease-spring) 180ms both;
+}
+
+@keyframes pp-welcome-rise {
+  from {
+    opacity: 0;
+    transform: translateY(18px);
+  }
+}
+
+@keyframes pp-welcome-pop {
+  from {
+    opacity: 0;
+    transform: scale(0.8);
+  }
+}
+
+.pp-welcome__body {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  min-height: 0;
+  padding: 22px 28px 6px;
+  overflow: auto;
+}
+
+.pp-welcome__title {
+  margin: 0;
+  font-size: var(--pp-text-xl);
+  font-weight: var(--pp-weight-semibold);
+  line-height: var(--pp-leading-tight);
+}
+
+.pp-welcome__lead {
+  margin: 0;
+  color: var(--pp-text-2);
+  font-size: var(--pp-text-md);
+  line-height: var(--pp-leading-body);
+}
+
+.pp-welcome__features {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 10px;
+  margin: 14px 0 0;
+  padding: 0;
+  list-style: none;
+}
+
+.pp-welcome__features li {
+  display: flex;
+  gap: 10px;
+  padding: 12px;
+  border-radius: var(--pp-radius-float);
+  background: var(--pp-fill);
+}
+
+.pp-welcome__features li > span:last-child {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
+  color: var(--pp-text-2);
+  font-size: var(--pp-text-sm);
+  line-height: var(--pp-leading-body);
+}
+
+.pp-welcome__features strong {
+  color: var(--pp-text);
+  font-size: var(--pp-text-md);
+  font-weight: var(--pp-weight-semibold);
+}
+
+.pp-welcome__icon {
+  display: grid;
+  flex-shrink: 0;
+  place-items: center;
+  width: 30px;
+  height: 30px;
+  border-radius: 8px;
+  background: var(--pp-accent-soft);
+  color: var(--pp-accent);
+}
+
+.pp-welcome__footer {
+  display: flex;
+  align-items: center;
+  gap: var(--pp-space-2);
+  padding: 18px 28px 22px;
+}
+
+.pp-welcome__note {
+  flex: 1;
+  color: var(--pp-text-3);
+  font-size: var(--pp-text-sm);
+}
+
+@media (max-width: 560px) {
+  .pp-welcome__features {
+    grid-template-columns: 1fr;
+  }
+
+  .pp-welcome__note {
+    flex-basis: 100%;
+  }
+
+  .pp-welcome__footer {
+    flex-wrap: wrap;
+    justify-content: flex-end;
+  }
+}
+
+/* ---- Guide: a mask with one control lit, and a card beside it ----------------- */
+
+.pp-guide {
+  position: fixed;
+  inset: 0;
+  z-index: 1000;
+}
+
+/* The lit area; its huge shadow is the mask, so mask and hole move together. */
+.pp-guide__spot {
+  position: fixed;
+  border-radius: 10px;
+  box-shadow: 0 0 0 2px var(--pp-accent), 0 0 0 9999px rgba(14, 16, 22, 0.46);
+  pointer-events: none;
+  transition:
+    top var(--pp-dur-layout) var(--pp-ease-layout),
+    left var(--pp-dur-layout) var(--pp-ease-layout),
+    width var(--pp-dur-layout) var(--pp-ease-layout),
+    height var(--pp-dur-layout) var(--pp-ease-layout);
+}
+
+/* Nothing to point at: the mask alone. */
+.pp-guide__spot[data-empty='true'] {
+  top: 50%;
+  left: 50%;
+  width: 0;
+  height: 0;
+  box-shadow: 0 0 0 9999px rgba(14, 16, 22, 0.46);
+}
+
+.pp-guide__card {
+  --pp-glass-bg: var(--pp-glass-float-solid);
+
+  position: fixed;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  width: 316px;
+  max-width: calc(100vw - 32px);
+  padding: 16px 18px 14px;
+  border-radius: var(--pp-radius-panel);
+  transition:
+    top var(--pp-dur-layout) var(--pp-ease-layout),
+    left var(--pp-dur-layout) var(--pp-ease-layout);
+  animation: pp-dialog-in var(--pp-dur-med) var(--pp-ease-spring);
+}
+
+.pp-guide__step {
+  color: var(--pp-accent);
+  font-size: var(--pp-text-xs);
+  font-weight: var(--pp-weight-semibold);
+  font-variant-numeric: tabular-nums;
+}
+
+.pp-guide__title {
+  margin: 0;
+  font-size: var(--pp-text-lg);
+  font-weight: var(--pp-weight-semibold);
+  line-height: var(--pp-leading-tight);
+}
+
+.pp-guide__text {
+  margin: 0;
+  color: var(--pp-text-2);
+  font-size: var(--pp-text-md);
+  line-height: var(--pp-leading-body);
+}
+
+.pp-guide__footer {
+  display: flex;
+  align-items: center;
+  gap: var(--pp-space-2);
+  margin-top: 8px;
+}
+
+.pp-guide__dots {
+  display: flex;
+  flex: 1;
+  gap: 4px;
+}
+
+.pp-guide__dots span {
+  width: 5px;
+  height: 5px;
+  border-radius: 50%;
+  background: var(--pp-fill-press);
+  transition: background var(--pp-dur-med), width var(--pp-dur-med) var(--pp-ease-out);
+}
+
+.pp-guide__dots span[data-on='true'] {
+  width: 14px;
+  border-radius: 3px;
+  background: var(--pp-accent);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .pp-welcome__sheet,
+  .pp-welcome__mark,
+  .pp-guide__card {
+    animation: none;
+  }
+
+  .pp-guide__spot,
+  .pp-guide__card {
+    transition: none;
+  }
+}

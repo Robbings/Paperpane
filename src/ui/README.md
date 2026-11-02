@@ -169,7 +169,9 @@ toast.show({ message: '翻译失败：请求超时', tone: 'error', action: { la
 
 - **两类设置**：
   - 偏好 `Preferences`（主题、界面语言、回答语言、插件内容字号、深色减光、公式复制格式、自动翻译 `autoTranslate`：off / on-add / on-open）：每项改了立即生效，调用 `onPreference(key, value)`，由逻辑层单字段保存并同步到其他标签页；保存失败时 `PreferencesState.local = 'failed'`，界面提示并可重试。
-  - 配置 `SettingsView`（模型服务、模型、默认模型、功能路由、提示词、运行参数、同步）：设置页编辑一份草稿，所有节共用，切换节不会丢；保存条整体调用 `onSave(draft, baseRevision)`（各页顶部的玻璃标题栏 `SettingsHeader` 右侧放保存条，不再有底部浮动保存条），按 `SaveSettingsResult` 显示成功、需要修改（`problems` 的 `path` 对应到字段）、冲突（保留草稿，用户选择载入最新或覆盖）、失败。
+  - 配置 `SettingsView`（模型服务、模型、默认模型、功能路由、提示词、运行参数、同步）：没有全局的「保存设置」。
+    - 默认模型、功能路由、两个翻译引擎、高级设置和翻译参数改完即存：界面立即显示，停顿约 0.4 秒后整体调用 `onSave(draft, baseRevision)`。成功时不提示；保存慢时标题栏右侧出现「正在保存…」；超出范围的值在该行报错且不保存；失败时标题栏显示原因和「重试」。其他窗口同时保存造成的冲突自动三方合并（`mergeOnto` / `mergeDrafts`），本页改过的字段优先。
+    - 供应商页和翻译服务页（连接、密钥、模型列表）是一份单独的草稿 `ServicePage`（`settings/service-page.ts`），标题栏右侧是「未保存 · 放弃 · 保存」（`SaveBar`）。有改动时返回、切换分区或关闭标签页都会先询问；新添加的服务没保存就离开等于没添加；移除供应商或翻译服务确认后立即生效，移除单个模型随该页保存。
 - **密钥**：快照只有 `hasKey` / `hasPassword`；草稿里用 `SecretEdit`（keep / clear / replace）。`toDraft(view)` 把快照转成草稿，所有密钥初始为 keep。
 - **外观的应用**：`applyAppearance()`（`src/ui/theme.ts`）设置主题、`--pp-read-scale` 和页面减光。正文字号只作用于批注、笔记、概览和回答正文（`--pp-text-read*`），不缩放工具栏，也不改变 PDF 缩放。
 - **节**：`SettingsSection` = general / models / translation / sync；`sectionFromHash()` 把旧地址 `#features` 转到翻译、`#advanced` 转到模型。界面不放解释性段落，需要说明的标签用 `SettingRow` 的 `hint`（悬停出现）；错误和结果一律用 `toast`。
@@ -192,6 +194,15 @@ toast.show({ message: '翻译失败：请求超时', tone: 'error', action: { la
 - **最近阅读**：`recent` 最多 3 篇，`onOpenRecent(id)`；右侧是时间，阅读进度是标题下的一条细线。没有记录（或读取中、失败）时整块不显示。
 - **问题**：只在出问题时出现一行红点文字（本机保存失败、同步失败或冲突、模型不可用，以及 `error`），点击跳到设置的对应一节。「数据仅保存在本机」「还没有配置模型」这类常态不在弹窗显示。
 - **底部**：文献库 `onOpenLibrary`、打开文件 `onOpenFile`（弹窗里直接选文件会让弹窗关闭，所以交给阅读器页弹出文件选择）。
+- **完成配置**：`setupNeeded`（既没有模型也没有翻译服务）时顶部出现一张卡片，按钮「开始配置引导」→ `onOpenGuide`，打开 `options.html?guide=1#models`。配好任意一项后自动消失。示例页加 `&setup` 查看。
+
+## 首次使用
+
+位于 `src/ui/onboarding/`，组件目录「首次使用」一节可以直接操作。
+
+- **欢迎弹窗** `WelcomeDialog`：安装后第一次打开阅读器、文献库或设置页时出现一次（`runtime/onboarding.ts` 的 `useWelcome`，状态存在 `storage.local` 的 `onboarding`）。已经有模型的用户（升级、从备份恢复）不弹；从 popup 进引导也算看过。「开始配置引导」在设置页直接开始，在阅读器和文献库会打开设置页并开始。
+- **配置引导** `GuideTour`：整页压暗，只亮出 `data-tour` 指向的控件，旁边一张说明卡片（步数、上一步、下一步、跳过；方向键翻页，Esc 退出）；期间页面不接受点击。步骤在 `settings/setup-guide.ts`：添加供应商、默认模型、全文翻译引擎、添加翻译服务、默认翻译到、自动翻译、WebDAV。还没有模型时最后一步多一个「去添加模型服务」，结束引导并打开添加供应商窗口。设置页侧栏底部的「配置引导」可以随时再看。
+- `SettingRow` / `SettingGroup` 的 `tour` 属性和按钮的 `data-tour` 是引导的锚点，改界面时保持这些名字。
 
 ## 译文栏（演示阶段）
 
