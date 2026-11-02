@@ -3,11 +3,8 @@ import { browserEntryDefaults, type BrowserEntrySettings } from './pdf';
 
 export const BROWSER_ENTRY_KEY = 'browserEntry';
 export function normalizeBrowserSettings(raw: unknown): BrowserEntrySettings {
-  const value = raw && typeof raw === 'object' ? raw as Partial<BrowserEntrySettings> : {};
-  return {
-    autoOpenPdf: typeof value.autoOpenPdf === 'boolean' ? value.autoOpenPdf : browserEntryDefaults.autoOpenPdf,
-    showPdfButtons: typeof value.showPdfButtons === 'boolean' ? value.showPdfButtons : browserEntryDefaults.showPdfButtons,
-  };
+  const showPdfButtons = raw && typeof raw === 'object' && 'showPdfButtons' in raw ? raw.showPdfButtons : undefined;
+  return { ...browserEntryDefaults, showPdfButtons: typeof showPdfButtons === 'boolean' ? showPdfButtons : browserEntryDefaults.showPdfButtons };
 }
 export async function readBrowserSettings(): Promise<BrowserEntrySettings> {
   if (!browser.runtime?.id) return normalizeBrowserSettings(JSON.parse(localStorage.getItem(BROWSER_ENTRY_KEY) ?? '{}'));

@@ -1,6 +1,7 @@
 import { getDocument, GlobalWorkerOptions, PasswordResponses } from 'pdfjs-dist';
 import workerUrl from 'pdfjs-dist/build/pdf.worker.min.mjs?url';
 import { ImportFault, abortIfNeeded } from './errors';
+import { pdfjsResources } from './pdfjs-resources';
 import { extractPdfBibliography } from './bibliography';
 import type { PdfBibliography } from '@/contracts/library';
 GlobalWorkerOptions.workerSrc = workerUrl;
@@ -15,7 +16,7 @@ export async function inspectPdf(
   const header = new TextDecoder('latin1').decode(bytes.subarray(0, Math.min(1024, bytes.length)));
   if (!/%PDF-\d\.\d/.test(header)) throw new ImportFault({ code: 'UNSUPPORTED_FILE', message: '文件内容不是 PDF，请重新选择文件或检查下载链接', recovery: ['choose-file'] });
   // PDF.js transfers its buffer to the packaged worker. Preserve original bytes for hashing/storage.
-  const task = getDocument({ data: bytes.slice(), stopAtErrors: true, useWorkerFetch: false, useSystemFonts: false, disableFontFace: true, enableXfa: false });
+  const task = getDocument({ ...pdfjsResources(), data: bytes.slice(), stopAtErrors: true, useWorkerFetch: false, useSystemFonts: false, disableFontFace: true, enableXfa: false });
   task.onPassword = (submit: (password: string) => void, reason: number) => {
     if (!signal.aborted) askPassword(submit, reason === PasswordResponses.INCORRECT_PASSWORD);
   };
