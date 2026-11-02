@@ -1,6 +1,7 @@
-import { Badge, Icon, Skeleton, Switch, type IconName } from '@/ui/components';
-import { useEffect, useState } from 'react';
-import { sinceText, StatusLine } from '@/ui/settings/StatusLine';
+import { Badge, HintLabel, Icon, IconButton, Switch } from '@/ui/components';
+import { useEffect, useState, type CSSProperties } from 'react';
+import { sinceText } from '@/ui/settings/StatusLine';
+import type { SettingsSection, StatusSummary } from '@/ui/settings/types';
 import type { ActiveTabView, PopupViewProps } from './types';
 import './popup.css';
 
@@ -25,46 +26,20 @@ function PageThumb() {
   );
 }
 
-const blockText: Record<NonNullable<ActiveTabView['block']>, { icon: IconName; title: string; detail: string }> = {
-  'not-pdf': { icon: 'file', title: '当前页面不是 PDF', detail: '打开论文的 PDF 链接后，可以在这里一键转到纸窗阅读。' },
-  restricted: { icon: 'lock', title: '这个页面无法打开', detail: '浏览器不允许扩展读取设置页、扩展商店等页面。' },
-  'file-access': { icon: 'file', title: '请手动导入本地 PDF', detail: '点击下方「打开文件」，选择电脑上的 PDF 导入纸窗。' },
-  'in-reader': { icon: 'check', title: '正在纸窗中阅读', detail: '这篇论文已经在阅读器里打开了。' },
-  'in-paperpane': { icon: 'check', title: '当前在纸窗中', detail: '切换到论文网页或 PDF 标签页后，可在这里打开论文。' },
-  unavailable: { icon: 'explain', title: '暂时无法读取页面', detail: '请重新打开弹窗重试。' },
-};
+/** Things worth a line in the popup: only what needs the reader's attention. */
+function problems(status: StatusSummary): { text: string; section: SettingsSection }[] {
+  const list: { text: string; section: SettingsSection }[] = [];
+  if (status.local === 'failed') list.push({ text: '有内容没能保存', section: 'general' });
+  if (status.sync === 'failed') list.push({ text: '同步失败', section: 'sync' });
+  if (status.sync === 'conflict') list.push({ text: '同步有冲突', section: 'sync' });
+  if (status.modelAvailability === 'unavailable') list.push({ text: status.modelMessage ?? '模型暂不可用', section: 'models' });
+  return list;
+}
 
-function CurrentTab({ tab, onOpen }: { tab: ActiveTabView | null; onOpen: () => void }) {
-  if (!tab || tab.pdf === 'checking' || tab.pdf === 'unknown') {
-    return (
-      <section className="pp-popup__card pp-popup__tab" aria-busy="true" aria-label="当前页面">
-        <div className="pp-popup__tab-row">
-          <span className="pp-popup__thumb pp-popup__thumb--empty" aria-hidden="true" />
-          <div className="pp-popup__tab-text">
-            <Skeleton lines={2} />
-          </div>
-        </div>
-      </section>
-    );
-  }
-
-  if (!tab.canOpenInReader) {
-    const block = blockText[tab.block ?? 'not-pdf'];
-    return (
-      <section className="pp-popup__card pp-popup__tab" data-state="blocked" aria-label="当前页面">
-        <div className="pp-popup__tab-row">
-          <span className="pp-popup__badge-icon" data-block={tab.block ?? 'not-pdf'} aria-hidden="true">
-            <Icon name={block.icon} size={18} />
-          </span>
-          <div className="pp-popup__tab-text">
-            <p className="pp-popup__tab-title">{block.title}</p>
-            <p className="pp-popup__tab-detail">{block.detail}</p>
-          </div>
-        </div>
-      </section>
-    );
-  }
-
+/** The current tab, only when it holds something the reader can open. */
+function CurrentTab({ tab, onOpen, onImport }: { tab: ActiveTabView; onOpen: () => void; onImport: () => void }) {
+  // A local PDF the browser will not let us read: offer to import it instead.
+  const local = !tab.canOpenInReader && tab.block === 'file-access';
   return (
     <section className="pp-popup__card pp-popup__tab" aria-label="当前页面">
       <div className="pp-popup__tab-row">
@@ -77,61 +52,61 @@ function CurrentTab({ tab, onOpen }: { tab: ActiveTabView | null; onOpen: () => 
             <span className="pp-popup__tab-url" title={tab.displayUrl}>
               {tab.displayUrl}
             </span>
-            {tab.inLibrary && <Badge>已在文献库</Badge>}
+            {tab.inLibrary && <Badge>已收藏</Badge>}
           </p>
         </div>
       </div>
-      <button type="button" className="pp-popup__primary" onClick={onOpen}>
-        在纸窗中打开
+      <button type="button" className="pp-popup__primary" onClick={local ? onImport : onOpen}>
+        {local ? '选择文件导入' : '在纸窗中打开'}
       </button>
     </section>
   );
 }
 
 /**
- * The extension's toolbar popup: the current tab and a way into the reader,
- * auto-open, recent papers, and the library and settings.
+ * The extension's toolbar popup: the current paper when there is one, the two
+ * browser switches, recent papers, and the way into the library.
  */
 export function PopupView(props: PopupViewProps) {
   const { activeTab: tab, recent } = props;
   const [now,setNow]=useState(()=>Date.now());
   useEffect(()=>{const timer=window.setInterval(()=>setNow(Date.now()),30000);return()=>window.clearInterval(timer);},[]);
+  const openable = !!tab && (tab.canOpenInReader || tab.block === 'file-access') && tab.pdf !== 'checking' && tab.pdf !== 'unknown';
+  const issues = problems(props.status);
 
   return (
     <div className="pp-popup">
       <header className="pp-popup__head">
         <LogoMark />
         <span className="pp-popup__name">纸窗</span>
-        <span className="pp-popup__name-en">Paperpane</span>
+        <IconButton icon="settings" label="设置" shape="pill" onClick={() => props.onOpenSettings()} />
       </header>
 
-      <CurrentTab tab={tab} onOpen={() => tab && props.onOpenInReader(tab.tabId)} />
+      {openable && <CurrentTab tab={tab} onOpen={() => props.onOpenInReader(tab.tabId)} onImport={props.onAllowFileAccess} />}
 
-      <section className="pp-popup__card pp-popup__group" aria-label="自动打开">
+      <section className="pp-popup__card pp-popup__group" aria-label="浏览器">
         <div className="pp-popup__row">
           <span className="pp-popup__row-label">自动打开 PDF</span>
           <Switch label="自动打开 PDF" hideLabel checked={props.autoOpenPdf} onChange={props.onAutoOpenPdf} />
         </div>
         {props.onShowPdfButtons && <div className="pp-popup__row">
-          <span className="pp-popup__row-label">显示网页打开按钮</span>
-          <Switch label="显示网页打开按钮" hideLabel checked={props.showPdfButtons??true} onChange={props.onShowPdfButtons}/>
+          <span className="pp-popup__row-label"><HintLabel hint="在论文网页和 PDF 链接旁显示「用纸窗打开」按钮">网页快捷按钮</HintLabel></span>
+          <Switch label="网页快捷按钮" hideLabel checked={props.showPdfButtons??true} onChange={props.onShowPdfButtons}/>
         </div>}
       </section>
-      {props.error && <p role="alert">{props.error}</p>}
 
-      {(
+      {recent.length > 0 && (
         <section className="pp-popup__recent" aria-labelledby="pp-popup-recent">
-          <h2 id="pp-popup-recent">继续阅读</h2>
-          {recent.length===0&&<p role="status">{props.recentState==='loading'?'正在读取最近阅读…':props.recentState==='failed'?'暂时无法显示最近阅读':'还没有最近阅读记录'}</p>}
+          <h2 id="pp-popup-recent">最近阅读</h2>
           <ul>
             {recent.slice(0, 3).map((paper) => (
               <li key={paper.id}>
                 <button type="button" onClick={() => props.onOpenRecent(paper.id)}>
                   <span className="pp-popup__recent-title">{paper.title}</span>
-                  <span className="pp-popup__recent-meta">
-                    {paper.progress !== undefined && paper.progress > 0 && paper.progress < 1 ? `读到 ${Math.round(paper.progress * 100)}% · ` : ''}
-                    {sinceText(paper.lastReadAt,now)}
-                  </span>
+                  <span className="pp-popup__recent-meta">{sinceText(paper.lastReadAt,now)}</span>
+                  {paper.progress !== undefined && paper.progress > 0 && paper.progress < 1 && (
+                    <span className="pp-popup__recent-progress" style={{ '--pp-progress': `${Math.round(paper.progress * 100)}%` } as CSSProperties} aria-label={`读到 ${Math.round(paper.progress * 100)}%`} />
+                  )}
                 </button>
               </li>
             ))}
@@ -139,7 +114,16 @@ export function PopupView(props: PopupViewProps) {
         </section>
       )}
 
-      <StatusLine status={props.status} inline className="pp-popup__status" onOpen={props.onOpenSettings} />
+      {(props.error || issues.length > 0) && (
+        <ul className="pp-popup__issues" role="alert">
+          {props.error && <li><span>{props.error}</span></li>}
+          {issues.map((issue) => (
+            <li key={issue.text}>
+              <button type="button" onClick={() => props.onOpenSettings(issue.section)}>{issue.text}</button>
+            </li>
+          ))}
+        </ul>
+      )}
 
       <nav className="pp-popup__card pp-popup__dock" aria-label="打开">
         <button type="button" onClick={props.onOpenLibrary}>
@@ -149,10 +133,6 @@ export function PopupView(props: PopupViewProps) {
         <button type="button" onClick={props.onOpenFile}>
           <Icon name="upload" size={17} />
           打开文件
-        </button>
-        <button type="button" onClick={() => props.onOpenSettings()}>
-          <Icon name="settings" size={17} />
-          设置
         </button>
       </nav>
     </div>

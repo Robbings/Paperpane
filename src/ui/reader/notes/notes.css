@@ -182,3 +182,20 @@
   height: 26px;
   color: var(--pp-text-3);
 }
+
+/* The note's colour dot doubles as its highlight control; empty when not highlighted. */
+.pp-note__dot--button {
+  flex-shrink: 0;
+  padding: 0;
+  border: 0;
+  cursor: pointer;
+}
+
+.pp-note__dot--button:hover {
+  box-shadow: 0 0 0 3px var(--pp-fill-hover);
+}
+
+.pp-note__dot[data-empty] {
+  background: transparent;
+  box-shadow: inset 0 0 0 1.5px var(--pp-text-3);
+}

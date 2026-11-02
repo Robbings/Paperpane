@@ -17,7 +17,7 @@ export function fromZoteroAnnotation(item:ZoteroItem,ref:DocumentRef,views:reado
   const onPage=['note','text','image'].includes(type);
   // A text box keeps its words as the comment; an image area has no text of its own.
   const comment=type==='text'?[d.annotationText,d.annotationComment].filter(Boolean).join('\n\n'):d.annotationComment??'';
-  return {id,revision:crypto.randomUUID(),createdAt:at,updatedAt:at,kind:onPage?'page-comment':d.annotationComment?'selection-comment':'highlight',anchor:{...ref,pages},color,quote:onPage?'':d.annotationText??'',comment,source:{kind:'user'},save:{local:'saved',sync:'unconfigured'}};
+  return {id,revision:crypto.randomUUID(),createdAt:at,updatedAt:at,kind:onPage?'page-comment':'highlight',anchor:{...ref,pages},color,quote:onPage?'':d.annotationText??'',comment,source:{kind:'user'},save:{local:'saved',sync:'unconfigured'}};
 }
 export function toZoteroAnnotations(row:Annotation,parentItem:string,views:readonly number[][]):ZoteroData[]{
   if(row.deletedAt)return [];

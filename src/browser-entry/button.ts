@@ -3,14 +3,21 @@ button[data-paperpane-button] { all:initial; box-sizing:border-box; display:inli
 button[data-paperpane-button]:hover { background:#3044b4; }
 button[data-paperpane-button]:focus-visible { outline:3px solid #aabaff; outline-offset:3px; }
 button[data-paperpane-button]:disabled { opacity:.65; cursor:wait; }
+button[data-paperpane-button][data-look=link] { display:inline; min-height:0; padding:0; border:0; border-radius:0; background:none; box-shadow:none; color:LinkText; font:inherit; text-decoration:none; }
+button[data-paperpane-button][data-look=link]:hover { background:none; text-decoration:underline; }
 `;
-export function createPdfButton(doc: Document, open: () => Promise<void>, label = '在 Paperpane 中打开'): HTMLButtonElement {
+/**
+ * 'link' sits in a page's own list of links and reads like one of them (text in the link colour);
+ * 'solid' floats over a PDF, where it has to stand out from the document.
+ */
+export function createPdfButton(doc: Document, open: () => Promise<void>, label = '在 Paperpane 中打开', look: 'solid' | 'link' = 'solid'): HTMLButtonElement {
   if (!doc.getElementById('paperpane-entry-style')) {
     const style = doc.createElement('style'); style.id = 'paperpane-entry-style'; style.textContent = CSS;
     (doc.head ?? doc.documentElement).append(style);
   }
   const button = doc.createElement('button');
   button.type = 'button'; button.dataset.paperpaneButton = ''; button.textContent = label;
+  if (look === 'link') button.dataset.look = 'link';
   button.addEventListener('click', async event => {
     event.preventDefault(); event.stopPropagation();
     if (button.disabled) return;

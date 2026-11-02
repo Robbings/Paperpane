@@ -475,13 +475,13 @@ export class PdfjsReader implements ReaderService, AnchorService {
     if (target?.kind === 'annotation') {
       const row = items.find(row => row.id === target.annotationId && !row.deletedAt);
       if (!row) this.dismissMenu();
-      else if (row.color !== target.color) this.publish({menuTarget:{...target,color:row.color}});
+      else if ((row.kind === 'highlight' ? row.color : undefined) !== target.color) this.publish({menuTarget:{...target,color:row.kind === 'highlight' ? row.color : undefined}});
     }
   }
   showAnnotation(id: string) {
     const row = this.annotations.find(row => row.id === id && !row.deletedAt); if (!row) return;
     window.getSelection()?.removeAllRanges();
-    this.publish({selection:null, menuTarget:{kind:'annotation',annotationId:id,anchor:row.anchor,color:row.color}});
+    this.publish({selection:null, menuTarget:{kind:'annotation',annotationId:id,anchor:row.anchor,color:row.kind === 'highlight' ? row.color : undefined}});
   }
   setTool(tool: ReaderState['tool']) { this.publish({tool}); }
   dismissMenu() { if (this.snapshot.data.menuTarget || this.snapshot.data.selection) this.publish({menuTarget:null,selection:null}); }

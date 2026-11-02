@@ -1,9 +1,9 @@
 import { MarkdownEditor } from '@/ui/markdown/MarkdownEditor';
 import { useEffect, useLayoutEffect, useRef, useState, type CSSProperties, type PointerEvent as ReactPointerEvent } from 'react';
 import { createPortal } from 'react-dom';
-import { Icon, IconButton } from '@/ui/components';
+import { Icon, IconButton, Menu, highlightColors, type HighlightColor } from '@/ui/components';
 import type { AnnotationView, NoteLayout, ViewRect } from '../types';
-import { floatingLeft, floatingMargin, floatingPaperBounds, useFloatingCanvas } from '../windows/floating-canvas';
+import { floatingLeft, floatingMargin, floatingPaperBounds, useFloatingCanvas, type PaperBounds } from '../windows/floating-canvas';
 
 export type { NoteLayout };
 import './notes.css';
@@ -29,8 +29,11 @@ interface CommentNotesProps {
   onComment: (id: string, comment: string) => void;
   onLocate: (id: string) => void;
   onRemoveComment: (id: string) => void;
+  /** Sets the passage's highlight, or takes it off (null). */
+  onHighlight?: (id: string, color: HighlightColor | null) => void;
 }
 
+const colorNames: Record<HighlightColor, string> = { yellow: '黄色', green: '绿色', blue: '蓝色', pink: '粉色', purple: '紫色' };
 const dot = (color: string) => ({ '--pp-dot': `var(--pp-hl-${color}-dot)` }) as CSSProperties;
 const clamp = (value: number, min: number, max: number) => Math.min(Math.max(value, min), Math.max(min, max));
 
@@ -39,8 +42,15 @@ export function noteTitle(annotation: AnnotationView): string {
   const first = annotation.note?.split('\n').find((line) => line.trim())?.trim();
   if (first) return first.replace(/^#{1,6}\s+/, '').replace(/!\[([^\]]*)\]\([^)]+\)/g,'$1').replace(/\*\*|__/g,'');
   const quote = annotation.quote?.trim();
-  return quote ? (quote.length > 24 ? `${quote.slice(0, 24)}…` : quote) : `第 ${annotation.pageIndex + 1} 页的评论`;
+  return quote ? (quote.length > 24 ? `${quote.slice(0, 24)}…` : quote) : `第 ${annotation.pageIndex + 1} 页的旁注`;
 }
+
+/**
+ * Focus from the keyboard shows the connector like hovering does. A click (or
+ * typing in the editor) does not, so the line goes away once the pointer leaves.
+ */
+export const keyboardFocus = (target: EventTarget) =>
+  target instanceof Element && target.matches(':focus-visible') && !target.closest('[contenteditable], textarea, input');
 
 /** The point on a rectangle closest to (x, y). */
 function nearest(rect: ViewRect, x: number, y: number) {
@@ -70,7 +80,7 @@ export function CommentNotes(props: CommentNotesProps) {
   const extents = notes.flatMap(note => {
     const anchor = anchors.get(note.id);
     if (!container || !note.open || !anchor) return [];
-    const width = cardWidth(note), left = floatingLeft(container, anchor.x + note.dx * props.zoomPercent / (note.zoom ?? 100), width, paper.left);
+    const width = cardWidth(note), left = floatingLeft(paper, anchor.x + note.dx * props.zoomPercent / (note.zoom ?? 100), width);
     return [{left,right:left+width}];
   });
   const canvas = useFloatingCanvas(container, extents.length ? Math.min(...extents.map(card => card.left)) : null, extents.length ? Math.max(...extents.map(card => card.right)) : null);
@@ -142,7 +152,7 @@ export function CommentNotes(props: CommentNotesProps) {
 
   // Existing page gutters count toward the card's room; only add space beyond the actual PDF.
   const bounds = { left: paper.left, width: paper.right, height: paper.bottom + 300 };
-  const margin = floatingMargin(container, Math.max(0, ...notes.filter(note => note.open).map(cardWidth)));
+  const margin = floatingMargin(paper, Math.max(0, ...notes.filter(note => note.open).map(cardWidth)));
 
   return (
     <>
@@ -169,6 +179,7 @@ export function CommentNotes(props: CommentNotesProps) {
                 note={note}
                 anchor={anchor}
                 bounds={bounds}
+                paper={paper}
                 container={container}
                 uiScale={props.uiScale ?? 1}
                 scale={props.zoomPercent / (note.zoom ?? 100)}
@@ -186,6 +197,7 @@ export function CommentNotes(props: CommentNotesProps) {
                 onComment={(text) => props.onComment(note.id, text)}
                 onLocate={() => props.onLocate(note.id)}
                 onRemoveComment={() => props.onRemoveComment(note.id)}
+                onHighlight={props.onHighlight && ((color) => props.onHighlight!(note.id, color))}
               />
             );
           })}
@@ -203,6 +215,8 @@ interface CommentNoteProps {
   anchor: { x: number; y: number };
   /** The paper's scrollable size: notes stay inside it. */
   bounds: { left: number; width: number; height: number };
+  /** The PDF's own bounds; the room beside it scales with them. */
+  paper: PaperBounds;
   container: HTMLElement;
   scale: number;
   uiScale: number;
@@ -216,15 +230,18 @@ interface CommentNoteProps {
   onComment: (text: string) => void;
   onLocate: () => void;
   onRemoveComment: () => void;
+  onHighlight?: (color: HighlightColor | null) => void;
 }
 
-function CommentNote({ onDragging, note, anchor, bounds, container, scale, uiScale, canvas, annotation, register, onHover, onChange, onRaise, onClose, onComment, onLocate, onRemoveComment }: CommentNoteProps) {
+function CommentNote({ onDragging, note, anchor, bounds, paper, container, scale, uiScale, canvas, annotation, register, onHover, onChange, onRaise, onClose, onComment, onLocate, onRemoveComment, onHighlight }: CommentNoteProps) {
+  const [colors, setColors] = useState<{ x: number; y: number } | null>(null);
+  const lit = annotation.kind === 'highlight' && annotation.highlighted !== false;
   const [draft, setDraft] = useState(annotation.note ?? '');
   const gesture = useRef<{ kind:'move'|'resize'; pointerId:number; target:HTMLElement; x:number;y:number;px:number;py:number;scrollX:number;scrollY:number;inset:number;width:number;height:number;startLeft:number;start:NoteLayout;moved:boolean }|null>(null);
   const element = useRef<HTMLElement | null>(null);
   const frame = useRef(0);
-  const current = useRef({note,anchor,bounds,scale,uiScale,onChange});
-  current.current = {note,anchor,bounds,scale,uiScale,onChange};
+  const current = useRef({note,anchor,bounds,paper,scale,uiScale,onChange});
+  current.current = {note,anchor,bounds,paper,scale,uiScale,onChange};
 
 
   // Take outside changes (e.g. edited in the annotation list) unless typing here.
@@ -233,7 +250,7 @@ function CommentNote({ onDragging, note, anchor, bounds, container, scale, uiSca
   }, [annotation.note]);
 
   const renderedWidth = element.current?.getBoundingClientRect().width ?? note.width * scale * uiScale;
-  const left = floatingLeft(container, anchor.x + note.dx * scale, renderedWidth, bounds.left) + canvas.inset;
+  const left = floatingLeft(paper, anchor.x + note.dx * scale, renderedWidth) + canvas.inset;
   const top = anchor.y + note.dy * scale;
   const width = note.collapsed ? undefined : note.width * uiScale;
   const height = (note.collapsed ? PILL_HEIGHT : note.height) * uiScale;
@@ -243,7 +260,7 @@ function CommentNote({ onDragging, note, anchor, bounds, container, scale, uiSca
     if(g?.target.hasPointerCapture(g.pointerId))g.target.releasePointerCapture(g.pointerId);
     if(expand && g?.moved && g.kind==='move') {
       const {note,anchor,scale,uiScale}=current.current;
-      const left=floatingLeft(container,anchor.x+note.dx*scale,g.width,current.current.bounds.left)+canvas.readInset(), right=left+(element.current?.getBoundingClientRect().width??note.width*scale*uiScale);
+      const left=floatingLeft(current.current.paper,anchor.x+note.dx*scale,g.width)+canvas.readInset(), right=left+(element.current?.getBoundingClientRect().width??note.width*scale*uiScale);
       if(right>container.scrollLeft+container.clientWidth-16)container.scrollLeft=right-container.clientWidth+16;
       else if(left<container.scrollLeft+16)container.scrollLeft=Math.max(0,left-16);
     }
@@ -258,12 +275,12 @@ function CommentNote({ onDragging, note, anchor, bounds, container, scale, uiSca
   },[container,scale,uiScale]);
   const updateGesture = () => {
     const g=gesture.current;if(!g)return;
-    const {anchor,bounds,scale,uiScale,note:latest,onChange}=current.current;
+    const {anchor,bounds,paper,scale,uiScale,note:latest,onChange}=current.current;
     const dx=g.px-g.x+container.scrollLeft-g.scrollX-(canvas.readInset()-g.inset), dy=g.py-g.y+container.scrollTop-g.scrollY;
     if(Math.abs(dx)+Math.abs(dy)>3)g.moved=true;
     if(!g.moved)return;
     if(g.kind==='move')onChange({...latest,
-      dx:(clamp(g.startLeft+dx,bounds.left+12-floatingMargin(container,g.width),bounds.width+floatingMargin(container,g.width)-g.width)-anchor.x)/scale,
+      dx:(clamp(g.startLeft+dx,bounds.left+12-floatingMargin(paper,g.width),bounds.width+floatingMargin(paper,g.width)-g.width)-anchor.x)/scale,
       dy:(clamp(anchor.y+g.start.dy*scale+dy,0,bounds.height-g.height)-anchor.y)/scale,
     });
     else onChange({...latest,width:clamp(g.start.width+dx/scale/uiScale,NOTE_SIZE.minWidth,NOTE_SIZE.maxWidth),height:clamp(g.start.height+dy/scale/uiScale,NOTE_SIZE.minHeight,NOTE_SIZE.maxHeight)});
@@ -300,11 +317,11 @@ function CommentNote({ onDragging, note, anchor, bounds, container, scale, uiSca
       ref={el => { element.current=el;register(el); }}
       className={note.collapsed ? 'pp-glass pp-note pp-note--pill' : 'pp-glass pp-note'}
       data-tone="float"
-      aria-label={`评论：${title}`}
+      aria-label={`旁注：${title}`}
       style={{ left, top, width, height, zIndex: note.z, transform:`scale(${scale})`, transformOrigin:'top left' }}
       onPointerEnter={() => onHover(true)}
       onPointerLeave={() => onHover(false)}
-      onFocus={() => onHover(true)}
+      onFocus={(event) => onHover(keyboardFocus(event.target))}
       onBlur={(event) => {
         if (!event.currentTarget.contains(event.relatedTarget as Node | null)) onHover(false);
       }}
@@ -314,14 +331,29 @@ function CommentNote({ onDragging, note, anchor, bounds, container, scale, uiSca
         <div className="pp-note__pill" {...drag}>
           <Icon name="comment" size={15} className="pp-note__pill-icon" />
           <span className="pp-note__pill-title">{title}</span>
-          <IconButton icon="openExternal" label="展开评论" size="md" shape="pill" onClick={() => onChange({ ...note, collapsed: false })} />
+          <IconButton icon="openExternal" label="展开旁注" size="md" shape="pill" onClick={() => onChange({ ...note, collapsed: false })} />
         </div>
       ) : (
         <>
           <header className="pp-note__head" {...drag}>
-            <span className="pp-note__dot" style={dot(annotation.color)} aria-hidden="true" />
+            {onHighlight && annotation.kind === 'highlight' ? (
+              <button
+                type="button"
+                className="pp-note__dot pp-note__dot--button"
+                style={dot(annotation.color)}
+                data-empty={!lit || undefined}
+                aria-label={lit ? '改变或取消高亮' : '加上高亮'}
+                title={lit ? '改变或取消高亮' : '加上高亮'}
+                onClick={(event) => {
+                  const box = event.currentTarget.getBoundingClientRect();
+                  setColors({ x: box.left, y: box.bottom + 4 });
+                }}
+              />
+            ) : (
+              <span className="pp-note__dot" style={dot(annotation.color)} data-empty={!lit || undefined} aria-hidden="true" />
+            )}
             <span className="pp-note__quote" title={annotation.quote}>
-              {annotation.quote ?? `第 ${annotation.pageIndex + 1} 页的评论`}
+              {annotation.quote ?? `第 ${annotation.pageIndex + 1} 页的旁注`}
             </span>
             <IconButton icon="region" label="定位到原文" size="md" shape="pill" onClick={onLocate} />
             <IconButton
@@ -331,18 +363,30 @@ function CommentNote({ onDragging, note, anchor, bounds, container, scale, uiSca
               shape="pill"
               onClick={() => onChange({ ...note, collapsed: true })}
             />
-            {annotation.note && <IconButton icon="trash" label="仅删除评论（保留高亮）" size="md" shape="pill" onClick={onRemoveComment} />}
+            {annotation.note && <IconButton icon="trash" label={lit ? '删除旁注（高亮保留）' : '删除旁注'} size="md" shape="pill" onClick={onRemoveComment} />}
             <IconButton
               icon="close"
-              label="关闭评论"
+              label="关闭旁注"
               size="md"
               shape="pill"
               onClick={onClose}
             />
           </header>
-          <MarkdownEditor storageKey={'comment:'+note.id} compact label="评论（第一行作为标题）" placeholder="第一行是标题，然后写下你的想法…" value={draft}
+          <MarkdownEditor storageKey={'comment:'+note.id} compact label="旁注（第一行作为标题）" placeholder="第一行是标题，然后写下你的想法…" value={draft}
             onChange={value=>{setDraft(value);onComment(value);}} onEscape={()=>onChange({...note,collapsed:true})}/>
           <span className="pp-note__resize" aria-hidden="true" onPointerDown={begin('resize')} onPointerMove={move} onPointerUp={end} onPointerCancel={end} onLostPointerCapture={()=>finish()} />
+          {colors && onHighlight && (
+            <Menu
+              label="高亮颜色"
+              anchor={colors}
+              entries={[
+                ...highlightColors.map((c) => ({ id: c, label: colorNames[c], checked: lit && annotation.color === c })),
+                ...(lit ? [{ kind: 'separator' as const, id: 'sep' }, { id: 'none', label: '取消高亮' }] : []),
+              ]}
+              onSelect={(id) => onHighlight(id === 'none' ? null : (id as HighlightColor))}
+              onClose={() => setColors(null)}
+            />
+          )}
         </>
       )}
     </section>

@@ -24,7 +24,10 @@ export interface OutlineItemView {
 
 export interface AnnotationView {
   id: string;
+  /** 'comment' is pinned to a place on the page; 'highlight' is on text, highlighted or not. */
   kind: 'highlight' | 'comment';
+  /** False for a comment on text without a highlight. Omitted means highlighted. */
+  highlighted?: boolean;
   color: HighlightColor;
   /** 0-based. */
   pageIndex: number;
@@ -101,6 +104,13 @@ export interface ReaderInteraction {
   onToolChange: (tool: ReaderTool) => void;
   /** Highlights a captured selection; no colour means the last one used. Resolves to the new annotation id, or null if it failed. */
   onCreateHighlight: (selectionId: string, color?: HighlightColor) => Promise<string | null>;
+  /** A comment on the selection without a highlight. Without it, a comment starts as a highlight. */
+  onCreateComment?: (selectionId: string) => Promise<string | null>;
+  /**
+   * Sets a text annotation's highlight, or removes it (null, or its current colour). Resolves to
+   * what happened: removing keeps the comment; with no comment the annotation is deleted.
+   */
+  onAnnotationHighlight?: (annotationId: string, color: HighlightColor | null) => Promise<'highlighted' | 'removed' | 'deleted' | null>;
   /** Other menu actions on a selection: translate, explain, ask, copy. */
   onSelectionAction: (selectionId: string, action: string) => void;
   /** Translate, explain or ask about an existing highlight's text. */

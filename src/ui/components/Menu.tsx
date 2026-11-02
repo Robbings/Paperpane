@@ -5,7 +5,7 @@ import { layerFor } from './useAnchoredPosition';
 import './Menu.css';
 
 export type MenuEntry =
-  | { kind?: 'item'; id: string; label: string; icon?: IconName; checked?: boolean; disabled?: boolean }
+  | { kind?: 'item'; id: string; label: string; icon?: IconName; checked?: boolean; disabled?: boolean; /** Shown at the end, e.g. "F3". */ shortcut?: string }
   | { kind: 'separator'; id: string };
 
 interface MenuProps {
@@ -117,6 +117,7 @@ export function Menu({ label, entries, anchor, align = 'start', triggerRef, mult
               {entry.checked ? <Icon name="check" size={14} strokeWidth={1.8} /> : entry.icon ? <Icon name={entry.icon} size={16} strokeWidth={1.5} /> : null}
             </span>
             <span>{entry.label}</span>
+            {entry.shortcut && <span className="pp-menu__shortcut" aria-hidden="true">{entry.shortcut}</span>}
           </button>
         ),
       )}

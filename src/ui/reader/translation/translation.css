@@ -248,3 +248,21 @@
 .pp-reader__paper.pp-translation-page-actions { padding-right: 52px; }
 .pp-tr-page-actions { position: absolute; top: 0; left: 0; pointer-events: none; z-index: 3; }
 .pp-tr-page-action { position: absolute; pointer-events: auto; border-radius: var(--pp-radius-pill); }
+
+/* 翻译全文: a text action beside 译文 / 对照, gone once the paper is translated. */
+.pp-tr__all {
+  flex-shrink: 0;
+  height: 26px;
+  padding: 0 8px;
+  border: 0;
+  border-radius: var(--pp-radius-pill);
+  background: transparent;
+  color: var(--pp-accent);
+  font-size: var(--pp-text-sm);
+  font-weight: var(--pp-weight-medium);
+  white-space: nowrap;
+}
+
+.pp-tr__all:hover {
+  background: var(--pp-accent-soft);
+}

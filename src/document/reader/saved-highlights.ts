@@ -24,7 +24,7 @@ export class SavedHighlights {
       do {
         this.again = false;
         const wanted = new Map<string, { row: Annotation; page: Annotation['anchor']['pages'][number]; signature: string }>();
-        for (const row of this.items) if (!row.deletedAt && row.kind !== 'page-comment') for (const page of row.anchor.pages) {
+        for (const row of this.items) if (!row.deletedAt && row.kind === 'highlight') for (const page of row.anchor.pages) {
           wanted.set(`${row.id}:${page.pageIndex}`, { row, page, signature: JSON.stringify([row.color, page.rects]) });
         }
         for (const [key, old] of this.editors) if (old.signature !== wanted.get(key)?.signature) { old.editor.remove(); this.editors.delete(key); }

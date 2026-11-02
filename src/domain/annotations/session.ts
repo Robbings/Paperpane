@@ -3,7 +3,7 @@ import { failure, success, type AppError, type Result, type Snapshot } from '@/c
 import type { DocumentRef } from '@/contracts/document';
 import { AnnotationDatabase, AnnotationFault } from '@/data/annotation-database';
 
-type Patch = { color?: Annotation['color']; comment?: string };
+type Patch = { color?: Annotation['color']; comment?: string; kind?: 'highlight' | 'selection-comment' };
 export interface SavedAnnotationState extends AnnotationState {
   layouts: readonly AnnotationNoteLayout[];
   pending: number;

@@ -3,6 +3,7 @@ import type { DocumentAnchor, DocumentRef, SelectionSnapshot } from './document'
 export type HighlightColor = 'yellow' | 'green' | 'blue' | 'pink' | 'purple';
 export interface Annotation extends RecordStamp {
   anchor: DocumentAnchor;
+  /** 'highlight' is drawn on the page (and may carry a comment); 'selection-comment' is a comment on text without a highlight. */
   kind: 'highlight' | 'selection-comment' | 'page-comment';
   color: HighlightColor; quote: string; comment: string;
   source: { kind: 'user' } | { kind: 'ai'; category: string; resultId: Id };
@@ -14,7 +15,8 @@ export type NewAnnotation =
 export interface AnnotationState { document: DocumentRef; items: readonly Annotation[] }
 export interface AnnotationService extends Readable<AnnotationState> {
   create(input: NewAnnotation): Promise<Result<Annotation>>;
-  update(id: Id, expectedRevision: Revision, patch: { color?: HighlightColor; comment?: string; anchor?: DocumentAnchor }): Promise<Result<Annotation>>;
+  /** `kind` switches a text annotation between highlighted and not; the comment is kept either way. */
+  update(id: Id, expectedRevision: Revision, patch: { color?: HighlightColor; comment?: string; anchor?: DocumentAnchor; kind?: 'highlight' | 'selection-comment' }): Promise<Result<Annotation>>;
   remove(id: Id, expectedRevision: Revision): Promise<Result<Annotation>>;
   /** Undo uses the deletion revision, so it cannot silently overwrite a later change. */
   restore(id: Id, expectedRevision: Revision): Promise<Result<Annotation>>;

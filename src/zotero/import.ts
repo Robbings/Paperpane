@@ -73,7 +73,10 @@ export async function importZotero(client:ZoteroClient,items:readonly ZoteroItem
           const id=`zotero:${client.userId}:${annotation.key}:${doc.fileVersion}`;
           const saved=await annotations.load(ref),existing=saved.items.find(r=>r.id===id);
           await db.saveRecord(`zotero-original:${client.userId}:${annotation.key}`,{document:ref,source:annotation});
-          try{const row=fromZoteroAnnotation(annotation,ref,views,id);if(!existing){await annotations.create(ref,row.kind==='page-comment'?{kind:'page-comment',anchor:row.anchor,color:row.color,comment:row.comment}:{kind:row.kind,selection:{anchor:row.anchor,text:row.quote},color:row.color,comment:row.comment},id);}
+          try{const row=fromZoteroAnnotation(annotation,ref,views,id);
+            // Zotero has no comment-without-highlight, so one exported from here comes back as a highlight: keep it as it is locally.
+            if(existing?.kind==='selection-comment'&&row.kind==='highlight')row.kind='selection-comment';
+            if(!existing){await annotations.create(ref,row.kind==='page-comment'?{kind:'page-comment',anchor:row.anchor,color:row.color,comment:row.comment}:{kind:row.kind,selection:{anchor:row.anchor,text:row.quote},color:row.color,comment:row.comment},id);}
             else if(previous?.annotationKeys?.[id+':'+row.anchor.pages[0]!.pageIndex]?.version!==annotation.version){const restore=new TransferStore();try{await restore.restore({format:'paperpane-backup',version:1,id:crypto.randomUUID(),createdAt:new Date().toISOString(),complete:false,databases:[{name:'paperpane',version:3,stores:{annotations:[row as unknown as Record<string,unknown>]}}],assets:[],preferences:{}},undefined,{mappingKey:`zotero-map:${client.userId}:${local.id}`,version:annotation.version,slots:row.anchor.pages.map(page=>({id:id+':'+page.pageIndex,key:annotation.key}))});}finally{await restore.close();}}
             for(const page of row.anchor.pages)link.annotationKeys![id+':'+page.pageIndex]={key:annotation.key,version:annotation.version,color:annotation.data.annotationColor,localColor:row.color};
             if(annotation.data.annotationColor&&!['#ffd400','#5fb236','#2ea8e5','#ff6666','#a28ae5'].includes(annotation.data.annotationColor.toLowerCase()))warnings.push('部分颜色换成了相近的颜色');
