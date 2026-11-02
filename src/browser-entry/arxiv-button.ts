@@ -10,7 +10,7 @@ export function mountArxivButton(doc: Document, open: (url: string) => Promise<v
     try { url = arxivPdfUrl(doc.location.href); } catch { return; }
     const pdfLink = doc.querySelector<HTMLAnchorElement>('.full-text a[href*="/pdf/"], a[title="Download PDF"]');
     if (!pdfLink) return;
-    const button = createPdfButton(doc, () => open(url));
+    const button = createPdfButton(doc, () => open(url), '用纸窗打开 PDF', 'link');
     button.id = 'paperpane-open-arxiv';
     const listItem = pdfLink.closest('li');
     if (listItem) {

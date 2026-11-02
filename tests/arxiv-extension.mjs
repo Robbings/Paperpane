@@ -49,7 +49,7 @@ try {
   });
   const arxiv = await context.newPage();
   await arxiv.goto('https://arxiv.org/abs/1706.03762');
-  const button = arxiv.getByRole('button', { name: '在 Paperpane 中打开', exact: true });
+  const button = arxiv.getByRole('button', { name: '用纸窗打开 PDF', exact: true });
   await button.waitFor();
   await arxiv.evaluate(() => document.body.append(document.createElement('div')));
   assert.equal(await arxiv.locator('#paperpane-open-arxiv').count(), 1);
@@ -141,7 +141,7 @@ try {
     await context.unrouteAll({ behavior: 'wait' });
     const live = await context.newPage();
     await live.goto('https://arxiv.org/abs/1706.03762', { waitUntil: 'domcontentloaded', timeout: 60000 });
-    await live.getByRole('button', { name: '在 Paperpane 中打开', exact: true }).waitFor({ timeout: 15000 });
+    await live.getByRole('button', { name: '用纸窗打开 PDF', exact: true }).waitFor({ timeout: 15000 });
     await live.screenshot({ path: resolve(output, 'arxiv-live-button.png') });
     const opened = context.waitForEvent('page');
     await live.locator('#paperpane-open-arxiv').click();

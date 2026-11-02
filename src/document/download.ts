@@ -41,16 +41,38 @@ async function readStream(stream: ReadableStream<Uint8Array>, total: number | un
     return data;
   } finally { signal.removeEventListener('abort', cancel); await reader.cancel().catch(() => {}); reader.releaseLock(); }
 }
+/** Gateway and rate-limit answers are usually passing: worth a short wait and another try. */
+const TRANSIENT = new Set([429, 502, 503, 504]);
+const wait = (ms: number, signal: AbortSignal) => new Promise<void>((resolve, reject) => {
+  const timer = setTimeout(resolve, ms);
+  signal.addEventListener('abort', () => { clearTimeout(timer); reject(signal.reason); }, { once: true });
+});
+/** arXiv's official mirror serves the same files when the main site's gateway times out. */
+function mirrorOf(url: URL): URL | undefined {
+  if (url.hostname !== 'arxiv.org' || !url.pathname.startsWith('/pdf/')) return undefined;
+  const mirror = new URL(url.href); mirror.hostname = 'export.arxiv.org'; return mirror;
+}
 export async function downloadPdf(url: URL, signal: AbortSignal, progress: (value: TransferProgress) => void): Promise<{ bytes: Uint8Array<ArrayBuffer>; filename: string; sourceUrl: string }> {
   const timeout = new AbortController();
   const timer = setTimeout(() => timeout.abort(), 120_000);
   const combined = AbortSignal.any([signal, timeout.signal]);
   try {
     // No cookies/auth forwarding. Login pages are rejected instead of being stored as PDFs.
-    const response = await fetch(url.href, { signal: combined, credentials: 'omit', referrerPolicy: 'no-referrer', cache: 'no-store', redirect: 'follow' });
+    const attempts = [url, url, mirrorOf(url) ?? url];
+    let response!: Response;
+    for (const [index, target] of attempts.entries()) {
+      if (index) await wait(index * 1500, combined);
+      response = await fetch(target.href, { signal: combined, credentials: 'omit', referrerPolicy: 'no-referrer', cache: 'no-store', redirect: 'follow' });
+      if (!TRANSIENT.has(response.status) || index === attempts.length - 1) break;
+      void response.body?.cancel().catch(() => {});
+    }
+    if (TRANSIENT.has(response.status)) {
+      void response.body?.cancel().catch(() => {});
+      throw new ImportFault({ code: 'NETWORK', message: `对方服务器暂时没有响应（HTTP ${response.status}），请稍后重试`, recovery: ['retry', 'choose-file'] });
+    }
     if (!response.ok) {
       void response.body?.cancel().catch(() => {});
-      throw new ImportFault({ code: response.status === 401 || response.status === 403 ? 'ACCESS_DENIED' : 'NETWORK', message: `下载失败（HTTP ${response.status}）。需要登录的文件请先下载到本机再导入`, recovery: ['retry', 'choose-file'] });
+      throw new ImportFault({ code: response.status === 401 || response.status === 403 ? 'ACCESS_DENIED' : 'NETWORK', message: response.status === 401 || response.status === 403 ? '需要登录才能下载，请先下载到本机再导入' : `下载失败（HTTP ${response.status}）`, recovery: ['retry', 'choose-file'] });
     }
     const type = response.headers.get('content-type')?.split(';')[0]?.trim().toLowerCase();
     if (type === 'text/html' || type === 'application/xhtml+xml' || type === 'application/json') {
