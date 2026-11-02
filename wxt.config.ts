@@ -5,6 +5,7 @@ import { dirname, join } from 'node:path';
 import { readdir } from 'node:fs/promises';
 const require=createRequire(import.meta.url);
 const ortDirectory=dirname(require.resolve('onnxruntime-web/wasm'));
+const pdfjsDirectory=dirname(require.resolve('pdfjs-dist/package.json'));
 
 export default defineConfig({
   srcDir:'src',modules:['@wxt-dev/module-react'],imports:false,manifestVersion:3,
@@ -16,6 +17,7 @@ export default defineConfig({
   },
   vite:()=>({worker:{format:'es'},resolve:{conditions:['onnxruntime-web-use-extern-wasm','module','browser','development|production']},plugins:[extensionDevHmr()]}),
   hooks:{'build:publicAssets':async(_wxt,files)=>{
+    for(const entry of await readdir(join(pdfjsDirectory,'wasm'),{withFileTypes:true}))if(entry.isFile())files.push({absoluteSrc:join(pdfjsDirectory,'wasm',entry.name),relativeDest:'pdfjs/wasm/'+entry.name});
     for(const name of ['ort-wasm-simd-threaded.mjs','ort-wasm-simd-threaded.wasm'])files.push({absoluteSrc:join(ortDirectory,name),relativeDest:'runtime/'+name});
     const root=join(dirname(require.resolve('vditor/package.json')),'dist');
     const add=async(relative:string)=>{

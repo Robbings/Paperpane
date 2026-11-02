@@ -5,6 +5,7 @@ import { PaperDatabase, type ImportReceipt } from '../data/database';
 import { abortIfNeeded, importError } from './errors';
 import { downloadPdf, parseSourceUrl, readPdfBytes, safeFilename } from './download';
 import { requestImportOrigin, hasImportOrigin } from './permissions';
+import { readableLocalSource } from './cached-source';
 
 type Run = {
   source: ImportSource; controller: AbortController; saving: boolean; epoch: number;
@@ -96,6 +97,16 @@ export function createDocumentService(database = new PaperDatabase(), options: {
     } catch (error) {
       if (!active()) return;
       const detail = signal.aborted ? { code: 'CANCELLED' as const, message: '导入已取消', recovery: ['retry' as const] } : importError(error);
+      if (detail.code === 'RATE_LIMITED' && run.source.kind === 'url') {
+        const local = await readableLocalSource(database, run.source.url, signal).catch(() => undefined);
+        if (!active() || signal.aborted) return;
+        if (local) {
+          receipts.set(id, { document: local, duplicate: true });
+          patchJob(id, { phase: 'readable', document: { documentId: local.id, fileVersion: local.fileVersion }, progress: undefined, error: undefined });
+          runs.delete(id);
+          return;
+        }
+      }
       patchJob(id, { phase: detail.code === 'CANCELLED' ? 'cancelled' : 'failed', error: detail, passwordRequest: undefined, progress: undefined });
     } finally { if (run.epoch === epoch) { run.password = undefined; run.saving = false; } }
   }

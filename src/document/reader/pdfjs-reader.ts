@@ -1,4 +1,5 @@
 import { nativeOutline, generatedOutline, type NavigationItem } from './navigation';
+import { pdfjsResources } from '../pdfjs-resources';
 import { setPaperpaneViewerTheme } from 'pdfjs-dist/build/paperpane-theme.mjs';
 import { TextLayer, AnnotationMode, AnnotationEditorType, GlobalWorkerOptions, PasswordResponses, getDocument, type PDFDocumentLoadingTask, type PDFDocumentProxy } from 'pdfjs-dist';
 import { mergeHighlightRects } from 'pdfjs-dist/build/paperpane-highlight-geometry.mjs';
@@ -178,7 +179,7 @@ export class PdfjsReader implements ReaderService, AnchorService {
     try {
       const data = new Uint8Array(await blob.arrayBuffer());
       if (this.disposed || this.snapshot.data.sessionId !== sessionId) return;
-      const task = this.task = getDocument({ data, enableXfa: false });
+      const task = this.task = getDocument({ ...pdfjsResources(), data, enableXfa: false });
       task.onProgress = ({loaded,total}: {loaded:number;total:number}) => { if (this.snapshot.data.sessionId === sessionId) this.publish({loadProgress: total > 0 ? Math.min(1,loaded/total) : undefined}); };
       task.onPassword = (submit: (password: string) => void, reason: number) => { if (this.snapshot.data.sessionId !== sessionId) return; const id = crypto.randomUUID(); this.password = { id, submit }; this.publish({ phase: 'password-required', passwordRequest: { requestId: id, incorrect: reason === PasswordResponses.INCORRECT_PASSWORD } }); };
       const pdf = await task.promise;

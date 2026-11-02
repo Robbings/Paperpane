@@ -1,4 +1,5 @@
 import { ImportFault, abortIfNeeded } from './errors';
+import { deferDownload, downloadBlockedUntil, rateLimitedDownload } from './download-cooldown';
 /** Per-file input limit. Full-buffer parsing/hashing still require additional memory. */
 export const MAX_PDF_BYTES = 256 * 1024 * 1024;
 export function parseSourceUrl(raw: string): URL {
@@ -41,11 +42,14 @@ async function readStream(stream: ReadableStream<Uint8Array>, total: number | un
     return data;
   } finally { signal.removeEventListener('abort', cancel); await reader.cancel().catch(() => {}); reader.releaseLock(); }
 }
-/** Gateway and rate-limit answers are usually passing: worth a short wait and another try. */
-const TRANSIENT = new Set([429, 502, 503, 504]);
+/** Gateway failures retain bounded retries; rate limits follow Retry-After. */
+const TRANSIENT = new Set([502, 503, 504]);
 const wait = (ms: number, signal: AbortSignal) => new Promise<void>((resolve, reject) => {
-  const timer = setTimeout(resolve, ms);
-  signal.addEventListener('abort', () => { clearTimeout(timer); reject(signal.reason); }, { once: true });
+  abortIfNeeded(signal);
+  const done = () => { signal.removeEventListener('abort', cancel); resolve(); };
+  const timer = setTimeout(done, ms);
+  const cancel = () => { clearTimeout(timer); signal.removeEventListener('abort', cancel); reject(signal.reason); };
+  signal.addEventListener('abort', cancel, { once: true });
 });
 /** arXiv's official mirror serves the same files when the main site's gateway times out. */
 function mirrorOf(url: URL): URL | undefined {
@@ -62,7 +66,16 @@ export async function downloadPdf(url: URL, signal: AbortSignal, progress: (valu
     let response!: Response;
     for (const [index, target] of attempts.entries()) {
       if (index) await wait(index * 1500, combined);
+      abortIfNeeded(combined);
+      const blocked = downloadBlockedUntil(target);
+      if (blocked) throw rateLimitedDownload(blocked);
       response = await fetch(target.href, { signal: combined, credentials: 'omit', referrerPolicy: 'no-referrer', cache: 'no-store', redirect: 'follow' });
+      if (response.status === 429) {
+        void response.body?.cancel().catch(() => {});
+        const until = deferDownload(target, response.headers.get('Retry-After'));
+        if (response.url) deferDownload(parseSourceUrl(response.url), response.headers.get('Retry-After'));
+        throw rateLimitedDownload(until);
+      }
       if (!TRANSIENT.has(response.status) || index === attempts.length - 1) break;
       void response.body?.cancel().catch(() => {});
     }
