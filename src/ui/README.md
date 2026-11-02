@@ -30,7 +30,7 @@
 | `Popover` | 锚定在某个元素上的非模态浮层（引用预览、小表单） | `anchorRef`、`open`、`onClose`、`label`、`placement`、`width` |
 | `Menu` | 下拉 / 右键菜单 | `entries`（普通项、勾选项、分隔线）、`anchor`（坐标）、`align`、`triggerRef`、`onSelect`、`onClose`；`multiple`：点勾选项后菜单不关，可以连续勾选 |
 | `Dialog` | 模态对话框 | `open`、`onClose`、`title`、`description`、`footer`、`size`、`dismissible` |
-| `toast` / `Toaster` | 页面顶部的轻提示 | `toast.show({ message, tone, action, duration })`；每个页面渲染一个 `<Toaster />` |
+| `toast` / `Toaster` | 页面顶部的轻提示 | `toast.show({ message, tone, action, duration })`；每个页面渲染一个 `<Toaster />`；`Dialog` 打开时自带一个，提示显示在弹窗上方且可关闭 |
 | `TextField` / `TextArea` | 输入框 / 自动长高的多行输入 | `label`、`value`、`onChange(value)`、`description`、`error`、`icon`、`clearable`；`TextArea` 另有 `maxRows`、`maxLength` |
 | `Switch` | 立即生效的开关 | `checked`、`onChange`、`label`、`description` |
 | `Checkbox` | 列表或表单里的勾选 | 同上，另有 `indeterminate` |
@@ -168,11 +168,14 @@ toast.show({ message: '翻译失败：请求超时', tone: 'error', action: { la
 位于 `src/ui/settings/`，视图模型在 `settings/types.ts`，按设置接口草案 v0.1 对应；示例接线是 `settings/sample/useSampleSettings.ts`（偏好和配置存在 localStorage，设置页与阅读器之间同步，仅作演示）。
 
 - **两类设置**：
-  - 偏好 `Preferences`（主题、界面语言、回答语言、正文字号、深色减光、公式复制格式）：每项改了立即生效，调用 `onPreference(key, value)`，由逻辑层单字段保存并同步到其他标签页；保存失败时 `PreferencesState.local = 'failed'`，界面提示并可重试。
-  - 配置 `SettingsView`（模型服务、模型、默认模型、功能路由、提示词、运行参数、同步）：设置页编辑一份草稿，所有节共用，切换节不会丢；保存条整体调用 `onSave(draft, baseRevision)`（模型二级页把同一组件放在顶部玻璃操作栏，其余页面继续使用底部保存条），按 `SaveSettingsResult` 显示成功、需要修改（`problems` 的 `path` 对应到字段）、冲突（保留草稿，用户选择载入最新或覆盖）、失败。
+  - 偏好 `Preferences`（主题、界面语言、回答语言、插件内容字号、深色减光、公式复制格式、自动翻译 `autoTranslate`：off / on-add / on-open）：每项改了立即生效，调用 `onPreference(key, value)`，由逻辑层单字段保存并同步到其他标签页；保存失败时 `PreferencesState.local = 'failed'`，界面提示并可重试。
+  - 配置 `SettingsView`（模型服务、模型、默认模型、功能路由、提示词、运行参数、同步）：设置页编辑一份草稿，所有节共用，切换节不会丢；保存条整体调用 `onSave(draft, baseRevision)`（各页顶部的玻璃标题栏 `SettingsHeader` 右侧放保存条，不再有底部浮动保存条），按 `SaveSettingsResult` 显示成功、需要修改（`problems` 的 `path` 对应到字段）、冲突（保留草稿，用户选择载入最新或覆盖）、失败。
 - **密钥**：快照只有 `hasKey` / `hasPassword`；草稿里用 `SecretEdit`（keep / clear / replace）。`toDraft(view)` 把快照转成草稿，所有密钥初始为 keep。
 - **外观的应用**：`applyAppearance()`（`src/ui/theme.ts`）设置主题、`--pp-read-scale` 和页面减光。正文字号只作用于批注、笔记、概览和回答正文（`--pp-text-read*`），不缩放工具栏，也不改变 PDF 缩放。
-- **节**：`SettingsSection` = general / models / features / sync / advanced / privacy；设置页地址的 `#models` 等直达对应一节。目前完成了通用和高级，其余几节下一步做。
+- **节**：`SettingsSection` = general / models / translation / sync；`sectionFromHash()` 把旧地址 `#features` 转到翻译、`#advanced` 转到模型。界面不放解释性段落，需要说明的标签用 `SettingRow` 的 `hint`（悬停出现）；错误和结果一律用 `toast`。
+  - **模型**：顶部「默认模型」组：默认模型，以及提问、解释、概览、图像识别（只列支持图片的模型）各自的功能路由 `features[].modelId`（空 = 跟随默认）。其下是模型服务列表和默认折叠的「高级设置」（`SettingGroup collapsible`：超时、输出上限）。添加模型时按 models.dev 目录 → OpenRouter 公开列表 → 默认值（支持图片、自动思考、128K）补全能力，多档上下文取最小；用了默认值的模型 `capabilitiesGuessed`，列表显示「待核对」，编辑保存后清除。
+  - **翻译**：默认翻译引擎 `translationEngine`（大模型或某个翻译服务）、默认翻译到、自动翻译、译文字号；折叠的「大模型翻译设置」（最大并发数默认 3 等）和「机器翻译设置」`runtime.machineTranslation`；翻译服务管理 `translationApis`，可选服务和字段见 `src/translation/machine-providers.ts`，各家接口由逻辑层实现统一的 `MachineTranslator`。
+  - **同步与备份**：WebDAV、备份（本机 / 云 / 回收站）、Zotero 三组，状态用标题旁的徽标表示。
 - **状态行** `StatusLine`：保存、同步、模型三种状态，设置页、阅读器快速设置和扩展弹窗共用，数据来自 `StatusSummary`。
 - **返回与导出**：`ReaderShell` 的 `onBack` 在工具栏最左边显示「返回文献库」；`exports`（`{ id, label, disabled? }[]`）让工具栏的导出按钮（窄窗口时在「更多」里）弹出导出菜单，选择后调用 `onExport(id)`。不传 `exports` 时导出按钮仍调用 `onTool('export')`。
 - **阅读器快速设置**：`ReaderShell` 的 `settings` prop（`ReaderSettingsProps`），工具栏设置按钮弹出：主题、正文字号、深色减光、回答语言、默认模型，加状态行和「全部设置…」。默认模型调用 `onDefaultModel(id)`，对应逻辑层的 `setDefaultModel(modelId, baseRevision)` 单项原子命令；不传 `settings` 时按钮仍调用 `onTool('settings')`。

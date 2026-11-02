@@ -1,4 +1,4 @@
-import { useState, type DragEvent } from 'react';
+import { useState, type CSSProperties, type DragEvent, type PointerEvent } from 'react';
 import { GlassSurface, Icon, IconButton, Menu, Tree, TREE_DRAG_TYPE, type IconName, type MenuEntry } from '@/ui/components';
 import { PAPER_DRAG_TYPE } from './dragTypes';
 import type { Collection, FolderView, TagView } from './types';
@@ -43,6 +43,43 @@ export function LibrarySidebar(props: LibrarySidebarProps) {
   const [expanded, setExpanded] = useState<ReadonlySet<string>>(() => new Set(folders.filter((f) => f.parentId === null).map((f) => f.id)));
   const [menu, setMenu] = useState<{ id: string; x: number; y: number } | null>(null);
   const [rootDrop, setRootDrop] = useState(false);
+  // The tag area's height is the reader's; kept across visits.
+  const [tagsHeight, setTagsHeight] = useState(() => {
+    try {
+      return Number(localStorage.getItem('pp-lib-tags-h')) || 140;
+    } catch {
+      return 140;
+    }
+  });
+  const [resizingTags, setResizingTags] = useState(false);
+  const resizeTags = (event: PointerEvent<HTMLDivElement>) => {
+    if (event.button !== 0) return;
+    event.preventDefault();
+    const handle = event.currentTarget,
+      startY = event.clientY,
+      start = tagsHeight;
+    handle.setPointerCapture(event.pointerId);
+    setResizingTags(true);
+    let last = start;
+    const move = (e: globalThis.PointerEvent) => {
+      last = Math.round(Math.min(Math.max(start + startY - e.clientY, 56), window.innerHeight * 0.7));
+      setTagsHeight(last);
+    };
+    const end = () => {
+      setResizingTags(false);
+      handle.removeEventListener('pointermove', move);
+      handle.removeEventListener('pointerup', end);
+      handle.removeEventListener('pointercancel', end);
+      try {
+        localStorage.setItem('pp-lib-tags-h', String(last));
+      } catch {
+        /* Only a convenience. */
+      }
+    };
+    handle.addEventListener('pointermove', move);
+    handle.addEventListener('pointerup', end);
+    handle.addEventListener('pointercancel', end);
+  };
 
   const isDescendant = (id: string, maybeChild: string | null): boolean => {
     let current = maybeChild;
@@ -146,7 +183,16 @@ export function LibrarySidebar(props: LibrarySidebarProps) {
       </div>
 
       {tags.length > 0 && (
-        <section className="pp-lib-tags" aria-label="按标签筛选">
+        <section className="pp-lib-tags" aria-label="按标签筛选" style={{ '--pp-tags-h': `${tagsHeight}px` } as CSSProperties}>
+          <div
+            className="pp-lib-tags__resize"
+            role="separator"
+            aria-orientation="horizontal"
+            aria-label="拖动调整标签区高度"
+            data-dragging={resizingTags || undefined}
+            onPointerDown={resizeTags}
+            onDoubleClick={() => setTagsHeight(140)}
+          />
           <div className="pp-lib-sidebar__heading">
             <span>标签</span>
             {activeTagIds.length > 0 && (
@@ -166,6 +212,7 @@ export function LibrarySidebar(props: LibrarySidebarProps) {
                     type="button"
                     className="pp-lib-tag"
                     aria-pressed={on}
+                    title={tag.label}
                     onClick={() => props.onTags(on ? activeTagIds.filter((id) => id !== tag.id) : [...activeTagIds, tag.id])}
                   >
                     {tag.label}

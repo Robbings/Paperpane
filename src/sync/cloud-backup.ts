@@ -5,7 +5,7 @@ import { sha256 } from '@/transfer/backup';
 export function davPaths(xml:string,base:URL):string[]{
   if(xml.length>4*1024*1024||/<!DOCTYPE|<!ENTITY/i.test(xml))throw new Error('WebDAV 目录响应无效');
   const values=[...xml.matchAll(/<(?:[\w.-]+:)?href\b[^>]*>([\s\S]*?)<\/(?:[\w.-]+:)?href\s*>/gi)];
-  if(values.length>5000)throw new Error('远程目录条目过多，请指定更小的目录');
+  if(values.length>5000)throw new Error('这个目录文件太多，请换一个');
   return values.flatMap(m=>{try{
     const href=m[1]!.replace(/&amp;/g,'&').replace(/&lt;/g,'<').replace(/&gt;/g,'>').replace(/&quot;/g,'"').replace(/&apos;/g,"'");
     const url=new URL(href,base);if(url.origin!==base.origin||!url.pathname.startsWith(base.pathname))return [];

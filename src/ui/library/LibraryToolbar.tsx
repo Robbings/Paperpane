@@ -129,8 +129,7 @@ export function LibraryToolbar(props: LibraryToolbarProps) {
             aria-expanded={open === 'scope'}
             onClick={() => setOpen(open === 'scope' ? null : 'scope')}
           >
-            {!allFields && <span>{scopeSummary}</span>}
-            <Icon name="chevronDown" size={12} strokeWidth={2} />
+            <Icon name="filter" size={14} strokeWidth={1.8} />
           </button>
         </Tooltip>
       </div>

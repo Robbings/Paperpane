@@ -1,5 +1,5 @@
-import { useId, type ReactNode } from "react";
-import { HintLabel } from "@/ui/components";
+import { useId, useState, type ReactNode } from "react";
+import { HintLabel, Icon } from "@/ui/components";
 
 /** A titled run of setting rows inside a section. No card of its own: rows sit on the page surface. */
 export function SettingGroup({
@@ -8,14 +8,30 @@ export function SettingGroup({
   children,
   hint,
   actions,
+  collapsible,
 }: {
   title?: string;
   description?: ReactNode;
   children: ReactNode;
   hint?: string;
   actions?: ReactNode;
+  /** Folded away until opened: for settings few people change. */
+  collapsible?: boolean;
 }) {
   const id = useId();
+  const [open, setOpen] = useState(false);
+  if (collapsible && title)
+    return (
+      <section className="pp-set-group pp-set-group--fold" data-open={open ? "true" : undefined} aria-labelledby={id}>
+        <h2 className="pp-set-group__title">
+          <button type="button" id={id} className="pp-set-fold" aria-expanded={open} onClick={() => setOpen(!open)}>
+            <Icon name="chevronRight" size={13} strokeWidth={2} />
+            <HintLabel hint={hint}>{title}</HintLabel>
+          </button>
+        </h2>
+        {open && <div className="pp-set-group__rows">{children}</div>}
+      </section>
+    );
   return (
     <section className="pp-set-group" aria-labelledby={title ? id : undefined}>
       {title && (hint || actions) ? (

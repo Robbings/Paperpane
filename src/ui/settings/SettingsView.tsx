@@ -1,13 +1,12 @@
-import { ZoteroSection } from './sections/ZoteroSection';
-import { SyncSection } from './sections/SyncSection';
-import { BackupSection } from './sections/BackupSection';
+import { SyncPage } from './sections/SyncPage';
 import { mergeOnto } from './merge-settings';
+import { SettingsHeader } from './SettingsHeader';
 import { ModelsSection } from './sections/ModelsSection';
-import { TranslationSection } from './sections/TranslationSection';
+import { TranslationSection, translationProblems } from './sections/TranslationSection';
 import { useEffect, useMemo, useRef, useState } from 'react';
-import { EmptyState, GlassSurface, Icon, ScrollArea, type IconName } from '@/ui/components';
+import { GlassSurface, Icon, ScrollArea, type IconName } from '@/ui/components';
 import { SaveBar, type SaveBarState } from './SaveBar';
-import { AdvancedSection, runtimeProblems } from './sections/AdvancedSection';
+import { runtimeProblems } from './sections/AdvancedSection';
 import { GeneralSection } from './sections/GeneralSection';
 import { StatusLine } from './StatusLine';
 import {
@@ -36,13 +35,11 @@ interface SettingsViewProps {
   status: StatusSummary;
 }
 
-const sections: { id: SettingsSection; label: string; icon: IconName; description: string }[] = [
-  { id: 'general', label: '通用', icon: 'settings', description: '外观、语言和复制格式。只对这台设备生效，改了立即生效。' },
-  { id: 'models', label: '模型', icon: 'model', description: '模型服务的地址和密钥，以及每个服务下可用的模型。' },
-  { id: 'features', label: '功能', icon: 'explain', description: '翻译、解释、讨论、概览等功能是否开启，各用哪个模型和提示词。' },
-  { id: 'sync', label: '同步与备份', icon: 'sync', description: '用 WebDAV 在设备之间同步，或导出一份备份。' },
-  { id: 'advanced', label: '高级', icon: 'sliders', description: '超时、同时进行的请求数和输出长度。' },
-  { id: 'privacy', label: '数据与隐私', icon: 'lock', description: '存储用量、操作记录、权限，以及数据会发到哪里。' },
+const sections: { id: SettingsSection; label: string; icon: IconName }[] = [
+  { id: 'general', label: '通用', icon: 'settings' },
+  { id: 'models', label: '模型', icon: 'model' },
+  { id: 'translation', label: '翻译', icon: 'translate' },
+  { id: 'sync', label: '同步与备份', icon: 'sync' },
 ];
 
 /** Draft comparison that tells an emptied number field (NaN) apart from "use the default" (null). */
@@ -50,14 +47,14 @@ const fingerprint = (draft: SettingsDraft) => JSON.stringify(draft, (_key, value
 
 const fieldNames: Record<string, string> = {
   'runtime.timeoutSec': '超时',
-  'runtime.concurrency': '同时进行的请求',
+  'runtime.concurrency': '最大并发数',
   'runtime.maxOutputTokens': '输出长度上限',
   defaultModelId: '默认模型',
 };
 const fieldName = (path: string) => fieldNames[path] ?? path;
 
 /** Problems the page can find before saving; the logic layer checks everything again. */
-const localProblems = (draft: SettingsDraft) => runtimeProblems(draft.runtime);
+const localProblems = (draft: SettingsDraft) => [...runtimeProblems(draft.runtime), ...translationProblems(draft)];
 
 export function SettingsView(props: SettingsViewProps) {
   const { section, settings } = props;
@@ -134,7 +131,7 @@ export function SettingsView(props: SettingsViewProps) {
     } else if (result.reason === 'invalid') {
       setProblems(new Map(result.problems.map((p) => [p.path, p.message])));
       // Problems the page has no field for still get said, at the bar.
-      const known = result.problems.filter((p) => p.path.startsWith('runtime.'));
+      const known = result.problems.filter((p) => p.path.startsWith('runtime.') || p.path.startsWith('translationApis.'));
       setBar({ kind: 'invalid', count: result.problems.length, message: known.length < result.problems.length ? result.problems[0]?.message : undefined });
     } else {
       setBar({ kind: 'failed', message: result.message });
@@ -200,28 +197,37 @@ export function SettingsView(props: SettingsViewProps) {
       <main className="pp-settings__main">
         <ScrollArea className="pp-settings__scroll" viewportClassName="pp-settings__viewport">
           <div className="pp-settings__content">
-            {section !== 'models' && <header className="pp-settings__head">
-              <h1>{current.label}</h1>
-              <p>{current.description}</p>
-            </header>}
-            {section === 'general' ? (
-              <GeneralSection state={props.preferences} onPreference={props.onPreference} onRetry={props.onRetryPreferences} />
-            ) : section === 'models' ? (
-              <ModelsSection draft={draft} onChange={edit} renderSaveBar={renderSaveBar} editor={modelEditor} setEditor={setModelEditor} />
-            ) : section === 'features' ? (
-              <TranslationSection draft={draft} onChange={edit} preferences={props.preferences.preferences} onPreference={props.onPreference} />
-            ) : section === 'sync' ? (
-              <><SyncSection/><BackupSection/><ZoteroSection/></>
-            ) : section === 'advanced' ? (
-              <AdvancedSection runtime={draft.runtime} onChange={(runtime) => edit({ ...draft, runtime })} problems={problems} />
+            {section === 'models' ? (
+              <ModelsSection
+                draft={draft}
+                onChange={edit}
+                renderSaveBar={renderSaveBar}
+                editor={modelEditor}
+                setEditor={setModelEditor}
+                problems={problems}
+              />
+            ) : section === 'translation' ? (
+              <TranslationSection
+                draft={draft}
+                onChange={edit}
+                problems={problems}
+                preferences={props.preferences.preferences}
+                onPreference={props.onPreference}
+                renderSaveBar={renderSaveBar}
+              />
             ) : (
-              <div className="pp-settings__pending">
-                <EmptyState icon={current.icon} title="这一节下一步完成" description={current.description} />
-              </div>
+              <>
+                {/* Pages that apply at once show saving only while the shared draft has changes. */}
+                <SettingsHeader title={current.label} saveBar={bar ? renderSaveBar('inline') : undefined} />
+                {section === 'general' ? (
+                  <GeneralSection state={props.preferences} onPreference={props.onPreference} onRetry={props.onRetryPreferences} />
+                ) : (
+                  <SyncPage />
+                )}
+              </>
             )}
           </div>
         </ScrollArea>
-        {section !== 'models' && renderSaveBar('floating')}
       </main>
     </div>
   );

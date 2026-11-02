@@ -20,18 +20,22 @@ test('一致快照保留研究内容，排除设备身份、密钥和缓存',asy
  const db=fresh();await seed(db,{meta:[{key:'deviceId',value:'private-device'},{key:'ai-v1:doc:version',value:{text:'研究结果'}},{key:'formula-plan:x',value:{count:3}},{key:'modelSettings-v1',value:{keys:{secret:'never-export'},view:{endpoints:[{id:'api',hasKey:true}],sync:{hasPassword:true,password:'secret'}}}}],cache:[{key:'cache',value:'discard'}]});
  const snapshot=await db.snapshot();const meta=snapshot.databases[0].stores.meta;assert.ok(meta.find(r=>r.key==='ai-v1:doc:version'));assert.ok(meta.find(r=>r.key==='formula-plan:x'));assert.equal(meta.find(r=>r.key==='deviceId'),undefined);assert.doesNotMatch(JSON.stringify(snapshot),/never-export/);assert.equal(snapshot.databases[0].stores.cache,undefined);await db.close();
 });
-test('合并恢复不覆盖冲突，双方内容保留，处理冲突采用 CAS',async()=>{
+test('合并恢复自动保存双方版本，可只切换有差异的字段',async()=>{
  const db=fresh();await seed(db,{libraryFolders:[{id:'folder',name:'本机目录',parentId:null}]});
  const snapshot={format:'paperpane-backup',version:1,id:'backup',createdAt:new Date().toISOString(),complete:true,databases:[{name:'paperpane',version:3,stores:{libraryFolders:[{id:'folder',name:'远程目录',parentId:null}]}}],assets:[],preferences:{}};
- const result=await db.restore(snapshot);assert.equal(result.conflicts,1);const conflicts=await db.conflicts();assert.equal(conflicts[0].local.name,'本机目录');assert.equal(conflicts[0].remote.name,'远程目录');await db.resolveConflict(conflicts[0].id,'remote');assert.equal((await db.conflicts()).length,0);
+ const result=await db.restore(snapshot);assert.equal(result.conflicts,0);const versions=await db.versions();assert.ok(versions.some(v=>v.value==='本机目录'));const remote=versions.find(v=>v.value==='远程目录');await db.useVersion(remote.id,remote.current);
  const native=await db.open();assert.equal((await request(native.transaction('libraryFolders').objectStore('libraryFolders').get('folder'))).name,'远程目录');await db.close();
 });
 test('未知表恢复失败且原库完整',async()=>{const db=fresh();await seed(db,{libraryFolders:[{id:'original',name:'保留'}]});await assert.rejects(()=>db.restore({databases:[{name:'paperpane',version:3,stores:{unknown:[]}}]}));const native=await db.open();assert.equal((await request(native.transaction('libraryFolders').objectStore('libraryFolders').getAll())).length,1);await db.close();});
 
-test('冲突发生后再次编辑须重新读取，历史保留，恢复操作可继续',async()=>{
+test('查看版本后继续编辑，刷新当前差异即可重试，不要求重新同步',async()=>{
  const db=fresh();await seed(db,{libraryFolders:[{id:'folder',name:'初稿'}]});
- const snapshot={format:'paperpane-backup',version:1,id:'cas',createdAt:new Date().toISOString(),complete:true,databases:[{name:'paperpane',version:3,stores:{libraryFolders:[{id:'folder',name:'远程'}]}}],assets:[],preferences:{}};
- await db.restore(snapshot);const [conflict]=await db.conflicts();await seed(db,{libraryFolders:[{id:'folder',name:'继续编辑'}]});
- await assert.rejects(()=>db.resolveConflict(conflict.id,'remote'),/本机内容已变化/);await db.refreshConflict(conflict.id);assert.equal((await db.conflicts())[0].local.name,'继续编辑');await db.resolveConflict(conflict.id,'remote');
- const native=await db.open();assert.equal((await request(native.transaction('libraryFolders').objectStore('libraryFolders').get('folder'))).name,'远程');const history=await request(native.transaction('meta').objectStore('meta').getAll());assert.ok(history.some(r=>r.key.startsWith('transfer-history:')&&r.value.local.name==='继续编辑'));await db.close();
+ const snapshot={format:'paperpane-backup',version:3,id:'cas',createdAt:new Date().toISOString(),complete:true,databases:[{name:'paperpane',version:3,stores:{libraryFolders:[{id:'folder',name:'远程'}]}}],assets:[],preferences:{}};
+ await db.restore(snapshot);const remote=(await db.versions()).find(v=>v.value==='远程');
+ await seed(db,{libraryFolders:[{id:'folder',name:'继续编辑'}]});
+ assert.equal(await db.useVersion(remote.id,remote.current),'changed');
+ const latest=(await db.versions()).find(v=>v.id===remote.id);assert.equal(latest.current,'继续编辑');
+ assert.equal(await db.useVersion(latest.id,latest.current),'applied');
+ const native=await db.open();assert.equal((await request(native.transaction('libraryFolders').objectStore('libraryFolders').get('folder'))).name,'远程');
+ assert.ok((await db.versions()).some(v=>v.value==='继续编辑'));await db.close();
 });

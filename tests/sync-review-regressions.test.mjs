@@ -78,7 +78,7 @@ test('完整 ZIP 恢复笔记正文、历史与评论/历史引用的 PNG，重�
   await notes.writeNote(ref, old.version.revision, markdown('研究正文'), [old.version]);
   await annotations.create(ref, inputFor(ref, `![图片](paperpane-asset:${commentImage})`), 'comment');
   const preview = await inspectBackup(await createBackup(await store.snapshot(true)));
-  assert.equal(preview.version, 2); assert.equal(preview.complete, true);
+  assert.equal(preview.version, 3); assert.equal(preview.complete, true);
   assert.equal(preview.assets.filter(a => a.mimeType === 'image/png').length, 2);
   assert.equal((await store.restore(preview)).conflicts, 0, 'Restoring our own ZIP must not conflict on omitted optional fields');
   await notes.close(); await annotations.close(); await store.close();
@@ -111,7 +111,7 @@ test('Zotero 更新选择远程后仍由 byDocument 查到，布局导入也重�
   await annotations.create(ref, inputFor(ref, '本地评论'), id);
   const row = fromZoteroAnnotation({ key: 'ANNO0001', version: 2, data: { itemType: 'annotation', annotationType: 'highlight', annotationText: 'source', annotationComment: '远程评论', annotationColor: '#ffd400', annotationPosition: JSON.stringify({ pageIndex: 0, rects: [[10, 10, 40, 20]] }) } }, ref, [[0, 0, 400, 500]], id);
   const snapshot = { ...(await store.snapshot(false)), id: 'zotero-update', databases: [{ name: 'paperpane', version: 3, stores: { annotations: [row], annotationLayouts: [{ id, document: ref, layout: { id, dx: 1, dy: 2 } }] } }] };
-  await store.restore(snapshot); const [conflict] = await store.conflicts(); await store.resolveConflict(conflict.id, 'remote');
+  await store.restore(snapshot); const remoteVersion = (await store.versions()).find(v => v.value === '远程评论' || v.value === 'remote'); assert.ok(remoteVersion); await store.useVersion(remoteVersion.id, remoteVersion.current);
   const visible = await annotations.load(ref);
   assert.equal(visible.items.length, 1); assert.equal(visible.items[0].comment, '远程评论'); assert.equal(visible.layouts.length, 1);
   assert.deepEqual((await read(store, 'annotations', id)).documentKey, [ref.documentId, ref.fileVersion]);
@@ -173,7 +173,7 @@ test('WebDAV 跨设备恢复笔记、历史和 PNG，重复同步不制造修订
   assert.equal(note.version.content.markdown, `shared ![](paperpane-asset:${image})`); assert.equal(note.history[0].content.markdown, 'history');
   assert.equal(await (await target.files.read('note-image:' + image)).text(), 'shared PNG');
   assert.equal((await targetConnections.status()).phase, 'success');
-  await sync(target, targetConnections, remote); assert.equal((await target.conflicts()).length, 0); assert.equal((await targetConnections.status()).phase, 'success');
+  await sync(target, targetConnections, remote); assert.equal((await target.versions()).length, 0); assert.equal((await targetConnections.status()).phase, 'success');
   await targetNotes.close(); await targetConnections.close(); await target.close();
 });
 
@@ -203,9 +203,9 @@ test('笔记恢复变更修订令牌，阻止已打开的旧草稿覆盖并保�
   const original = await notes.writeNote(ref, '', markdown('local original'));
   const snapshot = await store.snapshot(true), row = snapshot.databases[0].stores.meta.find(r => r.key.startsWith('notes:v1:'));
   row.value.version.content = markdown('remote');
-  await store.restore(snapshot); const [conflict] = await store.conflicts(); await store.resolveConflict(conflict.id, 'remote');
+  await store.restore(snapshot); const remoteVersion = (await store.versions()).find(v => v.value === '远程评论' || v.value === 'remote'); assert.ok(remoteVersion); await store.useVersion(remoteVersion.id, remoteVersion.current);
   const restored = await notes.readNote(ref); assert.equal(restored.version.content.markdown, 'remote');
-  assert.notEqual(restored.version.revision, original.version.revision); assert.equal(restored.history.at(-1).content.markdown, 'local original');
+  assert.notEqual(restored.version.revision, original.version.revision); assert.ok((await store.versions()).some(v => v.value === 'local original'));
   await assert.rejects(() => notes.writeNote(ref, original.version.revision, markdown('stale editor')), /另一窗口/);
   await notes.close(); await store.close();
 });
@@ -240,6 +240,76 @@ test('旧版 WebDAV 清单升级时剥离设备可用性与索引字段，仍可
   await targetConnections.saveDav(connection, true); await sync(target, targetConnections, remote);
   assert.equal((await targetConnections.status()).phase, 'success');
   const [received] = await target.list(); assert.equal((await targetAnnotations.load(refFor(received))).items[0].comment, 'legacy comment');
-  assert.equal(JSON.parse(remote.files.get('/paperpane/manifest.json')).version, 2);
+  assert.equal(JSON.parse(remote.files.get('/paperpane/manifest.json')).version, 3);
   await targetAnnotations.close(); await targetConnections.close(); await target.close();
+});
+
+test('真实持久层两设备编辑同一对话：不同消息自动合并，重叠文字留版本且其余内容继续同步', async () => {
+  const a=fresh(),ac=new ConnectionStore(),remote=server();const doc=await importDoc(a);
+  const keyA=`ai-v1:${doc.id}:${doc.fileVersion}`;
+  const record={revision:'base',sessions:[{id:'s',title:'研究讨论',messages:[{id:'m1',markdown:'问题一'},{id:'m2',markdown:'问题二'}]}],cards:[],overviews:[],attempts:[]};
+  await seed(a,'meta',{key:keyA,value:record});await ac.saveDav(connection,true);await sync(a,ac,remote);
+  const b=fresh(),bc=new ConnectionStore();await bc.saveDav(connection,true);await sync(b,bc,remote);
+  const [docB]=await b.list(),keyB=`ai-v1:${docB.id}:${docB.fileVersion}`;
+  const left=(await read(a,'meta',keyA)).value,right=(await read(b,'meta',keyB)).value;
+  left.sessions[0].messages[0].markdown='本机补充第一条';right.sessions[0].messages[1].markdown='另一设备补充第二条';
+  await seed(a,'meta',{key:keyA,value:left});await seed(b,'meta',{key:keyB,value:right});
+  await sync(a,ac,remote);await sync(b,bc,remote);await sync(a,ac,remote);
+  const combined=(await read(a,'meta',keyA)).value.sessions[0].messages;
+  assert.deepEqual(combined.map(x=>x.markdown),['本机补充第一条','另一设备补充第二条']);assert.equal((await a.versions()).length,0);
+  const l2=(await read(a,'meta',keyA)).value,r2=(await read(b,'meta',keyB)).value;
+  l2.sessions[0].messages[0].markdown='左边完全改写';r2.sessions[0].messages[0].markdown='右边完全改写';
+  await seed(a,'meta',{key:keyA,value:l2});await seed(b,'meta',{key:keyB,value:r2});
+  await seed(b,'libraryFolders',{id:'independent',name:'同步不能被挡住',createdAt:'2026-01-01'});
+  await sync(a,ac,remote);await sync(b,bc,remote);await sync(a,ac,remote);
+  assert.equal((await ac.status()).phase,'success');assert.equal((await bc.status()).phase,'success');
+  assert.equal((await read(a,'libraryFolders','independent')).name,'同步不能被挡住');
+  const versions=await a.versions();assert.equal(versions.length,2);assert.deepEqual(new Set(versions.map(v=>v.value?.markdown??v.value)),new Set(['左边完全改写','右边完全改写']));
+  assert.ok(versions.every(v=>v.path.at(-1)==='@m1'&&v.context==='研究讨论'));
+  for(let i=0;i<3;i++){await sync(b,bc,remote);await sync(a,ac,remote);}
+  assert.equal((await a.versions()).length,2);assert.equal((await b.versions()).length,2);
+  const chosen=(await a.versions()).find(v=>v.value?.markdown==='左边完全改写');
+  const current=(await read(a,'meta',keyA)).value;current.revision='background-save-only';current.sessions[0].messages[1].markdown='查看版本期间继续改另一条';await seed(a,'meta',{key:keyA,value:current});
+  assert.equal(await a.useVersion(chosen.id,chosen.current),'applied');
+  assert.equal((await read(a,'meta',keyA)).value.sessions[0].messages[1].markdown,'查看版本期间继续改另一条');
+  await sync(a,ac,remote);await sync(b,bc,remote);assert.equal((await read(b,'meta',keyB)).value.sessions[0].messages[0].markdown,'左边完全改写');
+  // Alternate versions must survive a complete ZIP and a fresh database.
+  const backup=await inspectBackup(await createBackup(await a.snapshot(true)));
+  await a.close();await ac.close();await b.close();await bc.close();const restored=fresh();await restored.restore(backup);
+  assert.equal((await restored.versions()).length,2);await restored.close();
+});
+
+test('旧冲突本机已变化：自动收存旧本机、最新本机、远端三个版本，同步立即恢复',async()=>{
+  const store=fresh(),connections=new ConnectionStore(),remote=server();
+  const key='ai-v1:legacy:version';
+  const row=text=>({key,value:{revision:crypto.randomUUID(),sessions:[{id:'s',title:'旧对话',messages:[{id:'m',markdown:text}]}],cards:[],overviews:[],attempts:[]}});
+  const local=row('旧本机'),latest=row('最新本机'),foreign=row('远端');
+  await seed(store,'meta',latest);await seed(store,'meta',{key:'transfer-conflict:legacy',value:{id:'transfer-conflict:legacy',store:'meta',key,local,remote:foreign,snapshotId:'old'}});
+  await connections.saveDav(connection,true);await sync(store,connections,remote);
+  assert.equal((await connections.status()).phase,'success');assert.equal(await read(store,'meta','transfer-conflict:legacy'),undefined);
+  const texts=(await store.versions()).map(v=>v.value?.markdown??v.value);for(const text of ['旧本机','最新本机','远端'])assert.ok(texts.includes(text));
+  await sync(store,connections,remote);assert.equal((await store.versions()).length,3);
+  await store.close();await connections.close();
+});
+
+test('两设备同时发布导致条件写入失败时，自动重读远端并重试合并',async()=>{
+  const store=fresh(),connections=new ConnectionStore(),remote=server();await connections.saveDav(connection,true);
+  await seed(store,'libraryFolders',{id:'local',name:'本机文件夹',createdAt:'2026-01-01'});
+  let injected=false,puts=0;
+  const fetcher=async(url,options)=>{
+    if(options.method==='PUT'&&new URL(url).pathname.endsWith('manifest.json')){
+      puts++;
+      if(!injected){injected=true;
+        const manifest=JSON.parse(String(options.body));manifest.records={'paperpane/libraryFolders/other':{id:'other',name:'另一设备文件夹',createdAt:'2026-01-01'}};
+        await remote.fetcher(url,{...options,body:JSON.stringify(manifest)});
+        return new Response('',{status:412});
+      }
+    }
+    return remote.fetcher(url,options);
+  };
+  await synchronize(new AbortController().signal,{store,connections,client:new WebDavClient(connection,fetcher)});
+  assert.equal(puts,2);assert.equal((await connections.status()).phase,'success');
+  const manifest=JSON.parse(remote.files.get('/paperpane/manifest.json'));
+  assert.equal(manifest.records['paperpane/libraryFolders/local'].name,'本机文件夹');assert.equal(manifest.records['paperpane/libraryFolders/other'].name,'另一设备文件夹');
+  await store.close();await connections.close();
 });

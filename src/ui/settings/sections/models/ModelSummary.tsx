@@ -31,6 +31,13 @@ export function ModelSummary({
     facts.push({ icon: "minus", label: "已在讨论模型选择器中隐藏" });
   return (
     <div className="pp-model-summary">
+      {model.capabilitiesGuessed && (
+        <Tooltip label="没查到资料，能力是默认值，请在详情里核对">
+          <span tabIndex={0} className="pp-model-guess-tag">
+            待核对
+          </span>
+        </Tooltip>
+      )}
       <Tooltip
         label={`上下文容量：${model.contextWindow ? model.contextWindow.toLocaleString() + " tokens" : "待确认"}`}
       >

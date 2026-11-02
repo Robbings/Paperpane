@@ -13,15 +13,37 @@ export class ZoteroClient {
     const headers=new Headers(options.headers);headers.set('Authorization','Bearer '+this.key);headers.set('Zotero-API-Version','3');
     const r=await this.fetcher('https://api.zotero.org'+path,{...options,headers,signal:signal?AbortSignal.any([signal,AbortSignal.timeout(120000)]):AbortSignal.timeout(120000),redirect:'error',credentials:'omit',cache:'no-store'});
     const wait=Math.max(Number(r.headers.get('Backoff'))||0,Number(r.headers.get('Retry-After'))||0);if(wait>0)pauses.set(this.key,Date.now()+wait*1000);
-    if(!r.ok)throw new ZoteroError(r.status,r.status===412?'Zotero 内容已变化，请重新读取后重试':r.status===429?'Zotero 请求频率受限，请稍后重试':r.status===403?'Zotero API Key 权限不足':r.status===404?'Zotero 条目或附件不存在':r.status===413?'Zotero 附件空间不足':`Zotero 请求失败（${r.status}）`,wait?Date.now()+wait*1000:undefined);
+    if(!r.ok)throw new ZoteroError(r.status,r.status===412?'Zotero 内容有变化，请刷新后重试':r.status===429?'Zotero 请求频率受限，请稍后重试':r.status===403?'Zotero API Key 权限不足':r.status===404?'Zotero 条目或附件不存在':r.status===413?'Zotero 附件空间不足':`Zotero 请求失败（${r.status}）`,wait?Date.now()+wait*1000:undefined);
     return r;
   }
-  async connection(signal?:AbortSignal):Promise<ZoteroAccess>{const data=await (await this.request('/keys/current',{},signal)).json();if(!data.access?.user?.library||!Number.isInteger(data.userID))throw new Error('API Key 没有个人文献库读取权限');return data;}
+  async connection(signal?:AbortSignal):Promise<ZoteroAccess>{const data=await (await this.request('/keys/current',{},signal)).json();if(!data.access?.user?.library||!Number.isInteger(data.userID))throw new Error('这个密钥不能读取文献库');return data;}
   async collections(signal?:AbortSignal):Promise<ZoteroCollection[]>{const values:ZoteroCollection[]=[];let start=0;while(true){const r=await this.request(`${this.prefix()}/collections?limit=100&start=${start}`,{},signal),page=await r.json();if(!Array.isArray(page))throw new Error('Zotero 分类响应无效');values.push(...page);if(page.length<100)break;start+=100;if(start>=10000)throw new Error('分类数量超出当前浏览限制');}return values;}
   async items(query:{collection?:string;text?:string;start?:number}={},signal?:AbortSignal):Promise<{items:ZoteroItem[];total:number}>{
     if(query.collection&&!/^[A-Z0-9]{8}$/.test(query.collection))throw new Error('Zotero 分类标识无效');
     const params=new URLSearchParams({limit:'50',start:String(Math.max(0,query.start??0)),sort:'title',direction:'asc'});if(query.text)params.set('q',query.text);
     const path=query.collection?`/collections/${query.collection}/items/top`:'/items/top';const r=await this.request(this.prefix()+path+'?'+params,{},signal),items=await r.json();if(!Array.isArray(items))throw new Error('Zotero 列表响应无效');return {items,total:Number(r.headers.get('Total-Results'))||items.length};
+  }
+  /** Select every matching paper across pages, publishing selection only after completion. */
+  async allItems(query:{collection?:string;text?:string}={},signal?:AbortSignal,onProgress?:(count:number,total:number)=>void):Promise<ZoteroItem[]>{
+    const values=new Map<string,ZoteroItem>();
+    for(let start=0;start<100000;start+=50){
+      signal?.throwIfAborted();const page=await this.items({...query,start},signal);
+      for(const row of page.items)if(!['note','annotation'].includes(row.data.itemType))values.set(row.key,row);
+      onProgress?.(values.size,page.total);
+      if(start+page.items.length>=page.total||page.items.length<50)return [...values.values()];
+    }
+    throw new Error('文献太多，请按分类分批选择');
+  }
+  async itemsByKeys(keys:readonly string[],signal?:AbortSignal):Promise<ZoteroItem[]>{
+    const unique=[...new Set(keys)],rows:ZoteroItem[]=[];
+    if(unique.some(key=>!/^[A-Z0-9]{8}$/.test(key)))throw new Error('条目标识无效');
+    for(let start=0;start<unique.length;start+=50){
+      signal?.throwIfAborted();
+      const params=new URLSearchParams({itemKey:unique.slice(start,start+50).join(','),limit:'100'});
+      const page=await (await this.request(`${this.prefix()}/items?${params}`,{},signal)).json();
+      if(!Array.isArray(page))throw new Error('Zotero 列表响应无效');rows.push(...page);
+    }
+    return rows;
   }
   async item(key:string,signal?:AbortSignal):Promise<ZoteroItem>{if(!/^[A-Z0-9]{8}$/.test(key))throw new Error('条目标识无效');return (await this.request(`${this.prefix()}/items/${key}`,{},signal)).json();}
   async children(key:string,signal?:AbortSignal):Promise<ZoteroItem[]>{if(!/^[A-Z0-9]{8}$/.test(key))throw new Error('条目标识无效');const result:ZoteroItem[]=[];for(let start=0;start<10000;start+=100){const r=await this.request(`${this.prefix()}/items/${key}/children?limit=100&start=${start}`,{},signal),page=await r.json();if(!Array.isArray(page))throw new Error('Zotero 附件响应无效');result.push(...page);if(page.length<100)return result;}throw new Error('附件数量过多');}
@@ -37,14 +59,14 @@ export class ZoteroClient {
     // Standard Authorization is removed by Fetch on cross-origin redirects; no custom secret header is used.
     if(!/^[A-Z0-9]{8}$/.test(key))throw new Error('附件标识无效');
     const r=await this.fetcher(`https://api.zotero.org${this.prefix()}/items/${key}/file`,{headers:{Authorization:'Bearer '+this.key,'Zotero-API-Version':'3'},redirect:'follow',credentials:'omit',signal:signal?AbortSignal.any([signal,AbortSignal.timeout(120000)]):AbortSignal.timeout(120000)});
-    if(!r.ok)throw new ZoteroError(r.status,r.status===404?'PDF 未上传到 Zotero Storage，可关联 WebDAV 后重试':'无法下载 Zotero PDF');return r;
+    if(!r.ok)throw new ZoteroError(r.status,r.status===404?'PDF 不在 Zotero 云端存储里':'无法下载 Zotero PDF');return r;
   }
   async upload(key:string,blob:Blob,filename:string,previousMd5?:string,signal?:AbortSignal){
     const bytes=new Uint8Array(await blob.arrayBuffer()),hash=md5(bytes);const condition:Record<string,string>=previousMd5?{'If-Match':previousMd5}:{'If-None-Match':'*'};
     const path=`${this.prefix()}/items/${key}/file`,params=new URLSearchParams({md5:hash,filename,filesize:String(blob.size),mtime:String(Date.now())});
     const authorization=await (await this.request(path,{method:'POST',headers:{...condition,'Content-Type':'application/x-www-form-urlencoded'},body:params},signal)).json();if(authorization.exists)return;
     const target=new URL(authorization.url);if(target.protocol!=='https:'||target.username||target.password)throw new Error('Zotero 上传地址无效');
-    const upload=await this.fetcher(target,{method:'POST',headers:{'Content-Type':authorization.contentType},body:new Blob([authorization.prefix,blob,authorization.suffix]),credentials:'omit',redirect:'error',signal:signal?AbortSignal.any([signal,AbortSignal.timeout(120000)]):AbortSignal.timeout(120000)});if(!upload.ok)throw new Error('PDF 上传失败，可重新导出以重试');
+    const upload=await this.fetcher(target,{method:'POST',headers:{'Content-Type':authorization.contentType},body:new Blob([authorization.prefix,blob,authorization.suffix]),credentials:'omit',redirect:'error',signal:signal?AbortSignal.any([signal,AbortSignal.timeout(120000)]):AbortSignal.timeout(120000)});if(!upload.ok)throw new Error('PDF 上传失败');
     await this.request(path,{method:'POST',headers:{...condition,'Content-Type':'application/x-www-form-urlencoded'},body:new URLSearchParams({upload:authorization.uploadKey})},signal);
   }
 }

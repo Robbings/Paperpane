@@ -163,9 +163,40 @@
 }
 
 .pp-lib-tags {
+  position: relative;
   flex-shrink: 0;
   padding-top: var(--pp-space-2);
   border-top: 0.5px solid var(--pp-hairline);
+}
+
+/* Drag the section's top edge to give the tags more or less room. */
+.pp-lib-tags__resize {
+  position: absolute;
+  top: -4px;
+  left: 0;
+  right: 0;
+  height: 8px;
+  cursor: row-resize;
+  touch-action: none;
+}
+
+.pp-lib-tags__resize::after {
+  content: '';
+  position: absolute;
+  top: 3px;
+  left: 50%;
+  width: 32px;
+  height: 2px;
+  border-radius: 1px;
+  background: var(--pp-accent);
+  opacity: 0;
+  transform: translateX(-50%);
+  transition: opacity var(--pp-dur-fast) var(--pp-ease-out);
+}
+
+.pp-lib-tags__resize:hover::after,
+.pp-lib-tags__resize[data-dragging]::after {
+  opacity: 0.6;
 }
 
 .pp-lib-tags__clear {
@@ -182,14 +213,19 @@
   display: flex;
   flex-wrap: wrap;
   gap: 4px;
-  max-height: 140px;
+  max-height: var(--pp-tags-h, 140px);
   overflow: auto;
   padding: 4px 6px;
 }
 
 .pp-lib-tag {
+  /* A long tag stays one line; the full name is in its tooltip. */
+  max-width: 100%;
   height: 24px;
+  overflow: hidden;
   padding: 0 10px;
+  text-overflow: ellipsis;
+  white-space: nowrap;
   border: 0;
   border-radius: var(--pp-radius-pill);
   background: var(--pp-fill);
@@ -315,10 +351,8 @@
   white-space: nowrap;
 }
 
-/* Only shown as text when the search is narrowed to some fields. */
+/* Narrowed to some fields (the tooltip names them): the icon takes the accent colour. */
 .pp-lib-search__scope[data-narrowed='true'] {
-  padding: 0 6px 0 8px;
-  background: var(--pp-accent-soft);
   color: var(--pp-accent);
 }
 
@@ -1082,11 +1116,3 @@ td[data-column='starred'] .pp-lib-cell-center {
   font-size: var(--pp-text-sm);
 }
 
-.pp-zotero-picker { display:grid; grid-template-columns:minmax(130px,1fr) minmax(0,2fr); gap:16px; min-height:240px; }
-.pp-zotero-picker aside,.pp-zotero-picker section { min-width:0; max-height:52vh; overflow:auto; }
-.pp-zotero-item { padding:10px 0; border-bottom:1px solid var(--pp-hairline); }
-.pp-zotero-item > span { color:var(--pp-text-3); font-size:var(--pp-text-xs); }
-.pp-zotero-pagination { display:flex; align-items:center; gap:8px; padding-top:12px; font-size:var(--pp-text-xs); }
-.pp-zotero-results { max-height:180px; overflow:auto; padding-left:20px; font-size:var(--pp-text-sm); }
-.pp-zotero-results li[data-failed=true] { color:var(--pp-danger,#bf4444); }
-@media(max-width:500px){.pp-zotero-picker{grid-template-columns:1fr}.pp-zotero-picker aside{max-height:150px}}

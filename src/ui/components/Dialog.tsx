@@ -1,5 +1,6 @@
 import { useEffect, useId, useRef, useState, type ReactNode } from 'react';
 import { IconButton } from './IconButton';
+import { Toaster } from './Toast';
 import './Dialog.css';
 
 interface DialogProps {
@@ -96,6 +97,7 @@ export function Dialog({ open, onClose, title, description, children, footer, si
         {children && <div className="pp-dialog__body">{children}</div>}
         {footer && <div className="pp-dialog__footer">{footer}</div>}
       </div>
+      {open && <Toaster inline />}
     </dialog>
   );
 }

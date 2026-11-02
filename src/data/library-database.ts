@@ -1,5 +1,5 @@
 import { PaperDatabase, type StoredDocument } from './database';
-import { FOLDERS, LIBRARY, PREFERENCES, TAGS, libraryDefaults, enrichItem } from './library-records';
+import { FOLDERS, LIBRARY, PREFERENCES, TAGS, libraryDefaults, enrichItem, itemFolders } from './library-records';
 import type { LibraryFolder, LibraryItem, LibraryPatch, LibraryPreferences, LibraryQuery, LibraryRow, LibraryState, LibraryTag, LibraryTagInput, PdfBibliography } from '@/contracts/library';
 import type { RecordStamp } from '@/contracts/common';
 import type { DocumentRef } from '@/contracts/document';
@@ -85,6 +85,7 @@ export class LibraryDatabase extends PaperDatabase {
       const folderSets = new Map(folders.map(f => [f.id, descendants(folders, f.id)]));
       const tagMap = new Map(tags.map(t => [t.id, t.label]));
       const items: LibraryRow[] = []; let total = 0;
+      const collectionTags = new Set<string>();
       const needle = query.text.trim().normalize('NFKC').toLocaleLowerCase();
       const value = (item: LibraryRow): string | number => {
         switch (query.sort.column) {
@@ -114,14 +115,15 @@ export class LibraryDatabase extends PaperDatabase {
             try {
               const r = row(item, doc);
               if (item.inLibrary) {
-                counts.all++; if (item.starred) counts.starred++; if (item.folderId === null) counts.unfiled++;
-                if (item.folderId) for (const [id, ids] of folderSets) if (ids.has(item.folderId)) counts.folders[id]!++;
+                counts.all++; if (item.starred) counts.starred++; if (!itemFolders(item).length) counts.unfiled++;
+                for (const [id, ids] of folderSets) if (itemFolders(item).some(folder => ids.has(folder))) counts.folders[id]!++;
               }
               if (r.lastReadAt) counts.recent++;
               let matches = query.collection.kind === 'recent' ? !!r.lastReadAt : item.inLibrary;
               if (query.collection.kind === 'starred') matches &&= item.starred;
-              if (query.collection.kind === 'unfiled') matches &&= item.folderId === null;
-              if (query.collection.kind === 'folder') matches &&= !!item.folderId && !!folderSets.get(query.collection.folderId)?.has(item.folderId);
+              if (query.collection.kind === 'unfiled') matches &&= !itemFolders(item).length;
+              if (query.collection.kind === 'folder') matches &&= itemFolders(item).some(id => folderSets.get((query.collection as {folderId:string}).folderId)?.has(id));
+              if (matches) for (const id of item.tagIds) collectionTags.add(id);
               if (query.tagIds.length) matches &&= query.tagIds.some(id => item.tagIds.includes(id));
               if (needle) matches &&= query.fields.some(field => {
                 const text = field === 'authors' ? item.authors.join(' ') : field === 'note' ? item.shortNote : field === 'body' || field === 'summary' ? '' : item[field];
@@ -142,7 +144,7 @@ export class LibraryDatabase extends PaperDatabase {
           } else accept();
         };
       });
-      return { items, total, folders, tags, counts, preferences: pref?.value ?? structuredClone(libraryDefaults), unavailableSearchFields: ['body', 'summary'] };
+      return { items, total, folders, tags, counts, preferences: pref?.value ?? structuredClone(libraryDefaults), unavailableSearchFields: ['body', 'summary'], collectionTagIds: [...collectionTags] };
     });
   }
   private async items(tx: IDBTransaction, ids: readonly string[]): Promise<LibraryItem[]> {
@@ -185,7 +187,7 @@ export class LibraryDatabase extends PaperDatabase {
   async move(ids: readonly string[], folderId: string | null): Promise<void> {
     await this.run('readwrite', async tx => {
       if (folderId) { const folder = required(await req(tx.objectStore(FOLDERS).get(folderId)) as LibraryFolder); if (folder.deletedAt) throw new LibraryFault('NOT_FOUND', '文件夹已删除'); }
-      for (const item of await this.items(tx, ids)) await this.changed(tx, LIBRARY, { ...item, folderId });
+      for (const item of await this.items(tx, ids)) await this.changed(tx, LIBRARY, { ...item, folderId, folderIds: [] });
     });
   }
   async addTag(ids: readonly string[], input: LibraryTagInput): Promise<void> {
@@ -250,9 +252,9 @@ export class LibraryDatabase extends PaperDatabase {
       if (action === 'delete') {
         if (all.some(f => f.parentId === id)) throw new LibraryFault('INVALID_INPUT', '请先清空子文件夹');
         const entries = await req(tx.objectStore(LIBRARY).getAll()) as LibraryItem[];
-        if (entries.some(p => p.inLibrary && p.folderId === id)) throw new LibraryFault('INVALID_INPUT', '请先移出文件夹内的论文');
+        if (entries.some(p => p.inLibrary && itemFolders(p).includes(id))) throw new LibraryFault('INVALID_INPUT', '请先移出文件夹内的论文');
         // Removed memberships must not retain dangling folder references when restored.
-        for (const entry of entries.filter(p => p.folderId === id)) await this.changed(tx, LIBRARY, { ...entry, folderId: null });
+        for (const entry of entries.filter(p => itemFolders(p).includes(id))) { const remaining = itemFolders(entry).filter(folder => folder !== id); await this.changed(tx, LIBRARY, { ...entry, folderId: remaining[0] ?? null, folderIds: remaining.slice(1) }); }
         item.deletedAt = new Date().toISOString();
       }
       await this.changed(tx, FOLDERS, item, action === 'delete' ? 'delete' : 'upsert');

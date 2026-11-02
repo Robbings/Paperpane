@@ -22,6 +22,8 @@ export interface LibraryViewProps {
   paperById: (id: string) => PaperView | undefined;
   folders: readonly FolderView[];
   tags: readonly TagView[];
+  /** Tags used in the current collection; the sidebar lists only these. Omitted: all tags. */
+  collectionTagIds?: readonly string[];
   counts: CollectionCounts;
   query: LibraryQuery;
   onQuery: (patch: Partial<LibraryQuery>) => void;
@@ -182,7 +184,7 @@ export function LibraryView(props: LibraryViewProps) {
         onCollection={(collection) => changeQuery({ collection })}
         folders={folders}
         counts={counts}
-        tags={tags}
+        tags={props.collectionTagIds ? tags.filter((tag) => props.collectionTagIds!.includes(tag.id) || query.tagIds.includes(tag.id)) : tags}
         activeTagIds={query.tagIds}
         onTags={(tagIds) => changeQuery({ tagIds })}
         onCreateFolder={(parentId) => setRenamingId(props.onCreateFolder(parentId))}

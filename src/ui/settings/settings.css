@@ -95,10 +95,9 @@
 }
 
 .pp-settings__content {
-  max-width: 660px;
+  max-width: 760px;
   margin: 0 auto;
-  /* Room at the end so the save bar never covers the last row. */
-  padding: 32px 36px 104px;
+  padding: 20px 36px 64px;
 }
 
 .pp-settings__head h1 {
@@ -393,7 +392,44 @@
 
 .pp-set-selbar__actions {
   display: flex;
-  justify-content: flex-end;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.pp-set-selbar__tip {
+  color: var(--pp-text-3);
+  font-size: var(--pp-text-xs);
+}
+
+.pp-set-selbar__look-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 2px 2px 6px;
+  border-bottom: 0.5px solid var(--pp-hairline);
+  font-size: var(--pp-text-md);
+}
+
+/* The bar as it looks now, small, beside the row's button. */
+.pp-set-selbar__mini {
+  display: inline-flex;
+  margin-right: 4px;
+  pointer-events: none;
+}
+
+.pp-set-selbar__mini .pp-selmenu {
+  position: static;
+  animation: none;
+  box-shadow: 0 0 0 0.5px var(--pp-hairline);
+  zoom: 0.85;
+}
+
+/* A few choices in one row, e.g. what element detection looks for. */
+.pp-set-checks {
+  display: inline-flex;
+  flex-wrap: wrap;
+  gap: 4px 16px;
 }
 
 /* 显示方式: folded away by default. */
@@ -475,10 +511,281 @@
   font-size: var(--pp-text-sm);
 }
 
-.pp-transfer-fields { display:grid; grid-template-columns:1fr 1fr; gap:16px; }
 .pp-transfer-compare { display:grid; grid-template-columns:1fr 1fr; gap:16px; }
 .pp-transfer-compare section { min-width:0; }
 .pp-transfer-compare pre { white-space:pre-wrap; overflow-wrap:anywhere; max-height:320px; overflow:auto; font-size:12px; }
-@media(max-width:600px){.pp-transfer-fields,.pp-transfer-compare{grid-template-columns:1fr}}
+@media(max-width:600px){.pp-transfer-compare{grid-template-columns:1fr}}
+.pp-transfer-compare :is(h3,h4) { margin:0 0 6px; color:var(--pp-text-2); font-size:var(--pp-text-sm); font-weight:var(--pp-weight-semibold); }
+.pp-transfer-compare :is(pre,.pp-saved-version-content) { margin:0; padding:10px 12px; border-radius:var(--pp-radius-control); background:var(--pp-fill); }
 
-.pp-transfer-actions{display:flex;gap:8px;padding:12px 0;}
+/* ---- Page header: title, page actions and saving, always at the top ------------- */
+
+.pp-settings-bar {
+  position: sticky;
+  top: 12px;
+  z-index: var(--pp-z-bar);
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 8px;
+  min-height: 48px;
+  margin-bottom: 8px;
+  padding: 6px 8px 6px 16px;
+}
+
+.pp-settings-bar__title {
+  display: flex;
+  flex: 1 1 0;
+  align-items: center;
+  gap: 8px;
+  min-width: 0;
+}
+
+.pp-settings-bar__title h1 {
+  margin: 0;
+  overflow: hidden;
+  color: var(--pp-text);
+  font-size: var(--pp-text-lg);
+  font-weight: var(--pp-weight-semibold);
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.pp-settings-bar__actions {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 6px;
+  min-width: 0;
+}
+
+.pp-settings-bar .pp-set-savebar[data-layout='inline'] {
+  position: static;
+  max-width: 100%;
+  padding: 0 0 0 8px;
+  border-left: 0.5px solid var(--pp-hairline-strong);
+  border-radius: 0;
+  transform: none;
+  animation: none;
+  gap: 6px;
+}
+
+.pp-settings-bar .pp-set-savebar__text {
+  margin: 0;
+  color: var(--pp-text-2);
+  font-size: var(--pp-text-sm);
+  white-space: normal;
+}
+
+.pp-settings-bar .pp-set-savebar__text:empty {
+  display: none;
+}
+
+.pp-settings-bar .pp-set-savebar[data-state='danger'] .pp-set-savebar__text {
+  color: var(--pp-danger);
+}
+
+.pp-settings-bar .pp-set-savebar[data-state='ok'] .pp-set-savebar__text {
+  color: var(--pp-ok);
+}
+
+.pp-settings-bar:has(.pp-set-savebar[data-state='warn']) .pp-settings-bar__actions,
+.pp-settings-bar:has(.pp-set-savebar[data-state='danger']) .pp-settings-bar__actions {
+  flex-basis: 100%;
+  justify-content: flex-end;
+}
+
+/* ---- Folded groups ("高级设置") ---------------------------------------------------- */
+
+.pp-set-fold {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  margin-left: -4px;
+  padding: 4px;
+  border: 0;
+  border-radius: var(--pp-radius-control);
+  background: transparent;
+  color: inherit;
+  font: inherit;
+}
+
+.pp-set-fold:hover {
+  background: var(--pp-fill-hover);
+}
+
+.pp-set-fold svg {
+  color: var(--pp-text-3);
+  transition: transform var(--pp-dur-fast) var(--pp-ease-out);
+}
+
+.pp-set-group--fold[data-open='true'] .pp-set-fold svg {
+  transform: rotate(90deg);
+}
+
+.pp-set-empty {
+  padding: 18px 0 6px;
+}
+
+/* Machine translation services: a monogram in the same frame as model providers' logos. */
+.pp-translator-logo__text {
+  font-size: 18px;
+  font-weight: var(--pp-weight-semibold);
+  line-height: 1;
+}
+
+.pp-translator-logo[data-size='sm'] .pp-translator-logo__text {
+  font-size: 13px;
+}
+
+/* ---- Shared pieces for connection-style groups (sync, backup, Zotero) ------------ */
+
+/* Text fields on the right of a row keep one width, so the column lines up. */
+.pp-set-row__control > .pp-field {
+  width: 300px;
+}
+
+/* A value read back in a row, before its buttons. */
+.pp-set-value {
+  max-width: 260px;
+  overflow: hidden;
+  color: var(--pp-text-2);
+  font-size: var(--pp-text-sm);
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.pp-set-value[data-tone='warn'] {
+  color: var(--pp-warn);
+}
+
+/* A group's state beside its title: a dot and a word. */
+.pp-set-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  color: var(--pp-text-2);
+  font-size: var(--pp-text-sm);
+  font-weight: var(--pp-weight-regular);
+}
+
+.pp-set-badge > span {
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: var(--pp-text-3);
+}
+
+.pp-set-badge[data-tone='ok'] > span {
+  background: var(--pp-ok);
+}
+
+.pp-set-badge[data-tone='warn'] > span {
+  background: var(--pp-warn);
+}
+
+.pp-set-badge[data-tone='busy'] > span {
+  background: var(--pp-accent);
+  animation: pp-set-pulse 1.2s ease-in-out infinite;
+}
+
+@keyframes pp-set-pulse {
+  50% {
+    opacity: 0.35;
+  }
+}
+
+/* Buttons that close a small form, on the right, after its rows. */
+.pp-set-actions {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 8px;
+  padding: 12px 0 4px;
+  border-top: 0.5px solid var(--pp-hairline);
+}
+
+.pp-set-actions .pp-progress {
+  flex: 1;
+}
+
+/* Lists inside dialogs: one line per item, hairlines between. */
+.pp-set-list {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.pp-set-list li {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  min-height: 40px;
+  padding: 4px 2px;
+  font-size: var(--pp-text-md);
+}
+
+.pp-set-list li + li {
+  border-top: 0.5px solid var(--pp-hairline);
+}
+
+.pp-set-list li > span {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.pp-set-list--scroll {
+  max-height: 46vh;
+  overflow: auto;
+}
+
+.pp-set-pick-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 0 2px 8px;
+  border-bottom: 0.5px solid var(--pp-hairline);
+  color: var(--pp-text-2);
+  font-size: var(--pp-text-sm);
+}
+
+/* A group title with its state or actions on the right. */
+.pp-set-group__head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  min-height: 28px;
+  margin-bottom: 4px;
+}
+
+.pp-set-group__head .pp-set-group__title {
+  margin: 0;
+}
+
+/* A row name with a hover explanation reads the same as one without. */
+.pp-set-row__text .pp-hint-label .pp-field__label {
+  color: var(--pp-text);
+  font-size: var(--pp-text-md);
+  font-weight: var(--pp-weight-medium);
+}
+
+/* Saved versions: a list on the left, the two sides compared on the right. */
+.pp-saved-versions { display:grid; grid-template-columns:200px minmax(0,1fr); gap:16px; min-height:min(360px,50vh); }
+.pp-saved-versions nav { display:flex; flex-direction:column; gap:2px; max-height:55vh; overflow:auto; }
+.pp-saved-version-item { display:flex; flex-direction:column; gap:2px; width:100%; padding:8px 10px; border:0; border-radius:var(--pp-radius-control); background:transparent; color:var(--pp-text); text-align:left; overflow-wrap:anywhere; }
+.pp-saved-version-item:hover { background:var(--pp-fill-hover); }
+.pp-saved-version-item[aria-pressed=true] { background:var(--pp-accent-soft); }
+.pp-saved-version-item strong { font-size:var(--pp-text-md); font-weight:var(--pp-weight-medium); }
+.pp-saved-version-item span, .pp-saved-version-item time { color:var(--pp-text-2); font-size:var(--pp-text-xs); }
+.pp-saved-version-content { max-height:44vh; overflow:auto; white-space:pre-wrap; overflow-wrap:anywhere; font-size:var(--pp-text-sm); line-height:1.65; }
+.pp-saved-version-content mark { border-radius:2px; background:color-mix(in srgb, var(--pp-warn) 28%, transparent); color:inherit; }
+@media(max-width:700px){.pp-saved-versions{grid-template-columns:1fr}.pp-saved-versions nav{max-height:160px}}
+
+/* A small aside under a group's rows, e.g. how to get a Zotero key. */
+.pp-set-note {
+  padding: 10px 2px 2px;
+}

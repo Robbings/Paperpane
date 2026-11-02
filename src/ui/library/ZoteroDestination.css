@@ -1,0 +1,56 @@
+/* Where Zotero imports go: one quiet row above the list. */
+.pp-zotero-destination {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px 16px;
+  min-height: 32px;
+}
+
+.pp-zotero-destination__switch {
+  display: inline-flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.pp-zotero-destination__switch .pp-field__label {
+  color: var(--pp-text);
+  font-size: var(--pp-text-sm);
+  font-weight: var(--pp-weight-regular);
+}
+
+.pp-zotero-destination__folder {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  min-width: 0;
+  max-width: 100%;
+  height: 30px;
+  margin-left: auto;
+  padding: 0 8px 0 10px;
+  border: 0;
+  border-radius: var(--pp-radius-control);
+  background: var(--pp-fill);
+  color: var(--pp-text);
+  font-size: var(--pp-text-sm);
+}
+
+.pp-zotero-destination__folder:hover:not(:disabled) {
+  background: var(--pp-fill-hover);
+}
+
+.pp-zotero-destination__folder > svg {
+  flex-shrink: 0;
+  color: var(--pp-text-2);
+}
+
+.pp-zotero-destination__label {
+  color: var(--pp-text-2);
+}
+
+.pp-zotero-destination__path {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}

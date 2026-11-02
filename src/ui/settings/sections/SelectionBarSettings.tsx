@@ -1,6 +1,6 @@
 import { useState } from 'react';
-import { Button, Icon, SelectionMenu, Switch, type IconName, type SelectionMenuAction, type SelectionMenuLook } from '@/ui/components';
-import { SettingGroup } from '../SettingRow';
+import { Button, Dialog, Icon, Select, SelectionMenu, Switch, type IconName, type SelectionMenuAction, type SelectionMenuLook } from '@/ui/components';
+import { SettingRow } from '../SettingRow';
 import { DEFAULT_SELECTION_BAR, type SelectionBarItem, type SelectionBarPrefs } from '../types';
 
 const items: Record<SelectionBarItem, { label: string; icon: IconName }> = {
@@ -14,12 +14,12 @@ const items: Record<SelectionBarItem, { label: string; icon: IconName }> = {
 
 const actions: SelectionMenuAction[] = (['comment', 'translate', 'explain', 'ask', 'copy'] as const).map((id) => ({ id, ...items[id] }));
 
-const looks: { look: SelectionMenuLook; label: string; note: string }[] = [
-  { look: 'text', label: '文字', note: '默认。最紧凑。' },
-  { look: 'icon', label: '图标', note: '最小；名称在悬停时显示。' },
-  { look: 'both', label: '图标加文字', note: '最直观，条最宽。' },
-  { look: 'stacked', label: '图标在上、文字在下', note: '像工具栏，条稍高。' },
-  { look: 'reveal', label: '图标，悬停展开文字', note: '平时只有图标。' },
+const looks: { value: SelectionMenuLook; label: string }[] = [
+  { value: 'text', label: '文字' },
+  { value: 'icon', label: '图标' },
+  { value: 'both', label: '图标加文字' },
+  { value: 'stacked', label: '图标在上、文字在下' },
+  { value: 'reveal', label: '图标，悬停展开文字' },
 ];
 
 const DRAG = 'application/x-paperpane-selection-bar-item';
@@ -29,10 +29,13 @@ interface SelectionBarSettingsProps {
   onChange: (value: SelectionBarPrefs) => void;
 }
 
-/** What the bar over selected text shows and in what order; how it shows them is folded away. */
+/**
+ * The bar over selected text: one row with a live preview; what it shows, in what order and
+ * how, is edited in a dialog so the page stays short.
+ */
 export function SelectionBarSettings({ value, onChange }: SelectionBarSettingsProps) {
   const [dragging, setDragging] = useState<SelectionBarItem | null>(null);
-  const [lookOpen, setLookOpen] = useState(false);
+  const [open, setOpen] = useState(false);
   const visible = value.order.filter((item) => !value.hidden.includes(item));
 
   const move = (item: SelectionBarItem, to: number) => {
@@ -43,13 +46,26 @@ export function SelectionBarSettings({ value, onChange }: SelectionBarSettingsPr
   const toggle = (item: SelectionBarItem, shown: boolean) =>
     onChange({ ...value, hidden: shown ? value.hidden.filter((i) => i !== item) : [...value.hidden, item] });
   const isDefault = JSON.stringify({ ...value, look: DEFAULT_SELECTION_BAR.look }) === JSON.stringify(DEFAULT_SELECTION_BAR);
-  const currentLook = looks.find((l) => l.look === value.look) ?? looks[0]!;
 
   return (
-    <SettingGroup title="选中文字后的浮动条" description="选择要显示的内容，拖动调整顺序。改动立即生效。">
+    <>
+      <SettingRow label="浮动工具条">
+        <span className="pp-set-selbar__mini" aria-hidden="true" inert>
+          <SelectionMenu label="预览" actions={actions} look={value.look} layout={visible} />
+        </span>
+        <Button size="sm" onClick={() => setOpen(true)}>
+          自定义
+        </Button>
+      </SettingRow>
+      <Dialog open={open} onClose={() => setOpen(false)} title="浮动工具条" size="md" footer={<Button variant="primary" onClick={() => setOpen(false)}>完成</Button>}>
       <div className="pp-set-selbar">
         <div className="pp-set-selbar__preview" aria-hidden="true" inert>
           <SelectionMenu label="预览" actions={actions} look={value.look} layout={visible} />
+        </div>
+
+        <div className="pp-set-selbar__look-row">
+          <span>显示方式</span>
+          <Select label="显示方式" size="sm" value={value.look} options={looks} onChange={(look) => onChange({ ...value, look })} />
         </div>
 
         <ol className="pp-set-selbar__list">
@@ -108,32 +124,13 @@ export function SelectionBarSettings({ value, onChange }: SelectionBarSettingsPr
         </ol>
 
         <div className="pp-set-selbar__actions">
+          <span className="pp-set-selbar__tip">拖动把手调整顺序</span>
           <Button size="sm" variant="quiet" icon="rotate" disabled={isDefault} onClick={() => onChange({ ...DEFAULT_SELECTION_BAR, look: value.look })}>
-            恢复默认内容和顺序
+            恢复默认
           </Button>
         </div>
-
-        <div className="pp-set-selbar__look" data-open={lookOpen ? 'true' : undefined}>
-          <button type="button" className="pp-set-selbar__disclosure" aria-expanded={lookOpen} onClick={() => setLookOpen((open) => !open)}>
-            <Icon name="chevronRight" size={13} strokeWidth={2} />
-            <span>显示方式</span>
-            <span className="pp-set-selbar__current">{currentLook.label}</span>
-          </button>
-          {lookOpen && (
-            <div className="pp-set-selbar__looks" role="radiogroup" aria-label="显示方式">
-              {looks.map((option) => (
-                <label key={option.look} className="pp-set-selbar__option">
-                  <input type="radio" name="pp-selbar-look" checked={value.look === option.look} onChange={() => onChange({ ...value, look: option.look })} />
-                  <span className="pp-set-selbar__option-text">
-                    <span>{option.label}</span>
-                    <span>{option.note}</span>
-                  </span>
-                </label>
-              ))}
-            </div>
-          )}
-        </div>
       </div>
-    </SettingGroup>
+      </Dialog>
+    </>
   );
 }

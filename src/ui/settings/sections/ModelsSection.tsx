@@ -4,11 +4,10 @@ import {
   Button,
   Dialog,
   EmptyState,
-  GlassSurface,
-  HintLabel,
   IconButton,
   Select as FieldSelect,
   TextField,
+  toast,
 } from "@/ui/components";
 import {
   presets,
@@ -22,11 +21,16 @@ import {
   updateCatalog,
   fetchEndpointModels,
   testConfiguredModel,
+  completeCapabilities,
 } from "@/runtime/model-settings-actions";
 import type { EndpointDraft, ModelConfigView, SettingsDraft } from "../types";
 import { SettingGroup, SettingRow } from "../SettingRow";
 import { ModelSummary } from "./models/ModelSummary";
+import { DefaultModels } from "./models/DefaultModels";
+import { AdvancedSection } from "./AdvancedSection";
+import { SettingsHeader } from "../SettingsHeader";
 import { ModelEditor } from "./models/ModelEditor";
+import { ManualModelForm, emptyManual, manualModel, type ManualDraft } from "./models/ManualModelForm";
 import { ProviderPicker } from "./models/ProviderPicker";
 import { ProviderList } from "./models/ProviderList";
 import { ProviderLogo } from "./models/ProviderLogo";
@@ -41,12 +45,14 @@ export function ModelsSection({
   renderSaveBar,
   editor,
   setEditor,
+  problems,
 }: {
   draft: SettingsDraft;
   onChange: (v: SettingsDraft) => void;
   renderSaveBar: (layout: "floating" | "inline") => ReactNode;
   editor: ModelConfigView | null;
   setEditor: (model: ModelConfigView | null) => void;
+  problems: ReadonlyMap<string, string>;
 }) {
   const [active, setActive] = useState<string | null>(null),
     [search, setSearch] = useState(""),
@@ -60,13 +66,18 @@ export function ModelsSection({
   const [catalog, setCatalog] = useState(readCatalog),
     [discovered, setDiscovered] = useState<CatalogModel[]>([]),
     [chosen, setChosen] = useState<string[]>([]);
-  const [message, setMessage] = useState(""),
-    [error, setError] = useState(""),
-    [busy, setBusy] = useState(false);
+  const [busy, setBusy] = useState(false);
+  // Results go to toasts like everywhere else; an empty string is "nothing to say".
+  const setMessage = (text: string) => {
+    if (text) toast.show({ tone: "success", message: text, duration: 2600 });
+  };
+  const setError = (text: string) => {
+    if (text) toast.show({ tone: "error", message: text });
+  };
   const [testId, setTestId] = useState<string | null>(null),
     [mode, setMode] = useState<"text" | "image" | "structured">("text");
-  const [manualId, setManualId] = useState(""),
-    [manualName, setManualName] = useState(""),
+  const [manual, setManual] = useState<ManualDraft>(emptyManual),
+    [manualAdded, setManualAdded] = useState<string[]>([]),
     [showKey, setShowKey] = useState(false);
   const [removing, setRemoving] = useState<{
     endpoint?: string;
@@ -120,7 +131,7 @@ export function ModelsSection({
       if (!c.signal.aborted) done(v);
     } catch (e) {
       if (!c.signal.aborted)
-        setError(e instanceof Error ? e.message : "操作失败。");
+        setError(e instanceof Error ? e.message : "操作失败");
     } finally {
       if (operation.current === c) setBusy(false);
     }
@@ -188,7 +199,7 @@ export function ModelsSection({
           return item ? refreshModel(m, item, v.updatedAt) : m;
         }),
       });
-      setMessage("目录已更新，已有模型的手动设置保持不变。");
+      setMessage("目录已更新");
     });
   }
   function openPicker() {
@@ -199,6 +210,8 @@ export function ModelsSection({
     );
     setQuery("");
     setChosen([]);
+    setManual(emptyManual);
+    setManualAdded([]);
     setPicker(true);
   }
   const identity = (m: CatalogModel) =>
@@ -210,17 +223,25 @@ export function ModelsSection({
         (x.protocolOverride ?? endpoint?.protocol) ===
           (m.protocol ?? endpoint?.protocol),
     );
-  function addItems(items: CatalogModel[]) {
+  /** Adds models after looking up what they can do (catalog, then the web, then defaults to check). */
+  function addItems(items: CatalogModel[], keepOpen = false, onAdded?: () => void) {
     if (!endpoint) return;
-    const added = items
-      .filter((m) => !already(m))
-      .map((m) => newModel(endpoint.id, m, catalog.updatedAt));
-    onChange({
-      ...draft,
-      models: [...draft.models, ...added],
-      defaultModelId: draft.defaultModelId ?? added[0]?.id ?? null,
-    });
-    setPicker(false);
+    const fresh = items.filter((m) => !already(m));
+    void run(
+      (signal) => completeCapabilities(fresh, catalog, signal),
+      (completed) => {
+        const added = completed.map((m) => newModel(endpoint.id, m, catalog.updatedAt));
+        onChange({
+          ...draft,
+          models: [...draft.models, ...added],
+          defaultModelId: draft.defaultModelId ?? added[0]?.id ?? null,
+        });
+        if (keepOpen) onAdded?.();
+        else setPicker(false);
+        const guessed = added.filter((m) => m.capabilitiesGuessed).length;
+        if (guessed) toast.show({ tone: 'warning', message: `${guessed} 个模型没查到资料，已用默认能力，请在详情里核对。` });
+      },
+    );
   }
   function remove() {
     if (!removing) return;
@@ -267,49 +288,33 @@ export function ModelsSection({
           <Button
             size="sm"
             variant="quiet"
-            onClick={() => {
-              cancel();
-              setMessage("已取消。");
-            }}
+            onClick={cancel}
           >
             取消
           </Button>
         </p>
       )}
-      {message && <p>{message}</p>}
-      {error && <p role="alert">{error}</p>}
     </div>
   );
   return (
     <div className={`pp-model-settings${endpoint ? " pp-model-detail" : ""}`}>
       {!endpoint ? (
         <>
-          <div className="pp-model-heading">
-            <div>
-              <h1>模型服务</h1>
-            </div>
-            <Button
-              variant="primary"
-              icon="plus"
-              onClick={() => setAdding(true)}
-            >
-              添加供应商
-            </Button>
-          </div>
-          <div className="pp-provider-toolbar">
-            <TextField
-              icon="search"
-              clearable
-              label="搜索供应商"
-              hideLabel
-              placeholder="搜索名称或地址"
-              value={search}
-              onChange={setSearch}
-            />
-            <span>
-              {draft.endpoints.length} 个服务 · {draft.models.length} 个模型
-            </span>
-          </div>
+          <SettingsHeader title="模型" saveBar={renderSaveBar("inline")} />
+          <DefaultModels draft={draft} onChange={onChange} />
+          <SettingGroup
+            title="模型服务"
+            actions={
+              <Button size="sm" variant="quiet" icon="plus" onClick={() => setAdding(true)}>
+                添加供应商
+              </Button>
+            }
+          >
+            {draft.endpoints.length > 4 && (
+              <div className="pp-provider-toolbar">
+                <TextField icon="search" clearable label="搜索供应商" hideLabel placeholder="搜索名称或地址" value={search} onChange={setSearch} />
+              </div>
+            )}
           <ProviderList
             endpoints={draft.endpoints}
             models={draft.models}
@@ -334,66 +339,33 @@ export function ModelsSection({
               </Button>
             </div>
           )}
-          <div className="pp-model-default">
-            <HintLabel hint="未单独指定模型的功能会使用此模型。">
-              默认模型
-            </HintLabel>
-            <FieldSelect
-              label="默认模型"
-              value={draft.defaultModelId ?? ""}
-              options={[
-                { value: "", label: "自动选择可用模型" },
-                ...draft.models.map((m) => ({
-                  value: m.id,
-                  label: `${draft.endpoints.find((e) => e.id === m.endpointId)?.name} / ${m.label || m.modelId}`,
-                })),
-              ]}
-              onChange={(id) =>
-                onChange({ ...draft, defaultModelId: id || null })
-              }
-            />
-          </div>
-          {renderSaveBar("floating")}
+          </SettingGroup>
+          <AdvancedSection runtime={draft.runtime} onChange={(runtime) => onChange({ ...draft, runtime })} problems={problems} />
         </>
       ) : (
         <>
-          <GlassSurface
-            as="header"
-            tone="bar"
-            radius="float"
-            className="pp-model-detail-toolbar"
-            aria-label="供应商操作"
-          >
-            <div className="pp-model-detail-identity">
-              <IconButton
-                icon="chevronLeft"
-                label="返回模型服务"
-                size="md"
-                onClick={() => setActive(null)}
-              />
-              <ProviderLogo
-                brand={providerBrand(endpoint.presetId)?.id}
-                size="sm"
-              />
-              <h1>{endpoint.name || "未命名服务"}</h1>
-            </div>
-            <div className="pp-model-detail-actions">
-              <IconButton
-                icon="copy"
-                label="复制配置"
-                size="md"
-                onClick={copyEndpoint}
-              />
-              <IconButton
-                icon="trash"
-                label="移除此供应商"
-                size="md"
-                className="pp-model-remove"
-                onClick={() => setRemoving({ endpoint: endpoint.id })}
-              />
-              {renderSaveBar("inline")}
-            </div>
-          </GlassSurface>
+          <SettingsHeader
+            title={endpoint.name || "未命名服务"}
+            leading={
+              <>
+                <IconButton icon="chevronLeft" label="返回模型服务" size="md" onClick={() => setActive(null)} />
+                <ProviderLogo brand={providerBrand(endpoint.presetId)?.id} size="sm" />
+              </>
+            }
+            actions={
+              <>
+                <IconButton icon="copy" label="复制配置" size="md" onClick={copyEndpoint} />
+                <IconButton
+                  icon="trash"
+                  label="移除此供应商"
+                  size="md"
+                  className="pp-model-remove"
+                  onClick={() => setRemoving({ endpoint: endpoint.id })}
+                />
+              </>
+            }
+            saveBar={renderSaveBar("inline")}
+          />
           <div className="pp-model-detail-content">
             <SettingGroup title="连接">
               <SettingRow
@@ -477,17 +449,10 @@ export function ModelsSection({
             </SettingGroup>
             <SettingGroup
               title="模型"
-              hint={`models.dev 目录 · ${catalog.updatedAt.slice(0, 10)}。目录是能力参考，不代表账号可以调用；可通过模型右侧的测试操作确认。`}
+              hint="能力来自公开目录，仅供参考；可用右侧的测试确认"
               actions={
                 <div className="pp-model-actions">
                   <span className="pp-model-detail-count">{models.length}</span>
-                  <IconButton
-                    icon="sync"
-                    label="更新目录"
-                    size="md"
-                    disabled={busy}
-                    onClick={refreshCatalog}
-                  />
                   <IconButton
                     icon="plus"
                     label="添加模型"
@@ -577,8 +542,7 @@ export function ModelsSection({
           cancel();
           setPicker(false);
         }}
-        title="添加模型"
-        description={`添加到 ${endpoint?.name ?? ""}。目录提供能力参考，模型列表不能保证账号可调用。`}
+        title={`添加模型 · ${endpoint?.name ?? ""}`}
         size="lg"
         footer={
           <>
@@ -593,25 +557,23 @@ export function ModelsSection({
             </Button>
             {source === "manual" ? (
               <Button
-                disabled={!manualId.trim()}
+                variant="primary"
+                disabled={busy || !manual.modelId.trim()}
                 onClick={() => {
-                  if (models.some((m) => m.modelId === manualId.trim())) {
-                    setError("该模型已经添加。");
+                  const id = manual.modelId.trim();
+                  if (models.some((m) => m.modelId === id)) {
+                    setError("这个模型已经添加过了");
                     return;
                   }
-                  addItems([
-                    {
-                      provider: "",
-                      modelId: manualId.trim(),
-                      label: manualName.trim() || manualId.trim(),
-                      reasoning: { kind: "unknown" },
-                    },
-                  ]);
-                  setManualId("");
-                  setManualName("");
+                  // Stays open for the next one; what was added is listed under the form.
+                  addItems([manualModel(manual)], true, () => {
+                    setManualAdded((list) => [...list, manual.label.trim() || id]);
+                    setManual(emptyManual);
+                    setMessage(`已添加 ${manual.label.trim() || id}`);
+                  });
                 }}
               >
-                添加到草稿
+                添加
               </Button>
             ) : (
               <Button
@@ -648,18 +610,7 @@ export function ModelsSection({
           ))}
         </div>
         {source === "manual" ? (
-          <div className="pp-model-fields">
-            <TextField
-              label="请求模型 ID"
-              value={manualId}
-              onChange={setManualId}
-            />
-            <TextField
-              label="显示名称"
-              value={manualName}
-              onChange={setManualName}
-            />
-          </div>
+          <ManualModelForm value={manual} onChange={setManual} added={manualAdded} />
         ) : (
           <>
             <div className="pp-model-picker-tools">
@@ -674,6 +625,7 @@ export function ModelsSection({
                 onChange={setCapability}
               />
               {source === "catalog" ? (
+                <>
                 <Select
                   label="模型厂商"
                   value={brand}
@@ -698,6 +650,15 @@ export function ModelsSection({
                     setChosen([]);
                   }}
                 />
+                <IconButton
+                  icon="sync"
+                  label={`更新目录 · ${catalog.updatedAt.slice(0, 10)}`}
+                  size="md"
+                  disabled={busy}
+                  className={busy ? "pp-model-refreshing" : undefined}
+                  onClick={refreshCatalog}
+                />
+                </>
               ) : (
                 <Button
                   disabled={busy}
@@ -707,7 +668,7 @@ export function ModelsSection({
                       (s) => fetchEndpointModels(endpoint, catalog, s),
                       (v) => {
                         setDiscovered(v);
-                        setMessage(`端点返回 ${v.length} 个模型。`);
+                        setMessage(`找到 ${v.length} 个模型`);
                       },
                     )
                   }
@@ -796,7 +757,7 @@ export function ModelsSection({
           setTestId(null);
         }}
         title="测试模型"
-        description="向当前草稿配置的端点发起一次模型请求，可能计费。使用测试内容，不发送论文。"
+        description="会发送一次测试请求，可能计费。"
         footer={
           <>
             <Button
@@ -853,7 +814,7 @@ export function ModelsSection({
         open={!!removing}
         onClose={() => setRemoving(null)}
         title="移除模型配置"
-        description="保存后移除。依赖此配置的默认模型和功能路由将回到自动选择；旧会话保留原模型记录，继续使用前需重新选择模型。"
+        description="保存后生效；用到它的功能会改用默认模型。"
         footer={
           <>
             <Button variant="quiet" onClick={() => setRemoving(null)}>

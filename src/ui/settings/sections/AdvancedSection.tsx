@@ -1,5 +1,5 @@
 import { useId } from 'react';
-import { Segmented, Stepper } from '@/ui/components';
+import { Segmented } from '@/ui/components';
 import { SettingGroup, SettingRow } from '../SettingRow';
 import { LLM_TRANSLATION_LIMITS } from '@/translation/settings';
 import type { RuntimeConfig } from '../types';
@@ -13,7 +13,7 @@ interface AdvancedSectionProps {
 
 export const RUNTIME_LIMITS = { timeout: { min: 10, max: 900 }, concurrency: { min: 1, max: 12 } } as const;
 
-/** Request limits. Part of the settings draft: saved together with models and features. */
+/** Request limits for every model call, in the models page's folded 高级设置. Part of the settings draft. */
 export function AdvancedSection({ runtime, onChange, problems }: AdvancedSectionProps) {
   const timeoutId = useId();
   const outputId = useId();
@@ -21,11 +21,11 @@ export function AdvancedSection({ runtime, onChange, problems }: AdvancedSection
   const customOutput = runtime.maxOutputTokens !== null;
 
   return (
-    <SettingGroup title="请求" description="对所有 AI 功能生效。改动只影响之后开始的任务。">
+    <SettingGroup title="高级设置" collapsible>
       <SettingRow
         label="超时"
         htmlFor={timeoutId}
-        description={`一次请求最长等多久，${RUNTIME_LIMITS.timeout.min}–${RUNTIME_LIMITS.timeout.max} 秒。从模型请求发出时开始计算。`}
+        hint={`一次请求最长等待的时间，${RUNTIME_LIMITS.timeout.min}–${RUNTIME_LIMITS.timeout.max} 秒`}
         error={problems.get('runtime.timeoutSec')}
       >
         <span className="pp-set-number">
@@ -38,18 +38,9 @@ export function AdvancedSection({ runtime, onChange, problems }: AdvancedSection
           <span>秒</span>
         </span>
       </SettingRow>
-      <SettingRow label="同时进行的请求" description="翻译按此上限并发，修改在下次启动任务时生效。" error={problems.get('runtime.concurrency')}>
-        <Stepper
-          label="同时进行的请求"
-          value={runtime.concurrency}
-          min={RUNTIME_LIMITS.concurrency.min}
-          max={RUNTIME_LIMITS.concurrency.max}
-          onChange={(concurrency) => set({ concurrency })}
-        />
-      </SettingRow>
       <SettingRow
         label="输出长度上限"
-        description="每次回答最多生成多少 token。各模型能接受的上限不同，保存时会逐个核对。"
+        hint="每次回答最多生成的 token 数"
         error={problems.get('runtime.maxOutputTokens')}
         stacked
       >

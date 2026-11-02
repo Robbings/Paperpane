@@ -121,13 +121,14 @@ export function useSampleSettings() {
       if (current.revision !== baseRevision) return { ok: false, reason: 'conflict', latest: current };
       const problems = runtimeProblems(draft.runtime);
       if (problems.length > 0) return { ok: false, reason: 'invalid', problems };
-      const { endpoints, sync, ...rest } = draft;
+      const { endpoints, sync, translationApis, ...rest } = draft;
       const { hadPassword, password, ...syncRest } = sync;
       const next: SettingsView = {
         ...rest,
         revision: String(Number(current.revision) + 1),
         endpoints: endpoints.map(({ hadKey, key, ...endpoint }) => ({ ...endpoint, hasKey: nextSecret(hadKey, key) })),
         sync: { ...syncRest, hasPassword: nextSecret(hadPassword, password) },
+        translationApis: translationApis.map(({ hadSecret, secret, ...api }) => ({ ...api, hasSecret: nextSecret(hadSecret, secret) })),
       };
       store(next);
       return { ok: true, value: next };

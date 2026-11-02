@@ -2,13 +2,9 @@ import { useEffect, useState } from 'react';
 import { Toaster } from '@/ui/components';
 import { useModelSettings } from '@/runtime/use-model-settings';
 import { SettingsView } from '@/ui/settings/SettingsView';
-import type { Preferences, PreferencesState, SettingsSection } from '@/ui/settings/types';
+import { sectionFromHash, type Preferences, type PreferencesState, type SettingsSection } from '@/ui/settings/types';
 
-const sectionIds: readonly SettingsSection[] = ['general', 'models', 'features', 'sync', 'advanced', 'privacy'];
-const fromHash = (): SettingsSection => {
-  const hash = window.location.hash.slice(1) as SettingsSection;
-  return sectionIds.includes(hash) ? hash : 'general';
-};
+const fromHash = (): SettingsSection => sectionFromHash(window.location.hash);
 
 interface SettingsPageProps {
   /** This device's preferences, from the real preference store (the same one the reader reads). */

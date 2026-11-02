@@ -5,7 +5,7 @@ export const BACKUP_LIMITS={bytes:1024*1024*1024,entries:50000,manifest:64*1024*
 export async function sha256(bytes:Uint8Array):Promise<string>{return Array.from(new Uint8Array(await crypto.subtle.digest('SHA-256',new Uint8Array(bytes))),b=>b.toString(16).padStart(2,'0')).join('');}
 function ensure(condition:unknown,message:string):asserts condition {if(!condition)throw new Error(message);}
 function validate(snapshot:TransferSnapshot){
-  ensure(snapshot?.format==='paperpane-backup'&&[1,2].includes(snapshot.version),'备份格式或版本不支持');
+  ensure(snapshot?.format==='paperpane-backup'&&[1,2,3].includes(snapshot.version),'备份格式或版本不支持');
   ensure(typeof snapshot.id==='string'&&snapshot.id.length>0&&typeof snapshot.createdAt==='string'&&typeof snapshot.complete==='boolean','备份清单无效');
   ensure(Array.isArray(snapshot.databases)&&Array.isArray(snapshot.assets),'备份数据无效');
   const names=new Set<string>();
@@ -30,11 +30,11 @@ export async function createBackup(snapshot:TransferSnapshot):Promise<Blob>{
   const assets=[];
   for(const asset of snapshot.assets){const bytes=new Uint8Array(await asset.blob.arrayBuffer());ensure(await sha256(bytes)===asset.sha256,'附件文件校验失败');files[assetPath(asset)]=bytes;const {blob,...record}=asset;assets.push({...record,byteLength:bytes.length});}
   const manifest=strToU8(JSON.stringify({...snapshot,assets}));ensure(manifest.length<=BACKUP_LIMITS.manifest,'备份清单过大');files['manifest.json']=manifest;
-  ensure(Object.values(files).reduce((n,b)=>n+b.length,0)<=BACKUP_LIMITS.bytes,'备份超过当前单包容量限制（1 GiB）');
+  ensure(Object.values(files).reduce((n,b)=>n+b.length,0)<=BACKUP_LIMITS.bytes,'备份超过 1 GB，暂不支持');
   return new Blob([new Uint8Array(zipSync(files,{level:0}))],{type:'application/zip'});
 }
 export async function inspectBackup(blob:Blob):Promise<TransferSnapshot>{
-  ensure(blob.size<=BACKUP_LIMITS.bytes,'备份超过当前单包容量限制（1 GiB）');
+  ensure(blob.size<=BACKUP_LIMITS.bytes,'备份超过 1 GB，暂不支持');
   let size=0,count=0;const paths=new Set<string>();
   const files=unzipSync(new Uint8Array(await blob.arrayBuffer()),{filter:entry=>{
     ensure(++count<=BACKUP_LIMITS.entries,'备份文件数量过多');

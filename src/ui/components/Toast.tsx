@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState, useSyncExternalStore } from 'react';
+import { useEffect, useLayoutEffect, useRef, useState, useSyncExternalStore } from 'react';
 import { createPortal } from 'react-dom';
 import { Icon, type IconName } from './Icon';
 import { IconButton } from './IconButton';
@@ -42,6 +42,13 @@ export const toast = {
     emit();
   },
 };
+
+/**
+ * Mounted toasters, oldest first. Only one shows the stack: the newest inside a
+ * dialog if any (it sits above the backdrop and is not inert), else the newest.
+ */
+let hosts: { inline: boolean }[] = [];
+const activeHost = () => hosts.filter((h) => h.inline).at(-1) ?? hosts.at(-1);
 
 const subscribe = (listener: () => void) => {
   listeners.add(listener);
@@ -154,15 +161,33 @@ function ToastItem({ entry }: { entry: ToastEntry }) {
   );
 }
 
-/** Renders the toast stack. Place once per page. */
-export function Toaster({ top = 64 }: { /** Distance from the window top, below the toolbar. */ top?: number }) {
-  const current = useSyncExternalStore(subscribe, () => entries);
-  return createPortal(
+/** Renders the toast stack. Place once per page; Dialog adds its own while open. */
+export function Toaster({
+  top = 64,
+  inline = false,
+}: {
+  /** Distance from the window top, below the toolbar. */
+  top?: number;
+  /** Render in place instead of on <body>, e.g. inside a modal dialog. */
+  inline?: boolean;
+}) {
+  const [host] = useState(() => ({ inline }));
+  useLayoutEffect(() => {
+    hosts = [...hosts, host];
+    emit();
+    return () => {
+      hosts = hosts.filter((h) => h !== host);
+      emit();
+    };
+  }, [host]);
+  const current = useSyncExternalStore(subscribe, () => (activeHost() === host ? entries : null));
+  if (!current) return null;
+  const stack = (
     <div className="pp-toaster" style={{ top }} aria-live="polite">
       {current.map((entry) => (
         <ToastItem key={entry.id} entry={entry} />
       ))}
-    </div>,
-    document.body,
+    </div>
   );
+  return inline ? stack : createPortal(stack, document.body);
 }

@@ -26,6 +26,8 @@ export interface LibraryItem extends RecordStamp {
   addedAt: string;
   starred: boolean;
   folderId: Id | null;
+  /** Additional collection memberships, used by Zotero multi-collection imports. */
+  folderIds?: Id[];
   tagIds: Id[];
   /** Original CSL data retains author structure, volume, pages, identifiers, etc. */
   citation?: Record<string, Json>;
@@ -59,6 +61,8 @@ export interface LibraryState {
   items: readonly LibraryRow[]; total: number; folders: readonly LibraryFolder[]; tags: readonly LibraryTag[];
   counts: LibraryCounts; query: LibraryQuery; preferences: LibraryPreferences;
   unavailableSearchFields: readonly LibraryField[];
+  /** Tags used by papers in the current collection, before tag and text filters. */
+  collectionTagIds?: readonly Id[];
 }
 export interface LibraryService extends Readable<LibraryState> {
   setQuery(patch: Partial<LibraryQuery>): void;

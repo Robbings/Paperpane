@@ -6,7 +6,8 @@ import { PaperDatabase } from './database';
 import type { SettingsView, SettingsDraft, SaveSettingsResult } from '@/ui/settings/types';
 import { runtimeProblems } from '@/ui/settings/sections/AdvancedSection';
 const KEY='modelSettings-v1';
-export const emptySettings:SettingsView={revision:'empty',endpoints:[],models:[],defaultModelId:null,features:[],prompts:[],runtime:{timeoutSec:120,concurrency:1,maxOutputTokens:null},sync:{enabled:false,webdavUrl:'',username:'',hasPassword:false,uploadPdfs:true}};
+const TRANSLATION_KEY='translation-api:';
+export const emptySettings:SettingsView={revision:'empty',endpoints:[],models:[],defaultModelId:null,features:[],prompts:[],runtime:{timeoutSec:120,concurrency:3,maxOutputTokens:null},sync:{enabled:false,webdavUrl:'',username:'',hasPassword:false,uploadPdfs:true}};
 interface Record {view:SettingsView;keys: {[endpointId:string]:string}}
 const request=<T>(r:IDBRequest<T>)=>new Promise<T>((ok,no)=>{r.onsuccess=()=>ok(r.result);r.onerror=()=>no(r.error);});
 export class ModelSettingsStore extends PaperDatabase {
@@ -33,8 +34,10 @@ export class ModelSettingsStore extends PaperDatabase {
           if(e.key.kind==='keep'&&prev&&endpointUrl(prev.baseUrl)!==endpointUrl(e.baseUrl)&&old.keys[e.id]){result={ok:false,reason:'invalid',problems:[{path:'endpoints',message:'接口地址已改变，请重新填写密钥，避免把旧密钥发送到另一个服务。'}]};return;}
           keys[e.id]=e.key.kind==='replace'?e.key.value.trim():e.key.kind==='clear'?'':old.keys[e.id]??'';
         }
-        const {endpoints,sync,...rest}=draft;
-        const view:SettingsView={...structuredClone(rest),revision:crypto.randomUUID(),endpoints:endpoints.map(({key:_key,hadKey:_had,...e})=>({...e,baseUrl:endpointUrl(e.baseUrl),hasKey:!!keys[e.id]})),sync:{...old.view.sync,...sync,hasPassword:old.view.sync.hasPassword}};
+        // Machine translation credentials sit beside the endpoint keys, under their own prefix.
+        for(const api of draft.translationApis??[]){const id=TRANSLATION_KEY+api.id;keys[id]=api.secret.kind==='replace'?api.secret.value:api.secret.kind==='clear'?'':old.keys[id]??'';}
+        const {endpoints,sync,translationApis,...rest}=draft;
+        const view:SettingsView={...structuredClone(rest),revision:crypto.randomUUID(),endpoints:endpoints.map(({key:_key,hadKey:_had,...e})=>({...e,baseUrl:endpointUrl(e.baseUrl),hasKey:!!keys[e.id]})),translationApis:(translationApis??[]).map(({secret:_secret,hadSecret:_had,...api})=>({...structuredClone(api),hasSecret:!!keys[TRANSLATION_KEY+api.id]})),sync:{...old.view.sync,...sync,hasPassword:old.view.sync.hasPassword}};
         // This slice does not implement or persist WebDAV secret edits.
         delete (view.sync as unknown as {[key:string]:unknown}).password;delete (view.sync as unknown as {[key:string]:unknown}).hadPassword;
         store.put({key:KEY,value:{view,keys}});result={ok:true,value:view};
@@ -49,6 +52,8 @@ export class ModelSettingsStore extends PaperDatabase {
     const key=endpoint.key.kind==='replace'?endpoint.key.value.trim():endpoint.key.kind==='clear'?'':record.keys[endpoint.id]??'';
     return {endpoint:{...endpoint,baseUrl},key};
   }
+  /** Credentials of a machine translation API, for request logic only (JSON of its secret fields). */
+  async translationApiSecret(apiId:string):Promise<{[field:string]:string}>{const {keys}=await this.record();try{return JSON.parse(keys[TRANSLATION_KEY+apiId]||'{}');}catch{return {};}}
   /** For request logic only; never expose this return value through a UI snapshot. */
   async resolveConnection(modelId?:string, feature: import('@/ui/settings/types').FeatureId = 'translate'){
     const {view,keys}=await this.record();
