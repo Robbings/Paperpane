@@ -38,8 +38,8 @@ export function LiveReaderPage() {
     setOwner(controller); void controller.start();
     return ()=>{live=false;void controller.dispose();};
   },[container,surface]);
-  const translation=useTranslation(owner,preferences.state.preferences);
   const modelSettings=useModelSettings();
+  const translation=useTranslation(owner,preferences.state.preferences,modelSettings.settings,!modelSettings.loading && !modelSettings.error);
   const state=owner?.reader.getSnapshot().data;
   const renderThumbnail=useCallback((index:number,signal:AbortSignal)=>owner?owner.reader.thumbnail(index,signal):Promise.reject(new Error('尚未就绪')),[owner,state?.sessionId]);
   const research=useResearch(owner,preferences.state.preferences,modelSettings.settings.revision,preferences.state.local!=='unmodified'&&preferences.state.local!=='failed');

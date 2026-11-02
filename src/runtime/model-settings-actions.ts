@@ -1,3 +1,7 @@
+import { createMachineTranslator, credentials } from '@/translation/machine';
+import { incomplete } from '@/translation/machine/transport';
+import { machineSlot } from '@/translation/machine/slot';
+import { machineTranslationSettings } from '@/translation/machine-providers';
 import { ModelSettingsStore } from "@/data/model-settings";
 import { requestImportOrigin } from "@/document/permissions";
 import { discoverModels, readJson } from "@/ai/model-discovery";
@@ -270,7 +274,7 @@ export async function completeCapabilities(items: CatalogModel[], catalog: Catal
 
 /**
  * Translates "Hello, world." with a machine translation service as the draft has it (typed or saved
- * credentials) and returns the translation. 待逻辑层接入 MachineTranslator 后实现。
+ * credentials) and returns the translation.
  */
 export async function testTranslationApi(
   draft: SettingsDraft,
@@ -278,6 +282,17 @@ export async function testTranslationApi(
   signal: AbortSignal,
 ): Promise<{ text: string; elapsedMs: number }> {
   signal.throwIfAborted();
-  if (!draft.translationApis.some((a) => a.id === apiId)) throw new Error("翻译服务不存在。");
-  throw new Error("翻译服务还没有接入，暂时无法检查。");
+  const api = draft.translationApis.find(a => a.id === apiId);
+  if (!api) throw new Error('翻译服务不存在。');
+  const db = new ModelSettingsStore();
+  try {
+    const secret = api.secret.kind === 'keep' ? await db.translationApiSecret(apiId) :
+      credentials(api.secret.kind === 'replace' ? api.secret.value : undefined);
+    const translator = createMachineTranslator(api, secret);
+    const start = performance.now();
+    const [text] = await machineSlot(apiId, machineTranslationSettings(draft.runtime), signal,
+      () => translator.translate({texts:['Hello, world.'],from:'en',to:'zh-CN',signal}));
+    if (!text?.trim()) throw incomplete();
+    return {text,elapsedMs:Math.round(performance.now()-start)};
+  } finally { await db.close(); }
 }

@@ -3,15 +3,16 @@ import type { ExtractedPaper, TranslationRun, TranslationSentence, SentenceTrans
 import { TranslationStore } from '@/data/translation-store';
 import { ModelSettingsStore } from '@/data/model-settings';
 import { EXTRACTION_VERSION } from './extract';
-import { createLlmEngine, PROMPT_VERSION } from './engines/llm';
+import { prepareTranslation, packBatches, carryOutputs } from './task-engine';
+import { savedEngineKey } from './resolve';
 import type { TranslationEngine } from './engine';
 import { TranslationError, retryPolicy } from './errors';
-import { llmTranslationSettings } from './settings';
 import { runTranslationQueue } from './queue';
 const message = (e: unknown) => e instanceof Error ? e.message : '翻译没有完成，请重试。';
 export { decodeTranslations } from './output';
 
 export class TranslationSession {
+  engineOverride?: string;
   requestScope?: { page?: number; ids?: string[] };
   paper?: ExtractedPaper;
   run?: TranslationRun;
@@ -105,9 +106,13 @@ export class TranslationSession {
         signal.throwIfAborted();
         const latest = await this.db.latest(this.ref, this.selection?.key);
         signal.throwIfAborted();
-        const c = await this.settings.resolveConnection(); signal.throwIfAborted();
-        const same = latest && latest.extractionVersion === this.paper!.version && latest.profile.language === language && latest.profile.modelId === c.model.id && latest.profile.modelName === c.model.modelId && latest.profile.endpointId === c.endpoint.id && latest.profile.endpointUrl === c.endpoint.baseUrl && latest.profile.protocol === c.endpoint.protocol && (latest.profile.sourceLanguage ?? 'auto') === (this.selection?.sourceLanguage ?? 'auto') && [PROMPT_VERSION, 'sentence-markdown-math-2'].includes(latest.profile.promptVersion);
-        if (retry && onlyIds && latest && !same) throw new Error('本次任务的模型或语言已变化，请使用原配置继续，或重新选择页面开始新版本。');
+        const resolved = await this.settings.resolveTranslationEngine(this.selection ? 'selection' : 'paper', this.engineOverride);
+        signal.throwIfAborted();
+        const task = prepareTranslation(resolved, language, this.selection?.sourceLanguage);
+        const compatible = latest && latest.extractionVersion === this.paper!.version && latest.profile.language === language &&
+          (latest.profile.sourceLanguage ?? 'auto') === (this.selection?.sourceLanguage ?? 'auto');
+        const same = compatible && savedEngineKey(latest.profile) === resolved.key && latest.profile.promptVersion === task.profile.promptVersion;
+        if (retry && onlyIds && latest && !compatible) throw new Error('原文或翻译语言已变化，请重新开始翻译。');
         const candidates = this.paper!.sentences.filter(s => s.kind !== 'formula' && (!onlyIds || onlyIds.includes(s.id)) && (page === undefined || s.anchor.pages.some(p => p.pageIndex === page)));
         const continuing = !!(retry && !replace && same && candidates.every(s => latest.requested.includes(s.id)));
         const now = new Date().toISOString();
@@ -115,9 +120,9 @@ export class TranslationSession {
           ...this.ref, id: crypto.randomUUID(), sessionId: crypto.randomUUID(), revision: 'new',
           parentRunId: latest?.id, extractionVersion: this.paper!.version, createdAt: now, updatedAt: now,
           selection: this.selection ? structuredClone(this.selection) : undefined,
-          scope: this.selection ? { kind: 'selection', ids: candidates.map(s=>s.id) } : onlyIds ? { kind: 'selection', ids: [...onlyIds] } : page === undefined ? { kind: 'document' } : { kind: 'page', page },
-          profile: { modelId: c.model.id, modelName: c.model.modelId, endpointId: c.endpoint.id, endpointUrl: c.endpoint.baseUrl, protocol: c.endpoint.protocol, configRevision: c.view.revision, language, sourceLanguage: this.selection?.sourceLanguage, promptVersion: PROMPT_VERSION },
-          phase: 'idle', requested: candidates.map(s => s.id), outputs: same ? structuredClone(latest.outputs) : {}, attempts: [],
+          scope: this.selection ? { kind: 'selection', ids: candidates.map(s=>s.id) } : onlyIds && latest?.scope ? structuredClone(latest.scope) : page === undefined ? { kind: 'document' } : { kind: 'page', page },
+          profile: task.profile, phase: 'idle', requested: candidates.map(s => s.id),
+          outputs: compatible ? carryOutputs(latest,!!same) : {}, attempts: [],
         };
         // No await between adopting the snapshot and its matching expected revision.
         this.persistedRevision = continuing ? latest!.revision : undefined;
@@ -134,24 +139,15 @@ export class TranslationSession {
         for (const s of selected) this.run.outputs[s.id] = { ...this.run.outputs[s.id], text: this.run.outputs[s.id]?.text ?? '', state: 'pending' };
         await this.save();
         signal.throwIfAborted();
-        // Pack adjacent paragraphs without crossing a page boundary. Avoid one request per heading.
-        const batches: TranslationSentence[][] = [];
-        const batching = llmTranslationSettings(c.view.runtime);
-        const charLimit = Math.min(batching.batchCharacters, c.view.runtime.maxOutputTokens ? Math.max(500, c.view.runtime.maxOutputTokens * .85) : batching.batchCharacters);
-        for (const s of selected) {
-          const last = batches.at(-1);
-          if (last && last[0]!.anchor.pages[0]?.pageIndex === s.anchor.pages[0]?.pageIndex && last.length < batching.batchSentences && last.reduce((n, x) => n + x.source.length, 0) + s.source.length < charLimit) last.push(s);
-          else batches.push([s]);
-        }
-        const engine = createLlmEngine(c);
+        const batches = packBatches(selected,task);
         const result = await runTranslationQueue(batches, {
-          concurrency: c.view.runtime.concurrency, signal, minInterval: Math.ceil(60000 / batching.requestsPerMinute),
+          concurrency:task.concurrency, signal, minInterval:Math.ceil(60000/task.rpm),
           execute: async (batch, retryRound, requestSignal) => {
             for (const sentence of batch) this.retrying.delete(sentence.id);
             if (!this.retrying.size) this.run!.error = undefined;
             this.update();
             const remaining = batch.filter(s => this.run!.outputs[s.id]?.state !== 'done');
-            if (remaining.length) await this.translateBatch(engine, remaining, language, c.view.revision, retryRound, requestSignal);
+            if (remaining.length) await this.translateBatch(task.engine, remaining, language, resolved.revision, retryRound, requestSignal);
           },
           split: batch => {
             const remaining = batch.filter(s => this.run!.outputs[s.id]?.state !== 'done');
@@ -183,7 +179,7 @@ export class TranslationSession {
   }
   private async translateBatch(engine: TranslationEngine, batch: TranslationSentence[], language: string, configRevision: string, retryRound: number, signal: AbortSignal) {
     const run = this.run!;
-    const attempt = { id: crypto.randomUUID(), sessionId: run.sessionId ?? run.id, sentenceIds: batch.map(s => s.id), raw: '', startedAt: new Date().toISOString(), configRevision, promptVersion: PROMPT_VERSION, engine: engine.id, retryRound, state: 'running' as const };
+    const attempt = { id: crypto.randomUUID(), sessionId: run.sessionId ?? run.id, sentenceIds: batch.map(s => s.id), raw: '', startedAt: new Date().toISOString(), configRevision, promptVersion: run.profile.promptVersion, engine: engine.id, retryRound, state: 'running' as const };
     run.attempts.push(attempt); const a = run.attempts.at(-1)!;
     for (const s of batch) run.outputs[s.id] = { ...run.outputs[s.id], text: run.outputs[s.id]?.text ?? '', state: 'streaming' };
     const paragraphs = new Set(batch.map(s => s.paragraphId));
@@ -194,7 +190,7 @@ export class TranslationSession {
       await engine.translate({ sentences: batch, context, language, sourceLanguage: this.selection?.sourceLanguage, signal, sessionId: run.sessionId ?? run.id, onDiagnostics: detail => { a.diagnostics = detail; } }, async output => {
         a.raw += output.raw;
         for (const value of output.sentences) if (a.sentenceIds.includes(value.id)) {
-          run.outputs[value.id] = { text: value.text, state: value.complete ? 'done' : 'streaming', format: 'markdown-math-v1', inferredMath: value.inferredMath };
+          run.outputs[value.id] = { engine:savedEngineKey(run.profile), text: value.text, state: value.complete ? 'done' : 'streaming', format: 'markdown-math-v1', inferredMath: value.inferredMath };
         }
         await this.save();
       });

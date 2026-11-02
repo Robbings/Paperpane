@@ -3,7 +3,7 @@ import type { TranslationLanguage } from './languages';
 
 // 机器翻译服务目录：每种服务的名称、需要填写的字段、单次请求的上限和语言代码。
 // 设置页按这里生成表单、提示不支持的语言；请求适配器按 kind 实现 MachineTranslator，对外只暴露统一的 translate()。
-// 语言代码和条数上限按各家公开文档整理，实现适配器时再逐项核对。
+// 无公开条数上限的服务使用保守批量值；供应商的字节限制在发送前另行计算。
 
 /** Our language code → the service's. A language missing here cannot be translated into. */
 export type LanguageCodes = Readonly<Partial<Record<TranslationLanguage, string>>>;
@@ -39,6 +39,7 @@ export interface MachineProvider {
   maxCharacters: number;
   /** Texts one request may carry. */
   maxTexts: number;
+  maxTextLength?: number;
   /** The service takes one text: several are sent joined by line breaks and split again on return. */
   joinLines?: boolean;
   /** Target language codes. */
@@ -73,7 +74,7 @@ export const machineProviders: readonly MachineProvider[] = [
       { key: 'region', label: '区域', placeholder: 'eastasia', default: 'global' },
     ],
     maxCharacters: 50000,
-    maxTexts: 100,
+    maxTexts: 1000,
     languages: shortCodes('zh-Hans', 'zh-Hant'),
     glossary: true,
   },
@@ -88,8 +89,8 @@ export const machineProviders: readonly MachineProvider[] = [
     ],
     maxCharacters: 100000,
     maxTexts: 50,
-    languages: { 'zh-CN': 'ZH-HANS', 'zh-TW': 'ZH-HANT', en: 'EN-US', ja: 'JA', ko: 'KO', fr: 'FR', de: 'DE', es: 'ES', pt: 'PT-BR', it: 'IT', ru: 'RU', ar: 'AR', id: 'ID', tr: 'TR' },
-    sourceLanguages: { 'zh-CN': 'ZH', 'zh-TW': 'ZH', en: 'EN', ja: 'JA', ko: 'KO', fr: 'FR', de: 'DE', es: 'ES', pt: 'PT', it: 'IT', ru: 'RU', ar: 'AR', id: 'ID', tr: 'TR' },
+    languages: { 'zh-CN': 'ZH-HANS', 'zh-TW': 'ZH-HANT', en: 'EN-US', ja: 'JA', ko: 'KO', fr: 'FR', de: 'DE', es: 'ES', pt: 'PT-BR', it: 'IT', ru: 'RU', ar: 'AR', hi: 'HI', vi: 'VI', id: 'ID', tr: 'TR' },
+    sourceLanguages: { 'zh-CN': 'ZH', 'zh-TW': 'ZH', en: 'EN', ja: 'JA', ko: 'KO', fr: 'FR', de: 'DE', es: 'ES', pt: 'PT', it: 'IT', ru: 'RU', ar: 'AR', hi: 'HI', vi: 'VI', id: 'ID', tr: 'TR' },
     glossary: true,
   },
   {
@@ -116,7 +117,7 @@ export const machineProviders: readonly MachineProvider[] = [
       { key: 'secretKey', label: 'SecretKey', secret: true },
       { key: 'region', label: '地域', placeholder: 'ap-guangzhou', default: 'ap-guangzhou' },
     ],
-    maxCharacters: 6000,
+    maxCharacters: 5999,
     maxTexts: 50,
     languages: shortCodes('zh', 'zh-TW'),
   },
@@ -130,7 +131,8 @@ export const machineProviders: readonly MachineProvider[] = [
       { key: 'accessKeySecret', label: 'AccessKey Secret', secret: true },
       { key: 'region', label: '地域', placeholder: 'cn-hangzhou', default: 'cn-hangzhou' },
     ],
-    maxCharacters: 5000,
+    maxCharacters: 8000,
+    maxTextLength: 1000,
     maxTexts: 50,
     languages: shortCodes('zh', 'zh-tw'),
   },

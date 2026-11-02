@@ -1,3 +1,5 @@
+import { credentials } from '@/translation/machine';
+import { resolveEngine } from '@/translation/resolve';
 import { endpointUrl, isModelProtocol, resolveConfiguredModel } from '@/ai/model-configuration';
 export { endpointUrl } from '@/ai/model-configuration';
 import { modelProblems } from '@/ai/model-capabilities';
@@ -53,7 +55,11 @@ export class ModelSettingsStore extends PaperDatabase {
     return {endpoint:{...endpoint,baseUrl},key};
   }
   /** Credentials of a machine translation API, for request logic only (JSON of its secret fields). */
-  async translationApiSecret(apiId:string):Promise<{[field:string]:string}>{const {keys}=await this.record();try{return JSON.parse(keys[TRANSLATION_KEY+apiId]||'{}');}catch{return {};}}
+  async translationApiSecret(apiId:string):Promise<{[field:string]:string}>{const {keys}=await this.record();return credentials(keys[TRANSLATION_KEY+apiId]);}
+  async resolveTranslationEngine(purpose: 'paper' | 'selection', override?: string) {
+    const {view, keys} = await this.record();
+    return resolveEngine(view, keys, purpose, override);
+  }
   /** For request logic only; never expose this return value through a UI snapshot. */
   async resolveConnection(modelId?:string, feature: import('@/ui/settings/types').FeatureId = 'translate'){
     const {view,keys}=await this.record();
