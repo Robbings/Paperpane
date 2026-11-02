@@ -19,7 +19,7 @@ const adapters: Record<string, { send: Adapter; version: number }> = {
   deepl: { send: deepl, version: 1 },
   baidu: { send: baidu, version: 1 },
   tencent: { send: tencent, version: 1 },
-  alibaba: { send: alibaba, version: 1 },
+  alibaba: { send: alibaba, version: 2 },
   youdao: { send: youdao, version: 1 },
   volcengine: { send: volcengine, version: 1 },
 };

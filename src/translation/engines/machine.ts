@@ -41,7 +41,10 @@ export function createMachineEngine(machine: ResolvedMachine): TranslationEngine
         const fragments: (string | undefined)[] = [];
         parts.set(sentence.id, fragments);
         const mask = settings.protectSpans ? protectText(sentence.source) : undefined;
-        if (mask && !unmaskedRetry.has(sentence.id) && measure(mask.masked) <= itemCap) {
+        // Alibaba may silently drop a reference placeholder while reporting success.
+        // Keep protected spans local on this adapter, including on the first request.
+        const keepSpansLocal = api.kind === 'alibaba' && mask?.masked !== sentence.source;
+        if (mask && !keepSpansLocal && !unmaskedRetry.has(sentence.id) && measure(mask.masked) <= itemCap) {
           pieces.push({ id: sentence.id, index: 0, text: mask.masked, restore: mask.restore });
           fragments.push(undefined);
           continue;
