@@ -26,9 +26,10 @@ const server = http.createServer((req, res) => {
     const hits = requests.get(pathname) ?? [];
     hits.push(verified);
     requests.set(pathname, hits);
+    if (pathname === '/retry.pdf' && hits.length === 2) { res.writeHead(403, { 'Cache-Control': 'no-store' }).end(); return; }
     if (pathname === '/session.pdf' && !verified) { res.writeHead(403).end(); return; }
     res.writeHead(200, { 'Content-Type': 'application/pdf', 'Content-Length': pdf.length,
-      'Cache-Control': pathname === '/session.pdf' ? 'no-store' : 'private, max-age=3600' }).end(pdf);
+      'Cache-Control': ['/session.pdf', '/retry.pdf'].includes(pathname) ? 'no-store' : 'private, max-age=3600' }).end(pdf);
   } else {
     res.writeHead(200, { 'Content-Type': 'text/html' }).end('<a href="/cached.pdf">PDF</a>');
   }
@@ -42,6 +43,7 @@ try {
     executablePath: process.env.PAPERPANE_CHROMIUM, headless: true,
     ignoreDefaultArgs: ['--disable-extensions'], args: [`--load-extension=${ext}`, `--disable-extensions-except=${ext}`],
   });
+  context.setDefaultTimeout(20000);
   const worker = context.serviceWorkers()[0] ?? await context.waitForEvent('serviceworker');
   const readerUrl = new URL('reader.html', worker.url()).href;
   const readers = () => context.pages().filter(page => page.url().startsWith(readerUrl));
@@ -56,14 +58,18 @@ try {
   const page = await context.newPage();
   await page.goto(base);
   const windowOf = url => worker.evaluate(async url => (await chrome.tabs.query({})).find(tab => tab.url === url)?.windowId, url);
+  const nativePage = context.waitForEvent('page');
   const opened = context.waitForEvent('page', candidate => candidate.url().startsWith(readerUrl));
   await page.locator('[data-paperpane-button]').click();
+  const native = await nativePage;
   const reader = await rendered(opened, base + '/cached.pdf');
+  if (!native.isClosed()) await native.waitForEvent('close');
   assert.equal(page.url(), base + '/');
-  const destinationWindow = await windowOf(base + '/cached.pdf');
+  const destinationWindow = await windowOf(reader.url());
   assert.ok(Number.isInteger(destinationWindow));
   assert.notEqual(destinationWindow, await windowOf(page.url()));
-  assert.equal(await windowOf(reader.url()), destinationWindow);
+  assert.equal(await windowOf(base + '/cached.pdf'), undefined);
+  assert.deepEqual(await worker.evaluate(async id => (await chrome.tabs.query({ windowId: id })).map(tab => tab.url), destinationWindow), [reader.url()]);
   assert.equal(requests.get('/cached.pdf').length, 1);
   assert.equal(cachedPdfReferrer, base + '/');
   console.log('PASS webpage button → browser PDF → reader, one PDF request with caching');
@@ -112,6 +118,7 @@ try {
   const manualReader = context.waitForEvent('page');
   await floating.click();
   await rendered(manualReader, base + '/manual.pdf');
+  if (!manual.isClosed()) await manual.waitForEvent('close');
   assert.equal(requests.get('/manual.pdf').length, 1);
 
   const verified = context.waitForEvent('page');
@@ -122,9 +129,13 @@ try {
   assert.equal(activeTab, verifiedReader.url());
   assert.equal(scholar.url(), results);
   assert.deepEqual(requests.get('/session.pdf'), [true, true]);
-  await challenge.reload();
-  await challenge.locator('#paperpane-completed-pdf-link').waitFor();
+  if (!challenge.isClosed()) await challenge.waitForEvent('close');
+  assert.equal(await windowOf(base + '/session.pdf?sig=a%2Fb'), undefined);
+  assert.equal(abandoned.isClosed(), false);
   assert.equal(readers().length, 3);
+  const beforeInstall = await context.newPage();
+  await beforeInstall.goto(base + '/popup.pdf');
+  await beforeInstall.locator('#paperpane-completed-pdf-link').waitFor();
   const popup = await context.newPage();
   await popup.goto(new URL('popup.html', worker.url()).href);
   const popupReader = context.waitForEvent('page');
@@ -133,12 +144,28 @@ try {
     // A PDF open before installation has no recorded network observation.
     await chrome.storage.session.remove('pdfTab:' + tab.id);
     return chrome.runtime.sendMessage({ type: 'OPEN_TAB_PDF', tabId: tab.id });
-  }, base + '/manual.pdf');
+  }, base + '/popup.pdf');
   assert.equal(result.ok, true);
-  await rendered(popupReader, base + '/manual.pdf');
-  assert.equal(requests.get('/manual.pdf').length, 1);
+  await rendered(popupReader, base + '/popup.pdf');
+  if (!beforeInstall.isClosed()) await beforeInstall.waitForEvent('close');
+  assert.equal(requests.get('/popup.pdf').length, 1);
   console.log('PASS PDF popup command reuses the original tab and cache');
   console.log('PASS selected Scholar result → 403 challenge → site session → reader, no anonymous fetch; independent manual PDF and single-use handoff');
+
+  const original = await context.newPage();
+  await original.goto(base + '/retry.pdf');
+  await original.locator('#paperpane-completed-pdf-link').waitFor();
+  await original.waitForTimeout(3000);
+  const [retry] = await Promise.all([
+    context.waitForEvent('page'),
+    original.locator('#paperpane-completed-pdf-link').click(),
+  ]);
+  await retry.getByText('论文导入失败', { exact: true }).waitFor();
+  assert.equal(original.isClosed(), false);
+  await retry.getByRole('button', { name: '重试导入' }).click();
+  await rendered(retry, base + '/retry.pdf');
+  if (!original.isClosed()) await original.waitForEvent('close');
+  console.log('PASS failed read keeps the native PDF available; successful retry closes it');
 } catch (error) {
   console.error('Open test pages:', context?.pages().map(page => page.url()), 'PDF requests:', [...requests]);
   throw error;

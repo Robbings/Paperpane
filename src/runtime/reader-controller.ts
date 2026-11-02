@@ -3,6 +3,7 @@ import { NoteDatabase } from '@/data/note-database';
 import { markdownWork } from '@/domain/notes/assets';
 import { AnnotationDatabase } from '@/data/annotation-database';
 import { AnnotationSession } from '@/domain/annotations/session';
+import type { BrowserPdfSource } from '@/document/browser-pdf';
 import { createDocumentService } from '@/document/service';
 import { PdfjsReader } from '@/document/reader/pdfjs-reader';
 import type { Annotation, HighlightColor } from '@/contracts/annotations';
@@ -70,7 +71,8 @@ export class ReaderController {
       }
       for (const job of this.imports.service.getSnapshot().data.jobs) if (job.phase === 'readable' && job.document && !this.openedJobs.has(job.id)) {
         this.openedJobs.add(job.id);
-        void this.open(job.document.documentId, job.id === this.externalImport?.jobId ? this.externalImport.url : undefined);
+        const imported = job.id === external?.jobId ? external : undefined;
+        void this.open(job.document.documentId, imported?.url, imported && this.imports.getImportReceipt(job.id)?.browserSource);
       }
       update();
     }));
@@ -173,7 +175,7 @@ export class ReaderController {
     } catch (error) { this.report(error instanceof Error ? error.message : '无法返回原 PDF。'); }
     finally { this.releaseDocumentChange(); }
   }
-  async open(id: string, importedSource?: string) {
+  async open(id: string, importedSource?: string, browserSource?: BrowserPdfSource) {
     if (!await this.prepareDocumentChange()) return;
     const epoch = ++this.epoch;
     try {
@@ -208,7 +210,13 @@ export class ReaderController {
       if (this.disposed || epoch !== this.epoch) return;
       this.reading = readingPersistence(this.db, ref, () => this.report('阅读位置保存失败，请保持页面打开后重试。'));
       this.restoring = false;
-      if (this.reader.getSnapshot().data.phase === 'ready') this.reading.update(this.reader.getSnapshot().data.position);
+      if (this.reader.getSnapshot().data.phase === 'ready') {
+        this.reading.update(this.reader.getSnapshot().data.position);
+        if (browserSource) {
+          const { closeImportedPdf } = await import('@/document/browser-pdf');
+          await closeImportedPdf(browserSource).catch(() => {}); // The original tab may already have closed or navigated.
+        }
+      }
     } catch (error) { if (!this.disposed && epoch === this.epoch) this.report(error instanceof Error ? error.message : '无法打开 PDF'); }
     finally { this.releaseDocumentChange(); }
   }

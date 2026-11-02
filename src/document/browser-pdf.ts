@@ -2,6 +2,22 @@ import { browser } from 'wxt/browser';
 import { ImportFault, abortIfNeeded } from './errors';
 import { MAX_PDF_BYTES, safeFilename, type TransferProgress } from './download';
 
+export interface BrowserPdfSource { tabId: number; documentId: string; url: string }
+
+/** Close only the PDF document that supplied the bytes for this reader. */
+export async function closeImportedPdf(source: BrowserPdfSource) {
+  const reader = await browser.tabs.getCurrent();
+  if (reader?.openerTabId !== source.tabId) return;
+  const [frame] = await browser.scripting.executeScript({
+    target: { tabId: source.tabId, documentIds: [source.documentId] },
+    func: (url: string) => document.contentType === 'application/pdf' && location.href.split('#')[0] === url,
+    args: [source.url],
+  });
+  if (!frame?.result) return;
+  const tab = await browser.tabs.get(source.tabId);
+  if (!tab.pendingUrl && tab.url?.split('#')[0] === source.url) await browser.tabs.remove(source.tabId);
+}
+
 /** Serialized into the original PDF tab. Bytes stay there until read in bounded chunks. */
 async function tabPdfTransfer(url: string, token: string, operation: 'start' | 'read' | 'drop', offset: number) {
   type Entry = { controller: AbortController; bytes?: Uint8Array; timer: ReturnType<typeof setTimeout> };
@@ -74,7 +90,8 @@ export async function readBrowserPdf(tabId: number, url: string, signal: AbortSi
       progress({ completed: offset, total: size, unit: 'bytes' });
     }
     abortIfNeeded(signal);
-    return { bytes, filename: safeFilename(new URL(url).pathname.split('/').at(-1) || '论文'), sourceUrl: url };
+    const browserSource = documentId ? { tabId, documentId, url } : undefined;
+    return { bytes, filename: safeFilename(new URL(url).pathname.split('/').at(-1) || '论文'), sourceUrl: url, browserSource };
   } catch (error) {
     abortIfNeeded(signal);
     throw new ImportFault({ code: 'NETWORK', message: error instanceof Error && /PDF|原页面|验证|HTTP/.test(error.message) ? error.message : '无法读取原 PDF 页面，请在浏览器下载后导入。', recovery: ['retry', 'choose-file'] });
