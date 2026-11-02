@@ -24,8 +24,10 @@ interface AnnotationsPanelProps {
   sync: SyncState;
   simulated?: boolean;
   onLocate: (id: string) => void;
+  /** Sets the highlight; the colour it already has takes the highlight off. */
   onColor: (id: string, color: HighlightColor) => void;
   onComment: (id: string, comment: string) => void;
+  /** Removes the highlight only; a comment stays. */
   onDelete: (id: string) => void;
   onRemoveComment: (id: string) => void;
   onCopyAll: () => void;
@@ -39,7 +41,7 @@ export function AnnotationsPanel({ items, local, sync, simulated, onLocate, onCo
   // "评论" lists anything that carries the reader's own words.
   const visible = items.filter(
     (item) =>
-      (kind === 'all' || (kind === 'highlight' ? item.kind === 'highlight' : Boolean(item.note))) &&
+      (kind === 'all' || (kind === 'highlight' ? item.kind === 'highlight' && item.highlighted !== false : Boolean(item.note))) &&
       (color === null || item.color === color),
   );
 
@@ -122,6 +124,7 @@ function AnnotationItem({ item, onLocate, onColor, onComment, onDelete, onRemove
   const [deletion, setDeletion] = useState<{x:number;y:number}|null>(null);
   const [editing, setEditing] = useState<string | null>(null);
   const editSession=useRef({original:'',active:false,cancelled:false});const currentEdit=editSession.current;
+  const lit = item.kind === 'highlight' && item.highlighted !== false;
   // A long quote or note is cut to a few lines so the items after it stay in sight.
   const [expanded, setExpanded] = useState(false);
   const [long, setLong] = useState(false);
@@ -144,8 +147,8 @@ function AnnotationItem({ item, onLocate, onColor, onComment, onDelete, onRemove
     <li className="pp-annotation-item" data-editing={editing !== null ? 'true' : undefined} data-long={(long || expanded) && editing === null ? '' : undefined}>
       <button type="button" className="pp-annotation" onClick={onLocate}>
         <span className="pp-annotation__meta">
-          <span className="pp-annotation__dot" style={dot(item.color)} aria-hidden="true" />
-          {item.kind === 'highlight' ? '高亮' : '页面旁注'} · 第 {item.pageIndex + 1} 页
+          <span className="pp-annotation__dot" style={dot(item.color)} data-empty={!lit || undefined} aria-hidden="true" />
+          {item.kind === 'comment' ? '页面旁注' : lit ? '高亮' : '旁注'} · 第 {item.pageIndex + 1} 页
         </span>
         {item.quote && <span ref={quote} className="pp-annotation__quote" data-clamped={!expanded || undefined}>{item.quote}</span>}
         {item.note && editing === null && <div ref={body} className="pp-annotation__note" data-clamped={!expanded || undefined}><MarkdownView value={item.note}/></div>}
@@ -181,8 +184,8 @@ function AnnotationItem({ item, onLocate, onColor, onComment, onDelete, onRemove
                 type="button"
                 className="pp-annotations__color"
                 style={dot(c)}
-                aria-label={colorNames[c]}
-                aria-pressed={item.color === c}
+                aria-label={lit && item.color === c ? `取消${colorNames[c]}高亮` : colorNames[c]}
+                aria-pressed={lit && item.color === c}
                 onClick={() => {
                   onColor(c);
                   setPicking(false);
@@ -195,23 +198,25 @@ function AnnotationItem({ item, onLocate, onColor, onComment, onDelete, onRemove
         ) : (
           <>
             {item.kind === 'highlight' && (
-              <Tooltip label="改变颜色" labelsChild>
-                <button type="button" className="pp-annotations__color" style={dot(item.color)} aria-label="改变颜色" onClick={() => setPicking(true)}>
+              <Tooltip label={lit ? '改变颜色' : '加上高亮'} labelsChild>
+                <button type="button" className="pp-annotations__color" style={dot(item.color)} data-empty={!lit || undefined} aria-label={lit ? '改变颜色' : '加上高亮'} onClick={() => setPicking(true)}>
                   <span />
                 </button>
               </Tooltip>
             )}
             <IconButton icon="edit" label={item.note ? '编辑旁注' : '添加旁注'} size="md" shape="pill" onClick={() => {editSession.current={original:item.note??'',active:true,cancelled:false};setEditing(item.note??'');}} />
-            <IconButton icon="trash" label={item.note ? '删除选项' : '删除高亮'} size="md" shape="pill" onClick={event=>{
+            <IconButton icon="trash" label={item.note && lit ? '删除…' : item.note ? '删除旁注' : '删除高亮'} size="md" shape="pill" onClick={event=>{
+              // Highlight and comment are deleted separately; ask only when there are both.
               if (!item.note) { onDelete(); return; }
+              if (!lit) { onRemoveComment(); return; }
               const box=event.currentTarget.getBoundingClientRect();setDeletion({x:box.right,y:box.bottom});
             }} />
           </>
         )}
       </span>
       {deletion && <Menu label="删除选项" anchor={deletion} align="end" entries={[
-        {id:'comment',label:'仅删除旁注（保留高亮）'},
-        {id:'annotation',label:'删除整条批注（含高亮）'},
+        {id:'comment',label:'删除旁注'},
+        {id:'annotation',label:'删除高亮'},
       ]} onClose={()=>setDeletion(null)} onSelect={id=>{setEditing(null);if(id==='comment')onRemoveComment();else onDelete();}}/>}
     </li>
   );

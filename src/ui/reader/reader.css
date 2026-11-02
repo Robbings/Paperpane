@@ -813,6 +813,13 @@
   background: var(--pp-dot);
 }
 
+/* A comment without a highlight: an empty ring instead of a colour. */
+.pp-annotation__dot[data-empty],
+.pp-annotations__color[data-empty] span {
+  background: transparent;
+  box-shadow: inset 0 0 0 1.5px var(--pp-text-3);
+}
+
 .pp-annotation__quote {
   font-family: var(--pp-font-paper);
   font-size: var(--pp-text-read-quote);

@@ -10,7 +10,7 @@ export function fromZoteroAnnotation(item:ZoteroItem,ref:DocumentRef,views:reado
   const pages=[page(position.pageIndex,position.rects)];if(position.nextPageRects)pages.push(page(position.pageIndex+1,position.nextPageRects));
   const color=(Object.entries(colors).find(([,value])=>value.toLowerCase()===d.annotationColor?.toLowerCase())?.[0]??'yellow') as HighlightColor;
   const at=new Date().toISOString();
-  return {id,revision:crypto.randomUUID(),createdAt:at,updatedAt:at,kind:d.annotationType==='note'?'page-comment':d.annotationComment?'selection-comment':'highlight',anchor:{...ref,pages},color,quote:d.annotationText??'',comment:d.annotationComment??'',source:{kind:'user'},save:{local:'saved',sync:'unconfigured'}};
+  return {id,revision:crypto.randomUUID(),createdAt:at,updatedAt:at,kind:d.annotationType==='note'?'page-comment':'highlight',anchor:{...ref,pages},color,quote:d.annotationText??'',comment:d.annotationComment??'',source:{kind:'user'},save:{local:'saved',sync:'unconfigured'}};
 }
 export function toZoteroAnnotations(row:Annotation,parentItem:string,views:readonly number[][]):ZoteroData[]{
   if(row.deletedAt)return [];

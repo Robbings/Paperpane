@@ -174,6 +174,12 @@ export function TranslationPane(props: TranslationPaneProps) {
           value={mode}
           onChange={props.onMode}
         />
+        {/* Until the whole paper is translated, the way to do it sits right here, in words. */}
+        {taskIdle(props.task) && pages.some(p => p.state !== 'done') && (
+          <button type="button" className="pp-tr__all" onClick={['paused', 'interrupted', 'failed'].includes(props.task.phase) ? props.onResume : props.onTranslateAll}>
+            翻译全文
+          </button>
+        )}
         <span className="pp-tr__spacer" />
         <TaskStatus task={props.task} pages={pages} onTranslateAll={props.onTranslateAll} onPause={props.onPause} onResume={props.onResume} />
         <IconButton
@@ -185,14 +191,9 @@ export function TranslationPane(props: TranslationPaneProps) {
           aria-pressed={props.follow}
           onClick={() => props.onFollow(!props.follow)}
         />
-        {/* One document action, by state: start, continue, then (all translated) translate again. */}
-        {taskIdle(props.task) && (['paused', 'interrupted', 'failed'].includes(props.task.phase) ? (
-          <Tooltip label="继续翻译全文"><Button size="sm" variant="quiet" icon="translate" className="pp-tr__all" onClick={props.onResume}>继续翻译</Button></Tooltip>
-        ) : pages.some(p => p.state !== 'done') ? (
-          <Tooltip label="翻译全文"><Button size="sm" variant="quiet" icon="translate" className="pp-tr__all" onClick={props.onTranslateAll}>翻译全文</Button></Tooltip>
-        ) : props.onRetranslateAll && pages.some(p => p.sentences.some(s => s.kind !== 'formula' && !!s.text)) && (
+        {taskIdle(props.task) && !pages.some(p => p.state !== 'done') && props.onRetranslateAll && pages.some(p => p.sentences.some(s => s.kind !== 'formula' && !!s.text)) && (
           <IconButton icon="sync" label="重新翻译全文" size="md" shape="pill" onClick={props.onRetranslateAll} />
-        ))}
+        )}
         {dock && (
           <IconButton
             icon={dock.floating ? 'paneRight' : 'float'}

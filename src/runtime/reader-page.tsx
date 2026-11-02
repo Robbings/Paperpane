@@ -76,6 +76,8 @@ export function LiveReaderPage() {
     onScrollContainer:setContainer, menuTarget, onDismissMenu:()=>owner?.reader.dismissMenu(),
     tool:state?.tool??'select',onToolChange:tool=>owner?.reader.setTool(tool),
     onCreateHighlight:(id,color)=>owner?.createHighlight(id,color)??Promise.resolve(null),
+    onCreateComment:id=>owner?.createComment(id)??Promise.resolve(null),
+    onAnnotationHighlight:(id,color)=>owner?.highlightAnnotation(id,color)??Promise.resolve(null),
     onSelectionAction:(id,action)=>{if(action==='explain'||action==='ask'){const selection=owner?.reader.resolveSelection(id);if(selection?.ok)void research.selected(selection.value,action);else if(selection&&!selection.ok)report(selection.error.message);}else owner?.selectionAction(id,action);},
     onAnnotationAction:(id,action)=>{const row=owner?.item(id);if(row){if(action==='explain'||action==='ask')void research.selected({anchor:row.anchor,text:row.quote},action);else if(action==='translate'&&owner?.translateSelection)owner.translateSelection(row.anchor,row.quote);else owner?.textAction(row.quote,action);}},
     onAnnotationColor:(id,color)=>owner?.colorAnnotation(id,color),
@@ -97,7 +99,7 @@ export function LiveReaderPage() {
   return <>
     <ReaderShell header={{title:owner?.document?.title??'打开论文',sourceLabel:owner?.document?.sourceUrl?new URL(owner.document.sourceUrl).hostname:'本地文件',pageCount:state?.pageCount??0}}
       outline={(state?.outline??[]).filter(item=>item.pageIndex!==undefined).map(item=>({id:item.id,label:item.title,level:item.depth,pageIndex:item.pageIndex!}))} navigationPending={state?.phase!=='ready'||state?.outlineStatus==='loading'} navigationMessage={state?.outlineStatus==='generated'?'按版面自动生成，可能存在识别偏差':state?.outlineStatus==='failed'?'目录读取失败，请重新打开论文。':state?.outlineStatus==='empty'?'未识别到标题；扫描件需先进行文字识别。':undefined} renderThumbnail={renderThumbnail} onOutlineNavigate={id=>void owner?.reader.navigateOutline(id).catch(()=>report('目录位置暂不可用。'))} pageIndex={state?.position.pageIndex??0} zoomPercent={Math.round((state?.position.zoom??1)*100)}
-      annotations={(saved?.items??[]).filter(row=>!row.deletedAt).map(row=>({id:row.id,kind:row.kind==='page-comment'?'comment':'highlight',color:row.color,pageIndex:row.anchor.pages[0]!.pageIndex,quote:row.quote,note:row.comment}))}
+      annotations={(saved?.items??[]).filter(row=>!row.deletedAt).map(row=>({id:row.id,kind:row.kind==='page-comment'?'comment':'highlight',highlighted:row.kind==='highlight',color:row.color,pageIndex:row.anchor.pages[0]!.pageIndex,quote:row.quote,note:row.comment}))}
       annotationStatus={{local,sync:'unconfigured'}}
       notes={{value:'',onChange:()=>report('整篇笔记将在后续接入。'),local:'unmodified',sync:'unconfigured'}}
       panelRequest={research.panelRequest}

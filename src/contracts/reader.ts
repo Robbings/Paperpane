@@ -5,7 +5,7 @@ import type { HighlightColor } from './annotations';
 export type ReaderPhase = 'empty' | 'loading' | 'password-required' | 'ready' | 'failed';
 export type ReaderTool = 'select' | 'auto-highlight';
 export interface ReaderSelection { id: Id; snapshot: SelectionSnapshot; projection: Projection & { space: 'viewport' } }
-export type ReaderMenuTarget = { kind: 'selection'; selection: ReaderSelection } | { kind: 'annotation'; annotationId: Id; anchor: DocumentAnchor; color: HighlightColor };
+export type ReaderMenuTarget = { kind: 'selection'; selection: ReaderSelection } | { kind: 'annotation'; annotationId: Id; anchor: DocumentAnchor; /** Absent when the annotation is a comment without a highlight. */ color?: HighlightColor };
 export interface ReaderSearchState { query: string; matchCase: boolean; wholeWord: boolean; status: 'idle' | 'searching' | 'done'; total: number; current: number }
 export interface ReaderOutlineItem { id: Id; title: string; depth: number; pageIndex?: number }
 export interface ReaderState {

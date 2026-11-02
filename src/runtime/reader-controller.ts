@@ -209,14 +209,16 @@ export class ReaderController {
     } catch (error) { if (!this.disposed && epoch === this.epoch) this.report(error instanceof Error ? error.message : '无法打开 PDF'); }
     finally { this.releaseDocumentChange(); }
   }
-  createHighlight(id: string, color = this.lastColor): Promise<string | null> {
+  /** A comment on the selected text, without a highlight; a colour can be added later. */
+  createComment(id: string): Promise<string | null> { return this.createHighlight(id, this.lastColor, 'selection-comment'); }
+  createHighlight(id: string, color = this.lastColor, kind: 'highlight' | 'selection-comment' = 'highlight'): Promise<string | null> {
     const existing = this.creations.get(id); if (existing) return existing;
     const captured = this.reader.resolveSelection(id), annotations = this.annotations, epoch = this.epoch;
     if (!captured.ok || !annotations) { this.report(captured.ok ? '批注存储尚未就绪' : captured.error.message); return Promise.resolve(null); }
     this.lastColor = color; this.reader.clearNativeSelection(id);
     // Start on a microtask so subscription callbacks see the deduplication entry first.
     const promise = Promise.resolve().then(async () => {
-      const result = await annotations.create({ kind: 'highlight', selection: captured.value, color });
+      const result = await annotations.create({ kind, selection: captured.value, color });
       if (!result.ok) { this.report(result.error.message); this.creations.delete(id); return null; }
       if (!this.disposed && epoch === this.epoch) {
         this.reader.setAnnotations(annotations.getSnapshot().data.items);
@@ -226,7 +228,18 @@ export class ReaderController {
     });
     this.creations.set(id, promise); return promise;
   }
-  colorAnnotation(id: string, color: HighlightColor) { this.lastColor=color; this.annotations?.edit(id,{color}); }
+  /**
+   * Sets or removes a text annotation's highlight. Choosing the colour it already has, or null,
+   * removes the highlight: the comment stays; with no comment there is nothing left to keep.
+   */
+  async highlightAnnotation(id: string, color: HighlightColor | null): Promise<'highlighted' | 'removed' | 'deleted' | null> {
+    const row = this.item(id); if (!row || row.kind === 'page-comment' || !this.annotations) return null;
+    if (color && !(row.kind === 'highlight' && row.color === color)) { this.lastColor = color; this.annotations.edit(id, { color, kind: 'highlight' }); return 'highlighted'; }
+    if (row.kind !== 'highlight') return null;
+    if (row.comment.trim()) { this.annotations.edit(id, { kind: 'selection-comment' }); return 'removed'; }
+    return (await this.annotations.deleteCurrent(id)) ? 'deleted' : null;
+  }
+  colorAnnotation(id: string, color: HighlightColor) { void this.highlightAnnotation(id, color); }
   rects(anchor: DocumentAnchor) {
     return anchor.pages.flatMap(page => { const p=this.reader.project({...anchor,pages:[page]},'viewport'); return p.state==='ready' ? p.rects.map(item=>item.rect) : []; });
   }
