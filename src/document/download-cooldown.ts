@@ -16,7 +16,7 @@ export function downloadBlockedUntil(url: URL, now = Date.now()): number {
 export function deferDownload(url: URL, retryAfter: string | null, now = Date.now()): number {
   const value = retryAfter?.trim() ?? '';
   const parsed = /^\d+$/.test(value) ? now + Number(value) * 1000 : Date.parse(value);
-  const requested = Number.isSafeInteger(parsed) ? Math.max(now + 1000, parsed) : now + 30000;
+  const requested = Number.isSafeInteger(parsed) ? Math.max(now + 1000, parsed) : now + 10000;
   const until = Math.max(downloadBlockedUntil(url, now), requested);
   deadlines.set(url.origin, until);
   try { globalThis.localStorage?.setItem(key(url), String(until)); } catch { /* Memory fallback. */ }
@@ -24,5 +24,5 @@ export function deferDownload(url: URL, retryAfter: string | null, now = Date.no
 }
 export function rateLimitedDownload(until: number, now = Date.now()): ImportFault {
   const seconds = Math.max(1, Math.ceil((until - now) / 1000));
-  return new ImportFault({ code: 'RATE_LIMITED', message: `站点暂时限制下载（HTTP 429），请约 ${seconds} 秒后重试，或先下载 PDF 到本机再导入`, recovery: ['retry', 'choose-file'] });
+  return new ImportFault({ code: 'RATE_LIMITED', message: `站点暂时限制下载或服务不可用，请约 ${seconds} 秒后重试，或先下载 PDF 到本机再导入`, recovery: ['retry', 'choose-file'] });
 }

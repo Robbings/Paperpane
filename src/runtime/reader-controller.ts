@@ -16,6 +16,7 @@ import { hasImportOrigin, requestImportOrigin } from '@/document/permissions';
 
 type ExternalImport = {
   url: string;
+  browserTabId?: number;
   phase: 'checking' | 'permission' | 'importing' | 'failed';
   jobId?: string;
   error?: string;
@@ -85,7 +86,9 @@ export class ReaderController {
     const external = params.get('import');
     if (external !== null) {
       try {
-        this.externalImport = { url: pdfSourceUrl(external), phase: 'checking' };
+        const tabHint = params.get('browserTab');
+        const browserTabId = tabHint !== null && /^\d+$/.test(tabHint) && Number.isSafeInteger(Number(tabHint)) ? Number(tabHint) : undefined;
+        this.externalImport = { url: pdfSourceUrl(external), browserTabId, phase: 'checking' };
         this.update();
         await this.importExternal(false);
       } catch (error) { this.report(error instanceof Error ? error.message : '论文链接无效。'); }
@@ -114,7 +117,7 @@ export class ReaderController {
         external.phase = 'importing';
       } else {
         external.phase = 'importing';
-        const result = await this.imports.service.importDocument({ kind: 'url', url: external.url, intent: 'import' });
+        const result = await this.imports.service.importDocument({ kind: 'url', url: external.url, intent: 'import', browserTabId: external.browserTabId });
         if (!result.ok) throw new Error(result.error.message);
         external.jobId = result.value;
       }
@@ -192,7 +195,7 @@ export class ReaderController {
       const annotations = this.annotations;
       this.unsubscribeAnnotations = annotations.subscribe(() => { this.reader.setAnnotations(annotations.getSnapshot().data.items); this.update(); });
       this.restoring = true;
-      const url = new URL(location.href); url.searchParams.delete('open'); url.searchParams.delete('item'); url.searchParams.delete('import'); url.searchParams.delete('source'); url.searchParams.set('documentId', doc.id);
+      const url = new URL(location.href); url.searchParams.delete('open'); url.searchParams.delete('item'); url.searchParams.delete('import'); url.searchParams.delete('browserTab'); url.searchParams.delete('source'); url.searchParams.set('documentId', doc.id);
       if (this.originalPdfUrl) url.searchParams.set('originalPdf', this.originalPdfUrl); else url.searchParams.delete('originalPdf');
       history.replaceState(null, '', url);
       this.externalImport = undefined;

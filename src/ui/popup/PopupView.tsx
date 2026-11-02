@@ -1,4 +1,4 @@
-import { Badge, HintLabel, Icon, IconButton, Switch } from '@/ui/components';
+import { Badge, Icon, IconButton } from '@/ui/components';
 import { useEffect, useState, type CSSProperties } from 'react';
 import { sinceText } from '@/ui/settings/StatusLine';
 import type { SettingsSection, StatusSummary } from '@/ui/settings/types';
@@ -83,17 +83,6 @@ export function PopupView(props: PopupViewProps) {
       </header>
 
       {openable && <CurrentTab tab={tab} onOpen={() => props.onOpenInReader(tab.tabId)} onImport={props.onAllowFileAccess} />}
-
-      <section className="pp-popup__card pp-popup__group" aria-label="浏览器">
-        <div className="pp-popup__row">
-          <span className="pp-popup__row-label">自动打开 PDF</span>
-          <Switch label="自动打开 PDF" hideLabel checked={props.autoOpenPdf} onChange={props.onAutoOpenPdf} />
-        </div>
-        {props.onShowPdfButtons && <div className="pp-popup__row">
-          <span className="pp-popup__row-label"><HintLabel hint="在论文网页和 PDF 链接旁显示「用纸窗打开」按钮">网页快捷按钮</HintLabel></span>
-          <Switch label="网页快捷按钮" hideLabel checked={props.showPdfButtons??true} onChange={props.onShowPdfButtons}/>
-        </div>}
-      </section>
 
       {recent.length > 0 && (
         <section className="pp-popup__recent" aria-labelledby="pp-popup-recent">

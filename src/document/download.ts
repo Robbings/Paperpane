@@ -42,7 +42,7 @@ async function readStream(stream: ReadableStream<Uint8Array>, total: number | un
     return data;
   } finally { signal.removeEventListener('abort', cancel); await reader.cancel().catch(() => {}); reader.releaseLock(); }
 }
-/** Gateway failures retain bounded retries; rate limits follow Retry-After. */
+/** Retry transient responses through a shared, cancellable site cooldown. */
 const TRANSIENT = new Set([502, 503, 504]);
 const wait = (ms: number, signal: AbortSignal) => new Promise<void>((resolve, reject) => {
   abortIfNeeded(signal);
@@ -56,28 +56,42 @@ function mirrorOf(url: URL): URL | undefined {
   if (url.hostname !== 'arxiv.org' || !url.pathname.startsWith('/pdf/')) return undefined;
   const mirror = new URL(url.href); mirror.hostname = 'export.arxiv.org'; return mirror;
 }
-export async function downloadPdf(url: URL, signal: AbortSignal, progress: (value: TransferProgress) => void): Promise<{ bytes: Uint8Array<ArrayBuffer>; filename: string; sourceUrl: string }> {
+async function performDownload(url: URL, signal: AbortSignal, progress: (value: TransferProgress) => void): Promise<{ bytes: Uint8Array<ArrayBuffer>; filename: string; sourceUrl: string }> {
   const timeout = new AbortController();
   const timer = setTimeout(() => timeout.abort(), 120_000);
   const combined = AbortSignal.any([signal, timeout.signal]);
   try {
     // No cookies/auth forwarding. Login pages are rejected instead of being stored as PDFs.
-    const attempts = [url, url, mirrorOf(url) ?? url];
     let response!: Response;
-    for (const [index, target] of attempts.entries()) {
-      if (index) await wait(index * 1500, combined);
+    let target = url;
+    let waited = 0;
+    let throttled = false;
+    for (let index = 0; index < 3; index++) {
+      // Recheck after every wake: another tab may have extended the deadline.
+      while (true) {
+        const blocked = downloadBlockedUntil(target);
+        if (!blocked) break;
+        const delay = blocked - Date.now();
+        if (waited + delay > 60_000) throw rateLimitedDownload(blocked);
+        waited += delay;
+        await wait(delay, combined);
+      }
       abortIfNeeded(combined);
-      const blocked = downloadBlockedUntil(target);
-      if (blocked) throw rateLimitedDownload(blocked);
       response = await fetch(target.href, { signal: combined, credentials: 'omit', referrerPolicy: 'no-referrer', cache: 'no-store', redirect: 'follow' });
-      if (response.status === 429) {
+      if (response.status === 429 || TRANSIENT.has(response.status)) {
         void response.body?.cancel().catch(() => {});
+        throttled = response.status === 429;
         const until = deferDownload(target, response.headers.get('Retry-After'));
         if (response.url) deferDownload(parseSourceUrl(response.url), response.headers.get('Retry-After'));
-        throw rateLimitedDownload(until);
+        if (index === 2) {
+          if (throttled) throw rateLimitedDownload(until);
+          break;
+        }
+        // A known official alternate may proceed independently of the blocked host.
+        if (index === 1) target = mirrorOf(url) ?? target;
+        continue;
       }
-      if (!TRANSIENT.has(response.status) || index === attempts.length - 1) break;
-      void response.body?.cancel().catch(() => {});
+      break;
     }
     if (TRANSIENT.has(response.status)) {
       void response.body?.cancel().catch(() => {});
@@ -103,4 +117,33 @@ export async function downloadPdf(url: URL, signal: AbortSignal, progress: (valu
     if (error instanceof ImportFault) throw error;
     throw new ImportFault({ code: 'NETWORK', message: timeout.signal.aborted ? '下载超时，请重试或先下载到本机' : '无法下载。请检查网络和站点权限；重定向到其他站点或需要登录的链接可先下载到本机', recovery: ['retry', 'choose-file'] });
   } finally { clearTimeout(timer); }
+}
+
+// Web Locks coordinate extension tabs; the local queue covers environments without it.
+const queues = new Map<string, Promise<void>>();
+export async function downloadPdf(url: URL, signal: AbortSignal, progress: (value: TransferProgress) => void) {
+  abortIfNeeded(signal);
+  const name = `paperpane:pdf-download:${url.hostname}`;
+  if (globalThis.navigator?.locks) {
+    return navigator.locks.request(name, { signal }, () => performDownload(url, signal, progress));
+  }
+  const previous = queues.get(name) ?? Promise.resolve();
+  let release!: () => void;
+  const gate = new Promise<void>(resolve => { release = resolve; });
+  const tail = previous.then(() => gate);
+  queues.set(name, tail);
+  let cancel!: () => void;
+  const aborted = new Promise<never>((_, reject) => {
+    cancel = () => reject(new DOMException('Cancelled', 'AbortError'));
+    signal.addEventListener('abort', cancel, { once: true });
+  });
+  try {
+    await Promise.race([previous, aborted]);
+    abortIfNeeded(signal);
+    return await performDownload(url, signal, progress);
+  } finally {
+    signal.removeEventListener('abort', cancel);
+    release();
+    void tail.then(() => { if (queues.get(name) === tail) queues.delete(name); });
+  }
 }

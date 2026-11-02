@@ -2,12 +2,9 @@ import { browser } from 'wxt/browser';
 import { browserEntryDefaults, type BrowserEntrySettings } from './pdf';
 
 export const BROWSER_ENTRY_KEY = 'browserEntry';
-export function normalizeBrowserSettings(raw: unknown): BrowserEntrySettings {
-  const value = raw && typeof raw === 'object' ? raw as Partial<BrowserEntrySettings> : {};
-  return {
-    autoOpenPdf: typeof value.autoOpenPdf === 'boolean' ? value.autoOpenPdf : browserEntryDefaults.autoOpenPdf,
-    showPdfButtons: typeof value.showPdfButtons === 'boolean' ? value.showPdfButtons : browserEntryDefaults.showPdfButtons,
-  };
+export function normalizeBrowserSettings(_raw: unknown): BrowserEntrySettings {
+  // Ignore legacy automatic-navigation and injected-button preferences.
+  return { ...browserEntryDefaults };
 }
 export async function readBrowserSettings(): Promise<BrowserEntrySettings> {
   if (!browser.runtime?.id) return normalizeBrowserSettings(JSON.parse(localStorage.getItem(BROWSER_ENTRY_KEY) ?? '{}'));
