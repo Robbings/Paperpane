@@ -89,7 +89,7 @@
 .pp-ov-section__toggle h3 {
   flex-shrink: 0;
   margin: 0;
-  font-size: 12.5px;
+  font-size: var(--pp-text-read-sm);
   font-weight: var(--pp-weight-semibold);
 }
 
@@ -198,7 +198,7 @@
   padding: 2px 8px;
   border-radius: 5px;
   background: var(--pp-fill);
-  font-size: var(--pp-text-sm);
+  font-size: var(--pp-text-read);
   line-height: 1.55;
 }
 
@@ -243,7 +243,7 @@
 
 .pp-ov-fields dt {
   color: var(--pp-text-2);
-  font-size: 12.5px;
+  font-size: var(--pp-text-read-sm);
   font-weight: var(--pp-weight-semibold);
 }
 
