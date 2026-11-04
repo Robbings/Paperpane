@@ -13,7 +13,7 @@ export default defineConfig({
     name:'Paperpane（纸间）',description:'Paperpane 论文阅读工具',
     permissions:['offscreen','unlimitedStorage','alarms','clipboardWrite','storage','webRequest','scripting','tabs'],
     content_security_policy:{extension_pages:"script-src 'self' 'wasm-unsafe-eval'; object-src 'self';"},
-    host_permissions:['https://*/*','http://*/*'],
+    host_permissions:['https://*/*','http://*/*','file:///*'],
   },
   vite:()=>({worker:{format:'es'},resolve:{conditions:['onnxruntime-web-use-extern-wasm','module','browser','development|production']},plugins:[extensionDevHmr()]}),
   hooks:{'build:publicAssets':async(_wxt,files)=>{

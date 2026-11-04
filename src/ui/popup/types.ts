@@ -43,6 +43,8 @@ export interface PopupViewProps {
   onOpenInReader: (tabId: number) => void;
   /** Opens the browser's page for this extension, where file URL access is switched on. */
   onAllowFileAccess: () => void;
+  /** Opens the extension's details page, where 允许访问文件网址 is switched on. */
+  onOpenFileAccessSettings?: () => void;
   /** Open PDFs in the reader as soon as the browser opens them. */
   autoOpenPdf: boolean;
   onAutoOpenPdf: (enabled: boolean) => void;

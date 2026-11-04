@@ -26,7 +26,7 @@ function problems(status: StatusSummary): { text: string; section: SettingsSecti
 }
 
 /** The current tab, only when it holds something the reader can open. */
-function CurrentTab({ tab, onOpen, onImport }: { tab: ActiveTabView; onOpen: () => void; onImport: () => void }) {
+function CurrentTab({ tab, onOpen, onImport, onFileAccess }: { tab: ActiveTabView; onOpen: () => void; onImport: () => void; onFileAccess?: () => void }) {
   // A local PDF the browser will not let us read: offer to import it instead.
   const local = !tab.canOpenInReader && tab.block === 'file-access';
   return (
@@ -46,8 +46,14 @@ function CurrentTab({ tab, onOpen, onImport }: { tab: ActiveTabView; onOpen: () 
         </div>
       </div>
       <button type="button" className="pp-popup__primary" onClick={local ? onImport : onOpen}>
-        {local ? '选择文件导入' : '在纸间中打开'}
+        {local ? '选择文件打开' : '在纸间中打开'}
       </button>
+      {local && onFileAccess && (
+        <p className="pp-popup__hint">
+          想直接打开本地 PDF：在扩展详情中开启「允许访问文件网址」，然后刷新这个页面。
+          <button type="button" onClick={onFileAccess}>前往开启</button>
+        </p>
+      )}
     </section>
   );
 }
@@ -86,7 +92,7 @@ export function PopupView(props: PopupViewProps) {
         </section>
       )}
 
-      {openable && <CurrentTab tab={tab} onOpen={() => props.onOpenInReader(tab.tabId)} onImport={props.onAllowFileAccess} />}
+      {openable && <CurrentTab tab={tab} onOpen={() => props.onOpenInReader(tab.tabId)} onImport={props.onAllowFileAccess} onFileAccess={props.onOpenFileAccessSettings} />}
 
       {recent.length > 0 && (
         <section className="pp-popup__recent" aria-labelledby="pp-popup-recent">

@@ -27,15 +27,16 @@ export function usePopupData() {
         if(!result?.ok)throw new Error(result?.error??'无法识别当前页面。');
         const value=result.value;
         let inLibrary=false;
-        if(value.pdfUrl){
-          const url=pdfSourceUrl(value.pdfUrl);
+        const pdf=value.pdfUrl??value.candidateUrl;
+        if(pdf&&/^https?:/.test(pdf)){
+          const url=pdfSourceUrl(pdf);
           const docs=await db.list();
           const matches=docs.filter(doc=>doc.sourceUrl===url||doc.sources.includes(url));
           for(const doc of matches){if((await db.getItemForDocument(doc.id))?.inLibrary){inLibrary=true;break;}}
         }
         if(alive&&ticket===tabEpoch){
           activeTabId=tab.id;setTabError(undefined);
-          setActiveTab({tabId:tab.id,title:value.title,displayUrl:value.displayUrl??'',pdf:value.pdfUrl?'available':'unavailable',canOpenInReader:!!value.pdfUrl,block:value.block as TabBlock|undefined,inLibrary});
+          setActiveTab({tabId:tab.id,title:value.title,displayUrl:value.displayUrl??'',pdf:pdf?'available':'unavailable',canOpenInReader:!!pdf,block:value.block as TabBlock|undefined,inLibrary});
         }
       }catch(reason){if(alive&&ticket===tabEpoch){setTabError(reason instanceof Error?reason.message:'无法识别当前页面。');setActiveTab({tabId:-1,title:'',displayUrl:'',pdf:'unavailable',canOpenInReader:false,block:'unavailable'});}}
     }

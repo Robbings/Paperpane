@@ -33,7 +33,8 @@ export function mountPdfPage(doc: Document, open: (url: string) => Promise<void>
       const wrapper = doc.createElement('span'); wrapper.dataset.paperpaneEntry = '';
       if(site)wrapper.dataset.paperpaneSource=site;
       if (floating) { wrapper.dataset.paperpaneFloating = ''; wrapper.style.cssText = 'position:fixed;left:20px;bottom:20px;z-index:2147483647;'; }
-      else wrapper.style.cssText = site==='google-scholar'?'display:block;margin:6px 0;':'display:inline-flex;margin:4px 8px;vertical-align:middle';
+      // Above neighbouring layout boxes: some sites (Zenodo) overlap the line after a heading.
+      else wrapper.style.cssText = (site==='google-scholar'?'display:block;margin:6px 0;':'display:inline-flex;margin:4px 8px;vertical-align:middle;')+'position:relative;z-index:2;';
       wrapper.append(floating ? createPdfButton(doc, () => open(url)) : createPdfButton(doc, () => open(url), '用纸间打开 PDF', 'link'));
       if (floating) doc.documentElement.append(wrapper); else if(position==='append')(anchor??source).append(wrapper);else(anchor??source).after(wrapper);
       controls.set(source, { control: wrapper, url, anchor });

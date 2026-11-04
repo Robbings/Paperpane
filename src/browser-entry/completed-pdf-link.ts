@@ -14,7 +14,7 @@ export function mountCompletedPdfLink(expectedUrl: string) {
   const button = document.createElement('button');
   button.type = 'button';
   button.textContent = '在纸间中打开';
-  button.title = '将当前 PDF 导入文献库并在纸间阅读器中打开';
+  button.title = '在纸间阅读器中打开当前 PDF';
   button.addEventListener('click', async event => {
     if (!event.isTrusted || button.disabled) return;
     button.disabled = true;
@@ -23,7 +23,7 @@ export function mountCompletedPdfLink(expectedUrl: string) {
       const result = await api.runtime.sendMessage({ type: 'OPEN_CURRENT_PDF' });
       if (!result?.ok) throw new Error(result?.error ?? '无法打开纸间');
       button.textContent = '已转交纸间 · 再次打开';
-      button.title = '将当前 PDF 导入文献库并在纸间阅读器中打开';
+      button.title = '在纸间阅读器中打开当前 PDF';
     } catch (error) {
       button.textContent = '打开失败 · 点击重试';
       button.title = error instanceof Error ? error.message : '请通过纸间扩展弹窗重试';

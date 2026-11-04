@@ -3,6 +3,8 @@ import { browser } from 'wxt/browser';
 import { mountArxivButton } from '@/browser-entry/arxiv-button';
 import { mountPdfPage } from '@/browser-entry/page-buttons';
 import { readBrowserSettings, subscribeBrowserSettings } from '@/browser-entry/settings';
+import { scanPaperSources } from '@/browser-entry/source-adapters';
+import { arxivPdfUrl } from '@/browser-entry/arxiv';
 
 export default defineContentScript({
   matches: ['https://*/*', 'http://*/*'],
@@ -17,6 +19,8 @@ export default defineContentScript({
       try {
         const result = await browser.runtime.sendMessage({ type: 'BEGIN_PDF_NAVIGATION', pdfUrl, marker });
         if (!result?.ok) throw new Error(result?.error ?? '请刷新页面后重试。');
+        // The site only offers the PDF as a download: the extension already sent this tab to the reader.
+        if (result.direct) return;
         // Only navigate our blank page. The user may already have closed or reused it.
         if (destination.closed || destination.location.href !== marker) throw new Error('新标签页已关闭或页面已改变。');
         destination.opener = null;
@@ -29,6 +33,20 @@ export default defineContentScript({
       }
     };
     const isArxiv = location.hostname === 'arxiv.org' && /^\/(abs|html)\//.test(location.pathname);
+    // The toolbar popup asks which PDF belongs to this paper page.
+    const answer = (message: unknown, _sender: unknown, reply: (value: { url?: string }) => void) => {
+      if ((message as { type?: string })?.type !== 'PAPERPANE_PAGE_PDF') return;
+      let url: string | undefined;
+      try { if (isArxiv) url = arxivPdfUrl(location.href); } catch { /* Not a paper page. */ }
+      url ??= scanPaperSources(document).candidates[0]?.url;
+      if (!url) {
+        const meta = document.querySelector<HTMLMetaElement>('meta[name="citation_pdf_url"]')?.content.trim();
+        try { if (meta && !meta.startsWith('#')) url = new URL(meta, document.baseURI).href; } catch { /* Invalid metadata. */ }
+      }
+      reply({ url });
+    };
+    browser.runtime.onMessage.addListener(answer);
+    ctx.onInvalidated(() => browser.runtime.onMessage.removeListener(answer));
     let dispose: (() => void) | undefined;
     function setVisible(show: boolean) {
       if (!show) { dispose?.(); dispose = undefined; }

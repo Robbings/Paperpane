@@ -11,7 +11,7 @@ import type { DocumentAnchor } from '@/contracts/document';
 import type { StoredDocument } from '@/data/database';
 import type { TranslationSession } from '@/translation/session';
 import { readingPersistence } from './reading-persistence';
-import { pdfSourceUrl } from '@/browser-entry/pdf';
+import { localPdfUrl, pdfSourceUrl } from '@/browser-entry/pdf';
 import { browser } from 'wxt/browser';
 import { hasImportOrigin, requestImportOrigin } from '@/document/permissions';
 import { PreferenceStore } from '@/data/preference-store';
@@ -23,6 +23,24 @@ type ExternalImport = {
   jobId?: string;
   error?: string;
 };
+
+/** Reads a file:// PDF. Extension pages may do so once 允许访问文件网址 is on; fetch() cannot, XHR can. */
+function readLocalPdf(url: string): Promise<File> {
+  return new Promise((resolve, reject) => {
+    const request = new XMLHttpRequest();
+    request.open('GET', url);
+    request.responseType = 'arraybuffer';
+    request.onload = () => {
+      const bytes = request.response as ArrayBuffer | null;
+      if (!bytes?.byteLength || (request.status !== 0 && request.status !== 200)) { reject(new Error('本地 PDF 为空或已被移动，请重新选择文件。')); return; }
+      let name = '论文.pdf';
+      try { name = decodeURIComponent(new URL(url).pathname.split('/').pop() || name); } catch { /* Keep the default name. */ }
+      resolve(new File([bytes], name, { type: 'application/pdf' }));
+    };
+    request.onerror = () => reject(new Error('无法读取本地 PDF。请在扩展详情中开启「允许访问文件网址」，或用「选择论文」打开文件。'));
+    request.send();
+  });
+}
 
 /** Session ownership and UI mapping only; file identity/import remains with the library. */
 export class ReaderController {
@@ -87,6 +105,14 @@ export class ReaderController {
     try { const original = params.get('originalPdf'); if (original) this.originalPdfUrl = pdfSourceUrl(original); } catch { /* Ignore an invalid source hint. */ }
     if (params.get('open') === 'file' && !id && !params.has('import')) return;
     const external = params.get('import');
+    const local = external !== null ? localPdfUrl(external) : undefined;
+    if (local) {
+      // A PDF the browser opened from this device; 返回原 PDF goes back to that file.
+      this.originalPdfUrl = local; this.update();
+      try { await this.openLocalFile(await readLocalPdf(local)); }
+      catch (error) { this.report(error instanceof Error ? error.message : '无法读取本地 PDF。'); }
+      return;
+    }
     if (external !== null) {
       try {
         const tabHint = params.get('browserTab');
