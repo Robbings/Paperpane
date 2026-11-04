@@ -21,10 +21,14 @@ const components: Components = {
   a: ({ children, href }) => <a href={href} target="_blank" rel="noopener noreferrer" onClick={e => e.stopPropagation()}>{children}</a>,
   span: ({ children, className, node: _node, style, ...props }) => <span {...props} className={className} style={className?.includes('katex-display') ? { ...style, display: 'block', maxWidth: '100%', overflowX: 'auto' } : style}>{children}</span>,
 };
+// Block mode keeps real paragraphs; defined once so the element type stays stable across renders.
+const blockComponents: Components = { ...components, p: ({ children }) => <p>{children}</p> };
+const remarkPlugins = [remarkMath];
+const rehypePlugins: NonNullable<Parameters<typeof ReactMarkdown>[0]['rehypePlugins']> = [[rehypeKatex, { trust: false, strict: 'ignore', maxExpand: 500, maxSize: 20, throwOnError: false }]];
 /** No raw HTML, remote images or trusted KaTeX commands. Unclosed streamed math stays literal. */
 export const TranslationMarkdown = memo(function TranslationMarkdown({ text, block = false }: { text: string; inferredMath?: boolean; block?: boolean }) {
   return <>
-    <ReactMarkdown skipHtml components={block ? { ...components, p: ({ children }) => <p>{children}</p> } : components} remarkPlugins={[remarkMath]} rehypePlugins={[[rehypeKatex, { trust: false, strict: 'ignore', maxExpand: 500, maxSize: 20, throwOnError: false }]]}>
+    <ReactMarkdown skipHtml components={block ? blockComponents : components} remarkPlugins={remarkPlugins} rehypePlugins={rehypePlugins}>
       {normalizeTranslationMarkdown(text)}
     </ReactMarkdown>
   </>;

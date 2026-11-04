@@ -1,5 +1,5 @@
-import type { ReactNode } from "react";
-import ReactMarkdown from "react-markdown";
+import { createContext, useContext, useMemo, type ReactNode } from "react";
+import ReactMarkdown, { type Components } from "react-markdown";
 import remarkMath from "remark-math";
 import remarkGfm from "remark-gfm";
 import rehypeKatex from "rehype-katex";
@@ -51,6 +51,68 @@ function sourceLinks() {
     visit(tree);
   };
 }
+type MarkerFn = (label: string) => ReactNode;
+// Overrides are module-level so React keeps the same element types between
+// renders. Inline functions here would remount every answer on each render,
+// dropping text selections and re-running KaTeX (visible as flicker).
+const MarkdownScope = createContext<{ marker: MarkerFn; inline: boolean }>({
+  marker: () => null,
+  inline: false,
+});
+const Heading = ({ children }: { children?: ReactNode }) => (
+  <h4 className="pp-md__heading">{children}</h4>
+);
+function SourceLink({ href, children, node }: { href?: string; children?: ReactNode; node?: any }) {
+  const { marker } = useContext(MarkdownScope);
+  if (href !== "#paperpane-source")
+    return (
+      <a href={href} target="_blank" rel="noopener noreferrer">
+        {children}
+      </a>
+    );
+  return (
+    <>
+      {marker(
+        String(
+          node?.properties["data-pp-citation"] ??
+            node?.properties.dataPpCitation ??
+            "unlocated",
+        ),
+      )}
+    </>
+  );
+}
+function Paragraph({ children }: { children?: ReactNode }) {
+  const { inline } = useContext(MarkdownScope);
+  return inline ? <span>{children}</span> : <p>{children}</p>;
+}
+const components: Components = {
+  h1: Heading,
+  h2: Heading,
+  h3: Heading,
+  h4: Heading,
+  h5: Heading,
+  h6: Heading,
+  img: () => null,
+  a: SourceLink,
+  p: Paragraph,
+  pre: ({ children }) => (
+    <pre style={{ maxWidth: "100%", overflowX: "auto" }}>{children}</pre>
+  ),
+};
+const remarkPlugins = [remarkMath, remarkGfm, sourceLinks];
+const rehypePlugins: NonNullable<Parameters<typeof ReactMarkdown>[0]["rehypePlugins"]> = [
+  [
+    rehypeKatex,
+    {
+      trust: false,
+      strict: "ignore",
+      throwOnError: false,
+      maxExpand: 500,
+      maxSize: 20,
+    },
+  ],
+];
 export function ResearchMarkdown({
   text,
   marker,
@@ -58,66 +120,36 @@ export function ResearchMarkdown({
   inline = false,
 }: {
   text: string;
-  marker: (label: string) => ReactNode;
+  marker: MarkerFn;
   className?: string;
   inline?: boolean;
 }) {
   const Wrapper = inline ? "span" : "div";
+  const source = useMemo(
+    () => normalizeTranslationMarkdown(normalizeSourceMarkers(text)),
+    [text],
+  );
+  // The parsed tree only depends on the text; citation markers read the
+  // latest marker function through context.
+  const body = useMemo(
+    () => (
+      <ReactMarkdown
+        skipHtml
+        remarkPlugins={remarkPlugins}
+        rehypePlugins={rehypePlugins}
+        components={components}
+      >
+        {source}
+      </ReactMarkdown>
+    ),
+    [source],
+  );
   return (
     <Wrapper
       className={`pp-md pp-ai-markdown ${className ?? ""}`}
       style={inline ? { display: "inline" } : undefined}
     >
-      <ReactMarkdown
-        skipHtml
-        remarkPlugins={[remarkMath, remarkGfm, sourceLinks]}
-        rehypePlugins={[
-          [
-            rehypeKatex,
-            {
-              trust: false,
-              strict: "ignore",
-              throwOnError: false,
-              maxExpand: 500,
-              maxSize: 20,
-            },
-          ],
-        ]}
-        components={{
-          h1: ({ children }) => <h4 className="pp-md__heading">{children}</h4>,
-          h2: ({ children }) => <h4 className="pp-md__heading">{children}</h4>,
-          h3: ({ children }) => <h4 className="pp-md__heading">{children}</h4>,
-          h4: ({ children }) => <h4 className="pp-md__heading">{children}</h4>,
-          h5: ({ children }) => <h4 className="pp-md__heading">{children}</h4>,
-          h6: ({ children }) => <h4 className="pp-md__heading">{children}</h4>,
-          img: () => null,
-          a: ({ href, children, node }) =>
-            href === "#paperpane-source" ? (
-              <>
-                {marker(
-                  String(
-                    node?.properties["data-pp-citation"] ??
-                      node?.properties.dataPpCitation ??
-                      "unlocated",
-                  ),
-                )}
-              </>
-            ) : (
-              <a href={href} target="_blank" rel="noopener noreferrer">
-                {children}
-              </a>
-            ),
-          p: ({ children }) =>
-            inline ? <span>{children}</span> : <p>{children}</p>,
-          pre: ({ children }) => (
-            <pre style={{ maxWidth: "100%", overflowX: "auto" }}>
-              {children}
-            </pre>
-          ),
-        }}
-      >
-        {normalizeTranslationMarkdown(normalizeSourceMarkers(text))}
-      </ReactMarkdown>
+      <MarkdownScope.Provider value={{ marker, inline }}>{body}</MarkdownScope.Provider>
     </Wrapper>
   );
 }
