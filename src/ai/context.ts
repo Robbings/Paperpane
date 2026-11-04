@@ -76,7 +76,7 @@ export function paperContext(
   };
 }
 /** One source ID inside a bracket: s12, ^s12, `s12`, \\s12 or a range s3-s5. */
-const SOURCE_ITEM = /^\^?`?\\?[sS](\d+)`?(?:[-–—~～]\^?`?\\?[sS]?(\d+)`?)?$/;
+const SOURCE_ITEM = /^\^?`?\\?[sS](\d{1,6})`?(?:[-–—~～]\^?`?\\?[sS]?(\d{1,6})`?)?$/;
 function sourceGroup(body: string): string | undefined {
   const parts = body.replace(/^\s*原文\s*[:：]\s*/, "").split(/[\s,，;；、]+/).filter(Boolean);
   if (!parts.length) return;
@@ -86,7 +86,8 @@ function sourceGroup(body: string): string | undefined {
     if (!match) return;
     const from = Number(match[1]), to = match[2] ? Number(match[2]) : from;
     // Ranges are expanded only when short; anything else is not a citation we can trust.
-    if (to < from || to - from > 12) return;
+    // IDs are sentence numbers: short, safe integers. Anything else is left as text.
+    if (!Number.isSafeInteger(from) || !Number.isSafeInteger(to) || to < from || to - from > 12) return;
     for (let n = from; n <= to; n++) labels.push(`[^s${n}]`);
   }
   return labels.join("");

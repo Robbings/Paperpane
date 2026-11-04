@@ -72,7 +72,7 @@ export function createDocumentService(database = new PaperDatabase(), options: {
         const { readBrowserPdf } = await import('./browser-pdf');
         ({ bytes, filename, sourceUrl, browserSource } = await readBrowserPdf(run.source.browserTabId, parseSourceUrl(run.source.url).href, signal, progress));
       } else {
-        ({ bytes, filename, sourceUrl } = await downloadPdf(parseSourceUrl(run.source.url), signal, progress));
+        ({ bytes, filename, sourceUrl } = await downloadPdf(parseSourceUrl(run.source.url), signal, progress, { withCookies: run.source.withCookies }));
       }
       abortIfNeeded(signal);
       if (!active()) return;

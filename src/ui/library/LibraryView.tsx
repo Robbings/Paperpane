@@ -1,6 +1,6 @@
 import { useUiScale } from '@/ui/use-ui-scale';
 import { useEffect, useMemo, useRef, useState, type DragEvent } from 'react';
-import { Button, Dialog, EmptyState, GlassSurface, Icon, IconButton, Menu, toast, type MenuEntry } from '@/ui/components';
+import { Button, Dialog, EmptyState, GlassSurface, Icon, IconButton, Menu, isDropHandled, toast, type MenuEntry } from '@/ui/components';
 import { PAPER_DRAG_TYPE } from './dragTypes';
 import { useViewport } from '@/ui/reader/useViewport';
 import { defaultVisibleColumns, firstDirection } from './columns';
@@ -181,6 +181,8 @@ export function LibraryView(props: LibraryViewProps) {
         event.preventDefault();
         dragDepth.current = 0;
         setDropping(false);
+        // A folder in the sidebar already imported these files into itself.
+        if (isDropHandled(event.nativeEvent)) return;
         const files = Array.from(event.dataTransfer.files).filter((file) => file.type === 'application/pdf' || file.name.toLowerCase().endsWith('.pdf'));
         if (files.length) props.onImport('pdf', files, currentFolder);
         else if (imports && !event.dataTransfer.files.length) {

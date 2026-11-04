@@ -19,6 +19,7 @@ import { PreferenceStore } from '@/data/preference-store';
 type ExternalImport = {
   url: string;
   browserTabId?: number;
+  withCookies?: boolean;
   phase: 'checking' | 'permission' | 'importing' | 'failed';
   jobId?: string;
   error?: string;
@@ -102,7 +103,7 @@ export class ReaderController {
     this.started = true;
     const params = new URLSearchParams(location.search);
     const id = params.get('documentId') ?? params.get('item');
-    try { const original = params.get('originalPdf'); if (original) this.originalPdfUrl = pdfSourceUrl(original); } catch { /* Ignore an invalid source hint. */ }
+    try { const original = params.get('originalPdf'); if (original) this.originalPdfUrl = localPdfUrl(original) ?? pdfSourceUrl(original); } catch { /* Ignore an invalid source hint. */ }
     if (params.get('open') === 'file' && !id && !params.has('import')) return;
     const external = params.get('import');
     const local = external !== null ? localPdfUrl(external) : undefined;
@@ -117,7 +118,7 @@ export class ReaderController {
       try {
         const tabHint = params.get('browserTab');
         const browserTabId = tabHint !== null && /^\d+$/.test(tabHint) && Number.isSafeInteger(Number(tabHint)) ? Number(tabHint) : undefined;
-        this.externalImport = { url: pdfSourceUrl(external), browserTabId, phase: 'checking' };
+        this.externalImport = { url: pdfSourceUrl(external), browserTabId, withCookies: params.get('session') === 'site', phase: 'checking' };
         this.update();
         await this.importExternal(false);
       } catch (error) { this.report(error instanceof Error ? error.message : '论文链接无效。'); }
@@ -146,7 +147,7 @@ export class ReaderController {
         external.phase = 'importing';
       } else {
         external.phase = 'importing';
-        const result = await this.imports.service.importDocument({ kind: 'url', url: external.url, intent: await this.importIntent(), browserTabId: external.browserTabId });
+        const result = await this.imports.service.importDocument({ kind: 'url', url: external.url, intent: await this.importIntent(), browserTabId: external.browserTabId, withCookies: external.withCookies });
         if (!result.ok) throw new Error(result.error.message);
         external.jobId = result.value;
       }
@@ -237,7 +238,7 @@ export class ReaderController {
       const annotations = this.annotations;
       this.unsubscribeAnnotations = annotations.subscribe(() => { this.reader.setAnnotations(annotations.getSnapshot().data.items); this.update(); });
       this.restoring = true;
-      const url = new URL(location.href); url.searchParams.delete('open'); url.searchParams.delete('item'); url.searchParams.delete('import'); url.searchParams.delete('browserTab'); url.searchParams.delete('source'); url.searchParams.set('documentId', doc.id);
+      const url = new URL(location.href); url.searchParams.delete('open'); url.searchParams.delete('item'); url.searchParams.delete('import'); url.searchParams.delete('browserTab'); url.searchParams.delete('session'); url.searchParams.delete('source'); url.searchParams.set('documentId', doc.id);
       if (this.originalPdfUrl) url.searchParams.set('originalPdf', this.originalPdfUrl); else url.searchParams.delete('originalPdf');
       history.replaceState(null, '', url);
       this.externalImport = undefined;

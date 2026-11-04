@@ -41,12 +41,14 @@ export function useReaderLibrary(owner: ReaderController | undefined, onOpenFile
     tags: data.tags,
     papers,
     recent: [...papers].filter(p => p.lastReadAt).sort((a, b) => (b.lastReadAt ?? '').localeCompare(a.lastReadAt ?? '')),
-    onSave: draft => {
+    onSave: (draft, baseline) => {
       const adding = !item.inLibrary;
-      void library.mutate(() => library.database.saveDocumentEntry({ documentId: document.id, fileVersion: document.fileVersion }, draft)).then(result => {
+      void library.mutate(() => library.database.saveDocumentEntry({ documentId: document.id, fileVersion: document.fileVersion }, draft, baseline)).then(result => {
         if (!result.ok) { fail(new Error(result.error.message)); return; }
-        setItem(current => current && { ...current, ...result.value });
+        setItem(current => current && { ...current, ...result.value.item });
         if (adding) toast.show({ tone: 'success', message: '已加入文献库' });
+        // Same as an import with 「添加文档时自动翻译」 on: the queued job starts now.
+        if (result.value.translationQueued) void import('@/translation/import-trigger').then(({ wakeImportedTranslation }) => wakeImportedTranslation(document.id, document.fileVersion)).catch(() => {});
       });
     },
     onRemove: () => {

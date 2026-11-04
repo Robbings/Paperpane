@@ -29,5 +29,5 @@ export { TextArea, TextField } from './TextField';
 export { Toaster, toast, type ToastOptions, type ToastTone } from './Toast';
 export { Checkbox, Switch } from './Toggle';
 export { Tooltip } from './Tooltip';
-export { Tree, TREE_DRAG_TYPE, type TreeNode } from './Tree';
+export { Tree, TREE_DRAG_TYPE, isDropHandled, type TreeNode } from './Tree';
 export { useAnchoredPosition, type Placement } from './useAnchoredPosition';

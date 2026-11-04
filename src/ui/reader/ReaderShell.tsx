@@ -113,7 +113,7 @@ export interface ReaderLibraryProps extends ReaderLibraryData {
   /** Prefilled entry (saved values, or metadata extracted from the paper). */
   entry: LibraryEntryDraft;
   tags: readonly TagView[];
-  onSave: (draft: LibraryEntryDraft) => void;
+  onSave: (draft: LibraryEntryDraft, baseline: LibraryEntryDraft) => void;
   onRemove: () => void;
   /** Creates a folder from the save popover and returns its id. */
   onCreateFolder: (parentId: string | null, name: string) => string;

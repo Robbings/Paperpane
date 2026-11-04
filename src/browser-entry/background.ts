@@ -53,12 +53,15 @@ export function installBrowserEntry() {
   const readerUrl = browser.runtime.getURL('/reader.html');
   const tails = new Map<number, Promise<void>>();
   const filter = { urls: ['https://*/*', 'http://*/*'], types: ['main_frame' as const] };
+  /** The reader downloads this PDF itself, with the site's session, as the clicked link would. */
+  const siteReaderUrl = (pdfUrl: string) => { const target = new URL(pdfReaderUrl(readerUrl, pdfUrl)); target.searchParams.set('session', 'site'); return target.href; };
   /** fromTab: read the bytes from the PDF already shown in that tab; otherwise the reader downloads or reads the file itself. */
   async function openReader(tabId: number, pdfUrl: string, fromTab = true) {
     const local = localPdfUrl(pdfUrl);
     const target = new URL(local ? readerUrl : pdfReaderUrl(readerUrl, pdfUrl));
     if (local) target.searchParams.set('import', local);
     else if (fromTab) target.searchParams.set('browserTab', String(tabId));
+    else target.searchParams.set('session', 'site');
     const source = await browser.tabs.get(tabId);
     await browser.tabs.create({ url: target.href, windowId: source.windowId, openerTabId: tabId });
   }
@@ -197,9 +200,10 @@ export function installBrowserEntry() {
           if (tab.pendingUrl || pdfSourceUrl(tab.url ?? '') !== pdfSourceUrl(sender.url)) throw new Error('论文页面已改变，请重试。');
           if (typeof message.marker !== 'string' || !/^about:blank#paperpane-(?:\d+-){3}\d+$/.test(message.marker)) throw new Error('打开请求已失效，请重试。');
           const destinationId = await waitForPdfTab(tab.windowId, tabId, message.marker);
-          if (await downloadOnlyPdf(url)) {
+          // arXiv shows its PDFs in the browser; probing it would only add a request.
+          if (new URL(url).hostname !== 'arxiv.org' && await downloadOnlyPdf(url)) {
             // The new tab goes straight to the reader, which downloads the file itself.
-            await browser.tabs.update(destinationId, { url: pdfReaderUrl(readerUrl, url) });
+            await browser.tabs.update(destinationId, { url: siteReaderUrl(url) });
             sendResponse({ ok: true, direct: true });
             return;
           }

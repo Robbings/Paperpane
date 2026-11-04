@@ -56,12 +56,14 @@ function mirrorOf(url: URL): URL | undefined {
   if (url.hostname !== 'arxiv.org' || !url.pathname.startsWith('/pdf/')) return undefined;
   const mirror = new URL(url.href); mirror.hostname = 'export.arxiv.org'; return mirror;
 }
-async function performDownload(url: URL, signal: AbortSignal, progress: (value: TransferProgress) => void): Promise<{ bytes: Uint8Array<ArrayBuffer>; filename: string; sourceUrl: string }> {
+/** withCookies: only for a PDF the reader just clicked on that site, which the browser itself would fetch with its session. */
+export interface DownloadOptions { withCookies?: boolean }
+async function performDownload(url: URL, signal: AbortSignal, progress: (value: TransferProgress) => void, options: DownloadOptions = {}): Promise<{ bytes: Uint8Array<ArrayBuffer>; filename: string; sourceUrl: string }> {
   const timeout = new AbortController();
   const timer = setTimeout(() => timeout.abort(), 120_000);
   const combined = AbortSignal.any([signal, timeout.signal]);
   try {
-    // No cookies/auth forwarding. Login pages are rejected instead of being stored as PDFs.
+    // No cookies/auth forwarding unless the reader opened this PDF from its own site. Login pages are rejected instead of being stored as PDFs.
     let response!: Response;
     let target = url;
     let waited = 0;
@@ -77,7 +79,7 @@ async function performDownload(url: URL, signal: AbortSignal, progress: (value: 
         await wait(delay, combined);
       }
       abortIfNeeded(combined);
-      response = await fetch(target.href, { signal: combined, credentials: 'omit', referrerPolicy: 'no-referrer', cache: 'no-store', redirect: 'follow' });
+      response = await fetch(target.href, { signal: combined, credentials: options.withCookies ? 'include' : 'omit', referrerPolicy: 'no-referrer', cache: 'no-store', redirect: 'follow' });
       if (response.status === 429 || TRANSIENT.has(response.status)) {
         void response.body?.cancel().catch(() => {});
         throttled = response.status === 429;
@@ -121,11 +123,11 @@ async function performDownload(url: URL, signal: AbortSignal, progress: (value: 
 
 // Web Locks coordinate extension tabs; the local queue covers environments without it.
 const queues = new Map<string, Promise<void>>();
-export async function downloadPdf(url: URL, signal: AbortSignal, progress: (value: TransferProgress) => void) {
+export async function downloadPdf(url: URL, signal: AbortSignal, progress: (value: TransferProgress) => void, options: DownloadOptions = {}) {
   abortIfNeeded(signal);
   const name = `paperpane:pdf-download:${url.hostname}`;
   if (globalThis.navigator?.locks) {
-    return navigator.locks.request(name, { signal }, () => performDownload(url, signal, progress));
+    return navigator.locks.request(name, { signal }, () => performDownload(url, signal, progress, options));
   }
   const previous = queues.get(name) ?? Promise.resolve();
   let release!: () => void;
@@ -140,7 +142,7 @@ export async function downloadPdf(url: URL, signal: AbortSignal, progress: (valu
   try {
     await Promise.race([previous, aborted]);
     abortIfNeeded(signal);
-    return await performDownload(url, signal, progress);
+    return await performDownload(url, signal, progress, options);
   } finally {
     signal.removeEventListener('abort', cancel);
     release();
