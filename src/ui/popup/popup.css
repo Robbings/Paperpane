@@ -400,3 +400,25 @@ body[data-page='popup'] {
   background: var(--pp-accent-soft);
   color: var(--pp-accent);
 }
+
+/* A local PDF the browser will not let the extension read: how to allow it. */
+.pp-popup__hint {
+  margin: 8px 0 0;
+  color: var(--pp-text-2);
+  font-size: var(--pp-text-xs);
+  line-height: 1.5;
+}
+
+.pp-popup__hint button {
+  margin-left: 4px;
+  padding: 0;
+  border: 0;
+  background: none;
+  color: var(--pp-accent);
+  font: inherit;
+  cursor: pointer;
+}
+
+.pp-popup__hint button:hover {
+  text-decoration: underline;
+}

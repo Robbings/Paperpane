@@ -1,6 +1,7 @@
 import { useUiScale } from '@/ui/use-ui-scale';
 import { useEffect, useMemo, useRef, useState, type DragEvent } from 'react';
-import { Button, Dialog, EmptyState, GlassSurface, Icon, IconButton, Menu, type MenuEntry } from '@/ui/components';
+import { Button, Dialog, EmptyState, GlassSurface, Icon, IconButton, Menu, isDropHandled, toast, type MenuEntry } from '@/ui/components';
+import { PAPER_DRAG_TYPE } from './dragTypes';
 import { useViewport } from '@/ui/reader/useViewport';
 import { defaultVisibleColumns, firstDirection } from './columns';
 import { LibrarySidebar, type CollectionCounts } from './LibrarySidebar';
@@ -136,7 +137,11 @@ export function LibraryView(props: LibraryViewProps) {
     <EmptyState icon="library" title="文献库还是空的" description="导入 PDF 或书目文件，或在阅读器里点「收藏」把正在读的论文加进来。" />
   );
 
-  const isFileDrag = (event: DragEvent) => Array.from(event.dataTransfer.types).includes('Files');
+  const isFileDrag = (event: DragEvent) => {
+    const types = Array.from(event.dataTransfer.types);
+    // Files from the desktop, or a link dragged in from another page (never a row or folder of this list).
+    return types.includes('Files') || (!!imports && types.includes('text/uri-list') && !types.includes(PAPER_DRAG_TYPE));
+  };
 
   const batchEntries: Record<Exclude<BatchMenu, null>, MenuEntry[]> = {
     tag: [...tags].sort((a, b) => a.label.localeCompare(b.label, 'zh-CN')).map((tag) => ({ id: tag.id, label: tag.label, icon: 'tag' as const })),
@@ -158,6 +163,8 @@ export function LibraryView(props: LibraryViewProps) {
       className="pp-library"
       onDragEnter={(event) => {
         if (!isFileDrag(event)) return;
+        // Cancelled here as well, so the browser never treats the drop as a navigation.
+        event.preventDefault();
         dragDepth.current += 1;
         setDropping(true);
       }}
@@ -174,12 +181,19 @@ export function LibraryView(props: LibraryViewProps) {
         event.preventDefault();
         dragDepth.current = 0;
         setDropping(false);
+        // A folder in the sidebar already imported these files into itself.
+        if (isDropHandled(event.nativeEvent)) return;
         const files = Array.from(event.dataTransfer.files).filter((file) => file.type === 'application/pdf' || file.name.toLowerCase().endsWith('.pdf'));
-        props.onImport('pdf', files, currentFolder);
+        if (files.length) props.onImport('pdf', files, currentFolder);
+        else if (imports && !event.dataTransfer.files.length) {
+          const link = (event.dataTransfer.getData('text/uri-list') || event.dataTransfer.getData('text/plain')).split(/\r?\n/).find((line) => /^https?:\/\//i.test(line.trim()));
+          if (link) void imports.onImportUrl(link.trim(), currentFolder).then((error) => { if (error) toast.show({ tone: 'error', message: error }); });
+        }
       }}
     >
       <div className="pp-lib-pane" data-side="left" data-state={paneState(sidebarOpen, sidebarDocked)} style={{ ['--pp-pane-w' as string]: `${SIDEBAR_WIDTH / 16}rem` }} inert={!sidebarOpen}>
       <LibrarySidebar
+        onImportFiles={(files, folderId) => { if (files.length) props.onImport('pdf', files, folderId); }}
         collection={query.collection}
         onCollection={(collection) => changeQuery({ collection })}
         folders={folders}

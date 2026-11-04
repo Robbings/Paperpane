@@ -12,6 +12,10 @@ import { useModelSettings } from './use-model-settings';
 import { toDraft } from '@/ui/settings/types';
 import { useLocalPreferences } from './use-local-preferences';
 import { downloadFile } from './library-page';
+import { useReaderLibrary } from './use-reader-library';
+import { isPdfFile, useWindowFileDrop } from './use-file-drop';
+import { GlassSurface, Icon } from '@/ui/components';
+import { pdfReaderUrl } from '@/browser-entry/pdf';
 
 /** Production reader entry; the proof URL uses exactly this same integration. */
 export function LiveReaderPage() {
@@ -42,6 +46,13 @@ export function LiveReaderPage() {
   const translation=useTranslation(owner,preferences.state.preferences,modelSettings.settings,!modelSettings.loading && !modelSettings.error,preferences.state.local==='saved');
   const state=owner?.reader.getSnapshot().data;
   const renderThumbnail=useCallback((index:number,signal:AbortSignal)=>owner?owner.reader.thumbnail(index,signal):Promise.reject(new Error('尚未就绪')),[owner,state?.sessionId]);
+  const openPdfFiles=(files:File[])=>{const file=files.find(isPdfFile);if(!file){owner?.report('请选择 PDF 文件。');return;}setOpenFiles(false);void owner?.openLocalFile(file);};
+  const library=useReaderLibrary(owner,openPdfFiles);
+  // A PDF dropped anywhere on the reader opens here; a dropped link opens in a new reader tab.
+  const dropping=useWindowFileDrop(({files,url})=>{
+    if(files.length)openPdfFiles(files);
+    else if(url){try{window.open(pdfReaderUrl(new URL('reader.html',location.href).href,url),'_blank','noopener');}catch{owner?.report('只能打开 HTTP(S) 的 PDF 链接。');}}
+  },!!owner);
   const research=useResearch(owner,preferences.state.preferences,modelSettings.settings.revision,preferences.state.local!=='unmodified'&&preferences.state.local!=='failed');
   useEffect(()=>{
     const media=window.matchMedia('(prefers-color-scheme: dark)');
@@ -106,7 +117,7 @@ export function LiveReaderPage() {
       panels={{...research.panels,notes:owner?.notes?<NotesEditorPanel key={owner.notes.document.documentId+owner.notes.document.fileVersion} session={owner.notes}/>:unavailable,cite:unavailable}}
       document={<>
         {external ? <EmptyState icon="file" title={external.phase==='failed'?'论文导入失败':external.phase==='permission'?'允许读取论文':`正在从 ${new URL(external.url).hostname} 导入论文`}
-          description={external.error??'PDF 将保存到本机文献库，下载完成后自动打开。'}
+          description={external.error??'下载完成后自动打开。'}
           actions={<>
             {(external.phase==='permission'||external.phase==='failed')&&<Button variant="primary" onClick={()=>void owner?.importExternal()}>{external.phase==='permission'?'允许并打开':'重试导入'}</Button>}
             <Button onClick={()=>void owner?.returnToOriginal()}>返回原 PDF</Button>
@@ -119,6 +130,7 @@ export function LiveReaderPage() {
         <div ref={setSurface} className="pdfViewer pp-pdf-surface"/>
       </>}
       interaction={interaction}
+      library={library}
       translation={translation.shell}
       onBack={()=>void owner?.leaveForLibrary()}
       onOriginalPdf={owner?.originalPdfUrl||owner?.document?.sourceUrl?()=>void owner?.returnToOriginal():undefined}
@@ -138,12 +150,13 @@ export function LiveReaderPage() {
     <Dialog open={openFiles} onClose={()=>setOpenFiles(false)} title="打开论文" description="复用文献库的 PDF 文件；导入的文件与批注保存在本机数据库。" footer={<><Button onClick={()=>{setOpenFiles(false);input.current?.click();}}>导入本地 PDF</Button><Button onClick={()=>void owner?.leaveForLibrary()}>文献库</Button></>}>
       {documents.length?documents.map(doc=><div key={doc.id}><Button onClick={()=>{setOpenFiles(false);void owner?.open(doc.id);}}>{doc.title}</Button></div>):<p>还没有导入论文。</p>}
     </Dialog>
-    <input ref={input} hidden type="file" accept="application/pdf,.pdf" onChange={event=>{const file=event.target.files?.[0];event.target.value='';if(file)void owner?.imports.service.importDocument({kind:'local',file}).then(r=>{if(!r.ok)report(r.error.message);});}}/>
+    <input ref={input} hidden type="file" accept="application/pdf,.pdf" onChange={event=>{const files=Array.from(event.target.files??[]);event.target.value='';if(files.length)openPdfFiles(files);}}/>
     <Dialog open={!!passwordRequest} onClose={cancelPassword} title="这个 PDF 需要密码" description="密码只用于本次打开，不会保存。" footer={<><Button onClick={cancelPassword}>取消</Button><Button type="submit" form="reader-password" variant="primary" disabled={!password}>打开</Button></>}>
       <form id="reader-password" onSubmit={event=>{event.preventDefault();if(job?.passwordRequest)void owner?.imports.service.submitPassword(job.id,job.passwordRequest.requestId,password);else if(state?.passwordRequest)owner?.reader.submitPassword(state.passwordRequest.requestId,password);setPassword('');}}>
         <TextField label="密码" type="password" value={password} onChange={setPassword} error={passwordRequest?.incorrect?'密码不正确，请重试。':undefined}/>
       </form>
     </Dialog>
+    {dropping&&<div className="pp-reader-drop" aria-hidden="true"><GlassSurface tone="float" radius="panel" className="pp-reader-drop__card"><Icon name="upload" size={28} strokeWidth={1.5}/><strong>松开以打开 PDF</strong><span>{preferences.state.preferences.autoAddToLibrary?'打开后会加入文献库':'只打开阅读，可再用工具栏收藏'}</span></GlassSurface></div>}
     <Toaster/>
   </>;
 }

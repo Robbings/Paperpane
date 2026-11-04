@@ -1,4 +1,4 @@
-import { PaperDatabase, type StoredDocument } from './database';
+import { PaperDatabase, importJobKey, type StoredDocument } from './database';
 import { FOLDERS, LIBRARY, PREFERENCES, TAGS, libraryDefaults, enrichItem, itemFolders } from './library-records';
 import type { LibraryFolder, LibraryItem, LibraryPatch, LibraryPreferences, LibraryQuery, LibraryRow, LibraryState, LibraryTag, LibraryTagInput, PdfBibliography } from '@/contracts/library';
 import type { RecordStamp } from '@/contracts/common';
@@ -8,6 +8,8 @@ const stores = [LIBRARY, FOLDERS, TAGS, PREFERENCES, 'documents', 'changes', 'me
 const req = <T>(request: IDBRequest<T>) => new Promise<T>((resolve, reject) => {
   request.onsuccess = () => resolve(request.result); request.onerror = () => reject(request.error);
 });
+/** What the reader's 收藏 popover edits. */
+export interface ReaderEntry { title: string; authors: string[]; venue?: string; year?: number; folderId: string | null; tags: readonly LibraryTagInput[] }
 export class LibraryFault extends Error {
   constructor(readonly code: 'NOT_FOUND' | 'CONFLICT' | 'INVALID_INPUT', message: string) { super(message); }
 }
@@ -274,6 +276,79 @@ export class LibraryDatabase extends PaperDatabase {
       tx.objectStore(PREFERENCES).put({ key: 'view', value: { ...(previous?.value ?? libraryDefaults), ...structuredClone(patch) } });
     });
   }
+  /**
+   * Saves the reader's 收藏 popover in one transaction: adds the open paper to the
+   * library (its PDF then syncs with it) or edits its entry. Only the fields the
+   * reader changed since opening the popover (baseline → entry) are written, so an
+   * edit made meanwhile in another window survives; a field changed in both
+   * places is a conflict. Returns whether an automatic translation was queued.
+   */
+  async saveDocumentEntry(ref: DocumentRef, entry: ReaderEntry, baseline: ReaderEntry): Promise<{ item: LibraryItem; translationQueued: boolean }> {
+    const clean = (value: ReaderEntry) => ({
+      title: value.title.trim(), authors: value.authors.map(a => a.trim()).filter(Boolean),
+      venue: value.venue?.trim() || undefined, year: value.year, folderId: value.folderId,
+    });
+    const next = clean(entry), base = clean(baseline);
+    if (!next.title || next.title.length > 100_000) throw new LibraryFault('INVALID_INPUT', '标题不能为空');
+    if (next.year !== undefined && (!Number.isInteger(next.year) || next.year < 1 || next.year > 9999)) throw new LibraryFault('INVALID_INPUT', '年份应为 1–9999 的整数');
+    const label = (tag: LibraryTagInput) => tag.label.trim().normalize('NFKC').toLocaleLowerCase();
+    if (entry.tags.some(tag => !tag.label.trim() || tag.label.trim().length > 100)) throw new LibraryFault('INVALID_INPUT', '标签应为 1–100 个字符');
+    const same = (a: unknown, b: unknown) => JSON.stringify(a) === JSON.stringify(b);
+    return this.run('readwrite', async tx => {
+      const document = required(await req(tx.objectStore('documents').get(ref.documentId)) as StoredDocument | undefined, '论文记录不存在，请重新打开');
+      if (document.deletedAt) throw new LibraryFault('NOT_FOUND', '论文记录已删除，请重新导入');
+      const item = required(await req(tx.objectStore(LIBRARY).index('byDocument').get(ref.documentId)) as LibraryItem | undefined, '文献库条目不存在，请重新打开论文');
+      const adding = !item.inLibrary;
+      const patch: Partial<LibraryItem> = {};
+      const edited: string[] = [];
+      for (const key of ['title', 'authors', 'venue', 'year'] as const) {
+        if (same(next[key], base[key])) continue;
+        if (!same(item[key], base[key]) && !same(item[key], next[key])) throw new LibraryFault('CONFLICT', '这篇论文的书目信息刚在别处改过，请重新打开收藏窗口核对后再保存');
+        Object.assign(patch, { [key]: next[key] });
+        edited.push(key);
+      }
+      // A paper being added takes the folder chosen now; an edit only moves it if the reader changed the folder.
+      if (adding || next.folderId !== base.folderId) {
+        if (!adding && item.folderId !== base.folderId && item.folderId !== next.folderId) throw new LibraryFault('CONFLICT', '这篇论文刚在别处移动过文件夹，请重新打开收藏窗口核对后再保存');
+        if (next.folderId) {
+          const folder = await req(tx.objectStore(FOLDERS).get(next.folderId)) as LibraryFolder | undefined;
+          if (!folder || folder.deletedAt) throw new LibraryFault('NOT_FOUND', '所选文件夹已删除，请重新选择');
+        }
+        patch.folderId = next.folderId;
+        patch.folderIds = next.folderId === item.folderId ? item.folderIds : [];
+      }
+      // Tags: apply the reader's additions and removals to the stored set.
+      const baseIds = new Set(baseline.tags.flatMap(tag => tag.id ? [tag.id] : []));
+      const baseLabels = new Set(baseline.tags.map(label));
+      const removed = new Set([...baseIds].filter(id => !entry.tags.some(tag => tag.id === id)));
+      let tagIds = (adding ? [] : item.tagIds).filter(id => !removed.has(id));
+      for (const input of entry.tags) {
+        if ((input.id && baseIds.has(input.id)) || (!input.id && baseLabels.has(label(input)))) { if (!adding) continue; }
+        let tag = await req(input.id ? tx.objectStore(TAGS).get(input.id) : tx.objectStore(TAGS).index('byNormalized').get(label(input))) as LibraryTag | undefined;
+        if (tag?.deletedAt) tag = undefined;
+        if (!tag) tag = await this.changed(tx, TAGS, { ...stamp(), label: input.label.trim(), normalized: label(input) });
+        tagIds.push(tag.id);
+      }
+      tagIds = [...new Set(tagIds)];
+      if (adding && document.syncScope !== 'record-and-file') await this.changed(tx, 'documents', { ...document, syncScope: 'record-and-file' });
+      // Joining the library counts as adding the paper for 「添加文档时自动翻译」, as an import does.
+      let translationQueued = false;
+      if (adding) {
+        const preferences = await req(tx.objectStore('meta').get('readerPreferences')) as { value?: { autoTranslate?: string } } | undefined;
+        if (preferences?.value?.autoTranslate === 'on-add') {
+          const job = { documentId: ref.documentId, fileVersion: document.fileVersion };
+          tx.objectStore('meta').put({ key: importJobKey(job), value: job });
+          translationQueued = true;
+        }
+      }
+      const saved = await this.changed(tx, LIBRARY, {
+        ...item, ...patch, inLibrary: true, deletedAt: undefined, tagIds,
+        addedAt: adding ? new Date().toISOString() : item.addedAt,
+        editedFields: edited.length ? [...new Set([...(item.editedFields ?? []), ...edited])] : item.editedFields,
+      });
+      return { item: saved, translationQueued };
+    });
+  }
   /** Called after PDF import. Existing classification and manually edited metadata win. */
   async retainDocument(ref: DocumentRef, folderId: string | null, firstImport: boolean): Promise<LibraryItem> {
     return this.run('readwrite', async tx => {
@@ -282,7 +357,9 @@ export class LibraryDatabase extends PaperDatabase {
         const folder = await req(tx.objectStore(FOLDERS).get(folderId)) as LibraryFolder | undefined;
         if (!folder || folder.deletedAt) throw new LibraryFault('NOT_FOUND', '导入目标文件夹已删除；PDF 已保存在本机，请重新选择文件夹');
       }
-      return this.changed(tx, LIBRARY, { ...item, inLibrary: true, folderId: firstImport ? folderId : item.folderId });
+      // A paper that was only read before (or never filed) takes the folder it was imported into.
+      const unfiled = item.folderId === null && !item.folderIds?.length;
+      return this.changed(tx, LIBRARY, { ...item, inLibrary: true, folderId: firstImport || unfiled ? folderId : item.folderId });
     });
   }
   async importBibliography(inputs: readonly Omit<LibraryItem, keyof RecordStamp | 'inLibrary' | 'addedAt' | 'starred' | 'folderId' | 'tagIds'>[], folderId: string | null): Promise<{ added: number; reused: number }> {

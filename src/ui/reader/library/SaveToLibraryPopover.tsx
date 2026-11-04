@@ -24,7 +24,8 @@ interface SaveToLibraryPopoverProps {
   initial: LibraryEntryDraft;
   folders: readonly FolderView[];
   tags: readonly TagView[];
-  onSave: (draft: LibraryEntryDraft) => void;
+  /** baseline: the values the popover opened with, so only the reader's own changes are saved. */
+  onSave: (draft: LibraryEntryDraft, baseline: LibraryEntryDraft) => void;
   onRemove: () => void;
   /** Creates a folder (null parent = top level) and returns its id. */
   onCreateFolder: (parentId: string | null, name: string) => string;
@@ -33,6 +34,7 @@ interface SaveToLibraryPopoverProps {
 /** Add the open paper to the library, or edit / remove its entry. */
 export function SaveToLibraryPopover({ anchorRef, open, onClose, saved, initial, folders, tags, onSave, onRemove, onCreateFolder }: SaveToLibraryPopoverProps) {
   const [draft, setDraft] = useState(initial);
+  const [baseline, setBaseline] = useState(initial);
   const [authorsText, setAuthorsText] = useState(initial.authors.join(', '));
   const [folderMenu, setFolderMenu] = useState(false);
   const folderRef = useRef<HTMLButtonElement>(null);
@@ -43,6 +45,7 @@ export function SaveToLibraryPopover({ anchorRef, open, onClose, saved, initial,
   useEffect(() => {
     if (!open) return;
     setDraft(initial);
+    setBaseline(initial);
     setAuthorsText(initial.authors.join(', '));
     setNewFolder(null);
   }, [open]); // only when it opens, not on every parent render
@@ -50,7 +53,7 @@ export function SaveToLibraryPopover({ anchorRef, open, onClose, saved, initial,
   const submit = (event: FormEvent) => {
     event.preventDefault();
     if (!draft.title.trim()) return;
-    onSave({ ...draft, title: draft.title.trim(), authors: authorsText.split(/[,，]/).map((a) => a.trim()).filter(Boolean) });
+    onSave({ ...draft, title: draft.title.trim(), authors: authorsText.split(/[,，]/).map((a) => a.trim()).filter(Boolean) }, baseline);
     onClose();
   };
 

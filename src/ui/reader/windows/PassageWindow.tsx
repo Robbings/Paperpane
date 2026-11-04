@@ -155,7 +155,8 @@ export function PassageWindow(props:Props){
     if(g.kind==='resize'){
       // The pointer moves in screen pixels; the size is kept in design units before both scales.
       const k=uiScale*s.scale;
-      changeLayout(s.offset,{width:clamp((g.size.width+dx)/k,220,Math.min(520,(container.clientWidth-24)/k)),height:clamp((g.size.height+dy)/k,140,Math.min(520,(container.clientHeight-48)/k))});
+      // Height may use the whole visible paper area; the style's maxHeight applies the same bound.
+      changeLayout(s.offset,{width:clamp((g.size.width+dx)/k,220,Math.min(900,(container.clientWidth-24)/k)),height:clamp((g.size.height+dy)/k,140,(container.clientHeight-48)/k)});
       return;
     }
     const cardWidth=(panel.current?.offsetWidth??360)*s.scale,margin=floatingMargin(s.paper,cardWidth);

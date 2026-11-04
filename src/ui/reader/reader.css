@@ -142,7 +142,7 @@
   /* The flex item is the tooltip wrapper: it must be allowed to shrink. */
   flex: 0 1 auto;
   min-width: 96px;
-  max-width: 320px;
+  max-width: 220px;
   margin-right: 6px;
 }
 
@@ -314,7 +314,8 @@
   flex-shrink: 0;
   align-items: center;
   gap: var(--pp-space-2);
-  height: 30px;
+  min-height: calc(30px * var(--pp-read-scale));
+  font-size: var(--pp-text-md);
   padding-right: 10px;
   border: 0;
   border-radius: var(--pp-radius-control);
@@ -676,7 +677,7 @@
 .pp-panel__title {
   margin: 0;
   color: var(--pp-text-2);
-  font-size: 12.5px;
+  font-size: calc(12.5px * var(--pp-read-scale));
   font-weight: var(--pp-weight-semibold);
   line-height: var(--pp-leading-tight);
 }
@@ -1344,4 +1345,52 @@
 
 .pp-reader[data-maximized='true'] .pp-splitter[data-placement='bottom'] {
   left: calc(var(--pp-gap) + 18px);
+}
+
+/* ---- Reading text size in side areas ----------------------------------------------- */
+/*
+ * The 阅读字号 preference reaches every label in the sidebar, the research area and
+ * the windows beside the paper, not only answer prose. Menus and popovers live
+ * outside these containers and keep the interface size.
+ */
+.pp-sidebar,
+.pp-research,
+.pp-passage-window {
+  --pp-text-xs: calc(11.5px * var(--pp-read-scale));
+  --pp-text-sm: calc(12px * var(--pp-read-scale));
+  --pp-text-md: calc(13px * var(--pp-read-scale));
+  --pp-text-quote: calc(13.5px * var(--pp-read-scale));
+  --pp-text-lg: calc(15px * var(--pp-read-scale));
+}
+
+/* ---- Dropping a PDF on the reader -------------------------------------------------- */
+.pp-reader-drop {
+  position: fixed;
+  inset: 0;
+  z-index: var(--pp-z-modal, 1000);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: rgba(20, 20, 24, 0.16);
+  pointer-events: none;
+}
+
+.pp-reader-drop__card {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 6px;
+  padding: var(--pp-space-8) 56px;
+  outline: 2px dashed var(--pp-accent);
+  outline-offset: -10px;
+  color: var(--pp-text-2);
+  text-align: center;
+}
+
+.pp-reader-drop__card svg {
+  color: var(--pp-accent);
+}
+
+.pp-reader-drop__card strong {
+  color: var(--pp-text);
 }

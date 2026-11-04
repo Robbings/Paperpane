@@ -1,6 +1,6 @@
 import { browser, type Browser } from 'wxt/browser';
 import { mountCompletedPdfLink } from './completed-pdf-link';
-import { completedPdfUrl, isPdfResponse, pdfReaderUrl, pdfSourceUrl } from './pdf';
+import { completedPdfUrl, isDownloadOnlyPdf, isPdfResponse, localPdfUrl, pdfReaderUrl, pdfSourceUrl } from './pdf';
 import { BROWSER_ENTRY_KEY, normalizeBrowserSettings, readBrowserSettings } from './settings';
 interface PdfTab { pageUrl: string; pdfUrl?: string; direct: boolean; completed: boolean; requestId: string }
 interface PdfNavigation { url: string; requestId?: string }
@@ -25,15 +25,43 @@ async function waitForPdfTab(windowId: number, openerTabId: number, marker: stri
   }
 }
 
+/**
+ * Some repositories (Zenodo among them) send a PDF as a download. The browser then
+ * saves it instead of showing it, so the reader has to fetch it itself.
+ */
+async function downloadOnlyPdf(url: string): Promise<boolean> {
+  try {
+    const response = await fetch(url, { method: 'HEAD', credentials: 'include', redirect: 'follow', signal: AbortSignal.timeout(5000) });
+    if (!response.ok) return false;
+    return isDownloadOnlyPdf(response.url || url, response.headers.get('content-type') ?? '', response.headers.get('content-disposition') ?? '');
+  } catch { return false; }
+}
+async function allowedFileAccess(): Promise<boolean> {
+  try { return await browser.extension.isAllowedFileSchemeAccess(); } catch { return false; }
+}
+/** The PDF a paper's landing page links to, as its content script reports it. */
+async function pagePdfCandidate(tabId: number): Promise<string | undefined> {
+  try {
+    const reply = await browser.tabs.sendMessage(tabId, { type: 'PAPERPANE_PAGE_PDF' }, { frameId: 0 }) as { url?: string } | undefined;
+    return reply?.url ? pdfSourceUrl(reply.url) : undefined;
+  } catch { return; }
+}
+
 export function installBrowserEntry() {
   let settingsTail = Promise.resolve();
   const extensionUrl = browser.runtime.getURL('/');
   const readerUrl = browser.runtime.getURL('/reader.html');
   const tails = new Map<number, Promise<void>>();
   const filter = { urls: ['https://*/*', 'http://*/*'], types: ['main_frame' as const] };
-  async function openReader(tabId: number, pdfUrl: string) {
-    const target = new URL(pdfReaderUrl(readerUrl, pdfUrl));
-    target.searchParams.set('browserTab', String(tabId));
+  /** The reader downloads this PDF itself, with the site's session, as the clicked link would. */
+  const siteReaderUrl = (pdfUrl: string) => { const target = new URL(pdfReaderUrl(readerUrl, pdfUrl)); target.searchParams.set('session', 'site'); return target.href; };
+  /** fromTab: read the bytes from the PDF already shown in that tab; otherwise the reader downloads or reads the file itself. */
+  async function openReader(tabId: number, pdfUrl: string, fromTab = true) {
+    const local = localPdfUrl(pdfUrl);
+    const target = new URL(local ? readerUrl : pdfReaderUrl(readerUrl, pdfUrl));
+    if (local) target.searchParams.set('import', local);
+    else if (fromTab) target.searchParams.set('browserTab', String(tabId));
+    else target.searchParams.set('session', 'site');
     const source = await browser.tabs.get(tabId);
     await browser.tabs.create({ url: target.href, windowId: source.windowId, openerTabId: tabId });
   }
@@ -113,6 +141,16 @@ export function installBrowserEntry() {
   browser.tabs.onUpdated.addListener((tabId, change) => {
     if (change.url && !/^https?:/.test(change.url) && !change.url.startsWith('about:blank#paperpane-')) enqueue(tabId, () => browser.storage.session.remove(navigationKey(tabId)));
     if (change.status === 'complete') enqueue(tabId, () => handleReady(tabId));
+    // Local files have no web requests to observe; offer the button once the PDF has loaded.
+    if (change.status === 'complete') void (async () => {
+      // The PDF viewer may still be starting when the tab reports complete: try a few times.
+      for (const delay of [0, 400, 1200, 2500]) {
+        if (delay) await new Promise(resolve => setTimeout(resolve, delay));
+        const tab = await browser.tabs.get(tabId).catch(() => undefined), local = localPdfUrl(tab?.url ?? '');
+        if (!local || tab?.status !== 'complete' || !await allowedFileAccess()) return;
+        if (await preparePdfPage(tabId, local)) return;
+      }
+    })();
   });
   browser.tabs.onRemoved.addListener(tabId => {
     enqueue(tabId, async () => { await browser.storage.session.remove([tabKey(tabId), navigationKey(tabId)]); });
@@ -120,7 +158,15 @@ export function installBrowserEntry() {
   async function currentPdf(tabId: number, inspectExisting = false) {
     const tab = await browser.tabs.get(tabId), raw = tab.url ?? '';
     if (raw.startsWith(extensionUrl)) return { tabId, title: tab.title ?? '纸间', block: /^\/(reader|reader-proof)\.html$/.test(new URL(raw).pathname)?'in-reader':'in-paperpane' };
-    if (raw.startsWith('file:')) return { tabId, title: tab.title ?? '本地文件', block: 'file-access' };
+    if (raw.startsWith('file:')) {
+      const local = localPdfUrl(raw);
+      const display = decodeURIComponent(new URL(raw).pathname);
+      if (!local) return { tabId, title: tab.title ?? '本地文件', displayUrl: display, block: 'not-pdf' };
+      if (!await allowedFileAccess()) return { tabId, title: tab.title ?? '本地文件', displayUrl: display, block: 'file-access' };
+      // The address alone could be a missing file; only a loaded PDF document counts.
+      const ready = tab.status === 'complete' && !tab.pendingUrl && await preparePdfPage(tabId, local);
+      return { tabId, title: tab.title ?? '本地文件', displayUrl: display, pdfUrl: ready ? local : undefined, block: ready ? undefined : 'not-pdf' };
+    }
     try { pdfSourceUrl(raw); } catch { return { tabId, title: tab.title ?? '', block: 'restricted' }; }
     const known = (await browser.storage.session.get(tabKey(tabId)))[tabKey(tabId)] as PdfTab | undefined;
     let pdfUrl = completedPdfUrl(tab, known);
@@ -130,7 +176,12 @@ export function installBrowserEntry() {
       const expected = pdfSourceUrl(raw);
       if (await preparePdfPage(tabId, expected)) pdfUrl = expected;
     }
-    return { tabId, title: tab.title ?? new URL(raw).hostname, displayUrl: new URL(raw).host + new URL(raw).pathname, pdfUrl, block: pdfUrl ? undefined : 'not-pdf' };
+    // A paper's landing page: the page script knows which PDF belongs to it.
+    let candidateUrl: string | undefined;
+    if (!pdfUrl && inspectExisting) {
+      candidateUrl = await pagePdfCandidate(tabId);
+    }
+    return { tabId, title: tab.title ?? new URL(raw).hostname, displayUrl: new URL(raw).host + new URL(raw).pathname, pdfUrl, candidateUrl, block: pdfUrl || candidateUrl ? undefined : 'not-pdf' };
   }
 
   browser.runtime.onMessage.addListener((message, sender, sendResponse) => {
@@ -149,12 +200,20 @@ export function installBrowserEntry() {
           if (tab.pendingUrl || pdfSourceUrl(tab.url ?? '') !== pdfSourceUrl(sender.url)) throw new Error('论文页面已改变，请重试。');
           if (typeof message.marker !== 'string' || !/^about:blank#paperpane-(?:\d+-){3}\d+$/.test(message.marker)) throw new Error('打开请求已失效，请重试。');
           const destinationId = await waitForPdfTab(tab.windowId, tabId, message.marker);
+          // arXiv shows its PDFs in the browser; probing it would only add a request.
+          if (new URL(url).hostname !== 'arxiv.org' && await downloadOnlyPdf(url)) {
+            // The new tab goes straight to the reader, which downloads the file itself.
+            await browser.tabs.update(destinationId, { url: siteReaderUrl(url) });
+            sendResponse({ ok: true, direct: true });
+            return;
+          }
           await browser.storage.session.set({ [navigationKey(destinationId)]: { url } });
         } else if (message.type === 'OPEN_CURRENT_PDF') {
           if (sender.tab?.id === undefined || sender.frameId !== 0) throw new Error('请从已打开的 PDF 页面导入。');
           await tails.get(sender.tab.id);
           const state = await currentPdf(sender.tab.id, true);
-          if (!('pdfUrl' in state) || !state.pdfUrl || pdfSourceUrl(sender.url) !== state.pdfUrl) throw new Error('PDF 页面尚未完成加载，请稍后重试。');
+          const senderUrl = localPdfUrl(sender.url) ?? pdfSourceUrl(sender.url);
+          if (!('pdfUrl' in state) || !state.pdfUrl || senderUrl !== state.pdfUrl) throw new Error('PDF 页面尚未完成加载，请稍后重试。');
           await openReader(state.tabId, state.pdfUrl);
         } else if (['OPEN_ARXIV_PAPER', 'OPEN_PDF', 'REPORT_PAGE_PDF'].includes(message.type)) {
           throw new Error('请先在浏览器中打开 PDF，再通过纸间扩展弹窗导入。');
@@ -165,11 +224,12 @@ export function installBrowserEntry() {
             await tails.get(message.tabId);
             const state = await currentPdf(message.tabId, true);
             if (message.type === 'GET_PDF_STATE') { sendResponse({ ok: true, value: state }); return; }
-            if (!('pdfUrl' in state) || !state.pdfUrl) throw new Error('当前页面没有可打开的 PDF。');
-            await openReader(state.tabId, state.pdfUrl);
+            if ('pdfUrl' in state && state.pdfUrl) await openReader(state.tabId, state.pdfUrl);
+            else if ('candidateUrl' in state && state.candidateUrl) await openReader(state.tabId, state.candidateUrl, false);
+            else throw new Error('当前页面没有可打开的 PDF。');
           } else if (message.type === 'OPEN_ORIGINAL_PDF') {
             if (!sender.tab?.id) throw new Error('当前阅读器标签页已关闭。');
-            const url = pdfSourceUrl(message.pdfUrl);
+            const url = localPdfUrl(message.pdfUrl) ?? pdfSourceUrl(message.pdfUrl);
             await browser.tabs.update(sender.tab.id, { url });
           } else if (message.type === 'SET_BROWSER_ENTRY') {
             const patch = message.patch;

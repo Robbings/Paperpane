@@ -8,6 +8,26 @@ export function pdfSourceUrl(raw: string): string {
   return url.href;
 }
 
+/** A PDF opened from this device (file://…/x.pdf), without its fragment; undefined otherwise. */
+export function localPdfUrl(raw: string): string | undefined {
+  try {
+    const url = new URL(raw);
+    if (url.protocol !== 'file:' || !/\.pdf$/i.test(url.pathname)) return;
+    url.hash = '';
+    return url.href;
+  } catch { return; }
+}
+
+/** Response headers of a site that hands out a PDF as a download instead of showing it. */
+export function isDownloadOnlyPdf(url: string, type: string, disposition: string): boolean {
+  const mime = type.split(';')[0]?.trim().toLowerCase() ?? '';
+  if (mime === 'text/html' || mime === 'application/xhtml+xml' || mime === 'application/json') return false;
+  const attachment = /^attachment(?:;|$)/i.test(disposition.trim());
+  const pdfName = /filename\*?=[^;]*\.pdf\b/i.test(disposition) || /\.pdf\/?$/i.test(new URL(url).pathname);
+  const generic = ['', 'application/octet-stream', 'binary/octet-stream', 'application/x-download', 'application/force-download', 'application/download'].includes(mime);
+  return (attachment && (mime === 'application/pdf' || pdfName)) || (generic && pdfName);
+}
+
 export function isPdfLink(raw: string, type = ''): boolean {
   try {
     const url = new URL(pdfSourceUrl(raw));

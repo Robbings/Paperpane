@@ -13,10 +13,11 @@ export default defineConfig({
     name:'Paperpane（纸间）',description:'Paperpane 论文阅读工具',
     permissions:['offscreen','unlimitedStorage','alarms','clipboardWrite','storage','webRequest','scripting','tabs'],
     content_security_policy:{extension_pages:"script-src 'self' 'wasm-unsafe-eval'; object-src 'self';"},
-    host_permissions:['https://*/*','http://*/*'],
+    host_permissions:['https://*/*','http://*/*','file:///*'],
   },
   vite:()=>({worker:{format:'es'},resolve:{conditions:['onnxruntime-web-use-extern-wasm','module','browser','development|production']},plugins:[extensionDevHmr()]}),
   hooks:{'build:publicAssets':async(_wxt,files)=>{
+    files.push({absoluteSrc:join(_wxt.config.root,'LICENSE'),relativeDest:'LICENSE'});
     for(const entry of await readdir(join(pdfjsDirectory,'wasm'),{withFileTypes:true}))if(entry.isFile())files.push({absoluteSrc:join(pdfjsDirectory,'wasm',entry.name),relativeDest:'pdfjs/wasm/'+entry.name});
     for(const name of ['ort-wasm-simd-threaded.mjs','ort-wasm-simd-threaded.wasm'])files.push({absoluteSrc:join(ortDirectory,name),relativeDest:'runtime/'+name});
     const root=join(dirname(require.resolve('vditor/package.json')),'dist');

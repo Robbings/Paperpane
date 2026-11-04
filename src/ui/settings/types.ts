@@ -55,6 +55,8 @@ export interface Preferences {
   selectionBar: SelectionBarPrefs;
   /** When a paper is translated without being asked: never, when it is added to the library, or whenever it is opened. */
   autoTranslate: 'off' | 'on-add' | 'on-open';
+  /** Papers opened in the reader join the library on their own. Off: only the reader's 收藏 button adds them. */
+  autoAddToLibrary: boolean;
 }
 
 export interface PreferencesState {
@@ -81,6 +83,7 @@ export const DEFAULT_PREFERENCES: Preferences = {
   mathDelimiter: 'brackets',
   selectionBar: DEFAULT_SELECTION_BAR,
   autoTranslate: 'off',
+  autoAddToLibrary: false,
 };
 
 export const UI_SCALE = { min: 80, max: 150, default: 100, step: 10 } as const;

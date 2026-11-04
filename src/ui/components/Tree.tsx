@@ -2,6 +2,10 @@ import { useEffect, useRef, useState, type DragEvent, type KeyboardEvent, type M
 import { Icon, type IconName } from './Icon';
 import './Tree.css';
 
+const handledDrops = new WeakSet<Event>();
+/** True when a tree row already took this drop (e.g. files dropped onto a folder). */
+export const isDropHandled = (event: Event) => handledDrops.has(event);
+
 export interface TreeNode {
   id: string;
   parentId: string | null;
@@ -160,6 +164,9 @@ export function Tree({
       if (moving !== targetId && (canMove?.(moving, targetId) ?? true)) onMove?.(moving, targetId);
       return;
     }
+    // Handled here. The event still bubbles so ancestors can end their drag state,
+    // but an ancestor drop zone must not import the same files again.
+    handledDrops.add(event.nativeEvent);
     onExternalDrop?.(targetId, event.dataTransfer);
   };
 

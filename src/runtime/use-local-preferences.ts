@@ -9,7 +9,7 @@ import { DEFAULT_PREFERENCES, DEFAULT_SELECTION_BAR, FONT_SIZE, UI_SCALE, type P
 
 function valid<K extends keyof Preferences>(key: K, value: unknown): value is Preferences[K] {
   switch (key) {
-    case 'elementDetection': case 'detectPictures': case 'detectTables': case 'detectFormulas': case 'formulaPreprocess': return typeof value === 'boolean';
+    case 'elementDetection': case 'detectPictures': case 'detectTables': case 'detectFormulas': case 'formulaPreprocess': case 'autoAddToLibrary': return typeof value === 'boolean';
     case 'formulaPreprocessLimit': return typeof value === 'number' && Number.isInteger(value) && value >= 5 && value <= 100;
     case 'formulaCopyMode': return value === 'formula' || value === 'image';
     case 'tableCopyFormat': return ['image','markdown','latex','excel'].includes(String(value));

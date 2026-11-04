@@ -11,17 +11,37 @@ import type { DocumentAnchor } from '@/contracts/document';
 import type { StoredDocument } from '@/data/database';
 import type { TranslationSession } from '@/translation/session';
 import { readingPersistence } from './reading-persistence';
-import { pdfSourceUrl } from '@/browser-entry/pdf';
+import { localPdfUrl, pdfSourceUrl } from '@/browser-entry/pdf';
 import { browser } from 'wxt/browser';
 import { hasImportOrigin, requestImportOrigin } from '@/document/permissions';
+import { PreferenceStore } from '@/data/preference-store';
 
 type ExternalImport = {
   url: string;
   browserTabId?: number;
+  withCookies?: boolean;
   phase: 'checking' | 'permission' | 'importing' | 'failed';
   jobId?: string;
   error?: string;
 };
+
+/** Reads a file:// PDF. Extension pages may do so once 允许访问文件网址 is on; fetch() cannot, XHR can. */
+function readLocalPdf(url: string): Promise<File> {
+  return new Promise((resolve, reject) => {
+    const request = new XMLHttpRequest();
+    request.open('GET', url);
+    request.responseType = 'arraybuffer';
+    request.onload = () => {
+      const bytes = request.response as ArrayBuffer | null;
+      if (!bytes?.byteLength || (request.status !== 0 && request.status !== 200)) { reject(new Error('本地 PDF 为空或已被移动，请重新选择文件。')); return; }
+      let name = '论文.pdf';
+      try { name = decodeURIComponent(new URL(url).pathname.split('/').pop() || name); } catch { /* Keep the default name. */ }
+      resolve(new File([bytes], name, { type: 'application/pdf' }));
+    };
+    request.onerror = () => reject(new Error('无法读取本地 PDF。请在扩展详情中开启「允许访问文件网址」，或用「选择论文」打开文件。'));
+    request.send();
+  });
+}
 
 /** Session ownership and UI mapping only; file identity/import remains with the library. */
 export class ReaderController {
@@ -83,14 +103,22 @@ export class ReaderController {
     this.started = true;
     const params = new URLSearchParams(location.search);
     const id = params.get('documentId') ?? params.get('item');
-    try { const original = params.get('originalPdf'); if (original) this.originalPdfUrl = pdfSourceUrl(original); } catch { /* Ignore an invalid source hint. */ }
+    try { const original = params.get('originalPdf'); if (original) this.originalPdfUrl = localPdfUrl(original) ?? pdfSourceUrl(original); } catch { /* Ignore an invalid source hint. */ }
     if (params.get('open') === 'file' && !id && !params.has('import')) return;
     const external = params.get('import');
+    const local = external !== null ? localPdfUrl(external) : undefined;
+    if (local) {
+      // A PDF the browser opened from this device; 返回原 PDF goes back to that file.
+      this.originalPdfUrl = local; this.update();
+      try { await this.openLocalFile(await readLocalPdf(local)); }
+      catch (error) { this.report(error instanceof Error ? error.message : '无法读取本地 PDF。'); }
+      return;
+    }
     if (external !== null) {
       try {
         const tabHint = params.get('browserTab');
         const browserTabId = tabHint !== null && /^\d+$/.test(tabHint) && Number.isSafeInteger(Number(tabHint)) ? Number(tabHint) : undefined;
-        this.externalImport = { url: pdfSourceUrl(external), browserTabId, phase: 'checking' };
+        this.externalImport = { url: pdfSourceUrl(external), browserTabId, withCookies: params.get('session') === 'site', phase: 'checking' };
         this.update();
         await this.importExternal(false);
       } catch (error) { this.report(error instanceof Error ? error.message : '论文链接无效。'); }
@@ -119,7 +147,7 @@ export class ReaderController {
         external.phase = 'importing';
       } else {
         external.phase = 'importing';
-        const result = await this.imports.service.importDocument({ kind: 'url', url: external.url, intent: 'import', browserTabId: external.browserTabId });
+        const result = await this.imports.service.importDocument({ kind: 'url', url: external.url, intent: await this.importIntent(), browserTabId: external.browserTabId, withCookies: external.withCookies });
         if (!result.ok) throw new Error(result.error.message);
         external.jobId = result.value;
       }
@@ -128,6 +156,19 @@ export class ReaderController {
       if (this.disposed || this.stopping) return;
       external.phase = 'failed'; external.error = error instanceof Error ? error.message : '无法导入论文，请重试。'; this.update();
     }
+  }
+  /** Papers opened here join the library only when the reader asked for that in settings. */
+  async importIntent(): Promise<'browse' | 'import'> {
+    const store = new PreferenceStore();
+    try { return (await store.read()).autoAddToLibrary === true ? 'import' : 'browse'; }
+    catch { return 'browse'; }
+    finally { void store.close(); }
+  }
+  /** Opens a PDF file from this device (file picker, drop or popup). */
+  async openLocalFile(file: File) {
+    if (this.disposed) return;
+    const result = await this.imports.service.importDocument({ kind: 'local', file, intent: await this.importIntent() });
+    if (!result.ok) this.report(result.error.message);
   }
   trackTranslation(session: TranslationSession) { this.translations.add(session); }
   async releaseTranslation(session: TranslationSession) {
@@ -197,7 +238,7 @@ export class ReaderController {
       const annotations = this.annotations;
       this.unsubscribeAnnotations = annotations.subscribe(() => { this.reader.setAnnotations(annotations.getSnapshot().data.items); this.update(); });
       this.restoring = true;
-      const url = new URL(location.href); url.searchParams.delete('open'); url.searchParams.delete('item'); url.searchParams.delete('import'); url.searchParams.delete('browserTab'); url.searchParams.delete('source'); url.searchParams.set('documentId', doc.id);
+      const url = new URL(location.href); url.searchParams.delete('open'); url.searchParams.delete('item'); url.searchParams.delete('import'); url.searchParams.delete('browserTab'); url.searchParams.delete('session'); url.searchParams.delete('source'); url.searchParams.set('documentId', doc.id);
       if (this.originalPdfUrl) url.searchParams.set('originalPdf', this.originalPdfUrl); else url.searchParams.delete('originalPdf');
       history.replaceState(null, '', url);
       this.externalImport = undefined;

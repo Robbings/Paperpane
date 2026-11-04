@@ -40,7 +40,8 @@ export interface DocumentRecord extends RecordStamp, DocumentRef {
   syncScope: 'record-only' | 'record-and-file';
   position?: ReadingPosition; lastReadAt?: ISODate; save: SaveStatus;
 }
-export type ImportSource = { kind: 'local'; file: File } | { kind: 'url'; url: string; intent: 'browse' | 'import'; browserTabId?: number };
+/** intent 'browse' keeps a reading record only; 'import' (the default for files) also adds the paper to the library. */
+export type ImportSource = { kind: 'local'; file: File; intent?: 'browse' | 'import' } | { kind: 'url'; url: string; intent: 'browse' | 'import'; browserTabId?: number; /** Send the site's cookies: set only for a PDF opened from that site's own page. */ withCookies?: boolean };
 export type DocumentPhase = 'reading' | 'validating' | 'extracting' | 'password-required' | 'readable' | 'partial' | 'no-text' | 'failed' | 'cancelled';
 export interface ImportJob {
   id: Id; title: string; phase: DocumentPhase; document?: DocumentRef;

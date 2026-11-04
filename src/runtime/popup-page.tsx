@@ -15,6 +15,7 @@ export function LivePopupPage() {
   return <PopupView activeTab={data.activeTab}
     onOpenInReader={tabId => { void browser.runtime.sendMessage({ type:'OPEN_TAB_PDF',tabId }).then(result => { if(!result?.ok)setError(result?.error??'无法打开 PDF。'); }).catch(()=>setError('无法打开 PDF。')); }}
     onAllowFileAccess={()=>open('/reader.html?open=file')}
+    onOpenFileAccessSettings={()=>{void browser.tabs.create({url:`chrome://extensions/?id=${browser.runtime.id}`}).catch(()=>setError('请在浏览器的扩展管理页打开纸间的详情。'));}}
     autoOpenPdf={entry.settings.autoOpenPdf} onAutoOpenPdf={value=>void entry.save({autoOpenPdf:value})}
     showPdfButtons={entry.settings.showPdfButtons} onShowPdfButtons={value=>void entry.save({showPdfButtons:value})}
     error={entry.error??error??data.error??model.error} recent={data.recent} recentState={data.recentState}

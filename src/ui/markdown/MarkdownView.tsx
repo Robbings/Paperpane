@@ -1,5 +1,5 @@
-import { useEffect, useState } from "react";
-import ReactMarkdown from "react-markdown";
+import { useEffect, useMemo, useState } from "react";
+import ReactMarkdown, { type Components } from "react-markdown";
 import remarkGfm from "remark-gfm";
 import remarkMath from "remark-math";
 import rehypeKatex from "rehype-katex";
@@ -30,44 +30,48 @@ function AssetImage({ reference, alt }: { reference: string; alt?: string }) {
     <span className="pp-markdown-view__missing">{alt || "图片暂不可用"}</span>
   );
 }
+// Module-level overrides keep element types stable, so a re-render does not
+// remount images (refetching them) or replace the text under a selection.
+const components: Components = {
+  img: ({ src, alt }) =>
+    src?.startsWith("paperpane-asset:") ? (
+      <AssetImage reference={src} alt={alt} />
+    ) : null,
+  a: ({ href, children }) => (
+    <a
+      href={href}
+      target="_blank"
+      rel="noopener noreferrer"
+      onClick={(e) => e.stopPropagation()}
+    >
+      {children}
+    </a>
+  ),
+};
+const remarkPlugins = [remarkGfm, remarkMath];
+const rehypePlugins: NonNullable<Parameters<typeof ReactMarkdown>[0]["rehypePlugins"]> = [
+  [rehypeKatex, { trust: false, throwOnError: false, maxExpand: 500, maxSize: 20 }],
+];
+const urlTransform = (url: string, key: string) =>
+  key === "src" && /^paperpane-asset:[a-f0-9]{64}$/.test(url)
+    ? url
+    : /^(https?:|#|\/)/.test(url)
+      ? url
+      : "";
 export function MarkdownView({ value }: { value: string }) {
-  return (
-    <div className="pp-markdown-view">
+  const body = useMemo(
+    () => (
       <ReactMarkdown
         skipHtml
-        remarkPlugins={[remarkGfm, remarkMath]}
-        rehypePlugins={[
-          [
-            rehypeKatex,
-            { trust: false, throwOnError: false, maxExpand: 500, maxSize: 20 },
-          ],
-        ]}
-        urlTransform={(url, key) =>
-          key === "src" && /^paperpane-asset:[a-f0-9]{64}$/.test(url)
-            ? url
-            : /^(https?:|#|\/)/.test(url)
-              ? url
-              : ""
-        }
-        components={{
-          img: ({ src, alt }) =>
-            src?.startsWith("paperpane-asset:") ? (
-              <AssetImage reference={src} alt={alt} />
-            ) : null,
-          a: ({ href, children }) => (
-            <a
-              href={href}
-              target="_blank"
-              rel="noopener noreferrer"
-              onClick={(e) => e.stopPropagation()}
-            >
-              {children}
-            </a>
-          ),
-        }}
+        remarkPlugins={remarkPlugins}
+        rehypePlugins={rehypePlugins}
+        urlTransform={urlTransform}
+        components={components}
       >
         {value}
       </ReactMarkdown>
-    </div>
+    ),
+    [value],
   );
+  return <div className="pp-markdown-view">{body}</div>;
 }

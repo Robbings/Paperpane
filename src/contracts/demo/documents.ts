@@ -37,7 +37,7 @@ export function createDemoDocuments() {
       title: job(id)?.title ?? '演示论文', pageCount,
       sourceUrl: run.source.kind === 'url' ? run.source.url : undefined,
       file: { assetId: demoId(), availability: 'local' },
-      syncScope: run.source.kind === 'url' && run.source.intent === 'browse' ? 'record-only' : 'record-and-file',
+      syncScope: run.source.intent === 'browse' ? 'record-only' : 'record-and-file',
       save: { local: 'saved', sync: 'unconfigured' },
     };
     store.update({ ...store.data(), documents: [...store.data().documents, record] });
