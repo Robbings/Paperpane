@@ -19,8 +19,17 @@ export function supportsModelOperation(protocol: string, operation: ModelOperati
   return isModelProtocol(protocol) && adapters[protocol][operation];
 }
 
+// Zero-width spaces, joiners, word joiner, BOM and soft hyphen survive String#trim()
+// and often ride along when an address or key is copied from a web page.
+const INVISIBLE = /[\u200B-\u200D\u2060\uFEFF\u00AD]/g;
+
+/** Normalizes a pasted endpoint address or API key: drops invisible characters, then trims. */
+export function cleanPasted(raw: string): string {
+  return raw.replace(INVISIBLE, '').trim();
+}
+
 export function endpointUrl(raw: string): string {
-  const url = new URL(raw.trim());
+  const url = new URL(cleanPasted(raw));
   if (url.username || url.password || url.search || url.hash || !['http:', 'https:'].includes(url.protocol))
     throw new Error('接口地址应为不含凭据、查询参数的 HTTP(S) 地址。');
   if (url.protocol === 'http:' && !['localhost', '127.0.0.1', '[::1]'].includes(url.hostname))
