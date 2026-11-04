@@ -16,6 +16,7 @@ import { Button, Icon, IconButton, EmptyState, toast } from "@/ui/components";
 import type { ChatSessionView, ModelChangeView } from "@/ui/reader/chat/types";
 import type { ResearchPanelId } from "@/ui/reader/types";
 import type { DocumentAnchor, SelectionSnapshot } from "@/contracts/document";
+import type { SourceCitation } from "@/contracts/conversation";
 import {
   messageVersions,
   latestLeaf,
@@ -30,6 +31,20 @@ const report = (e: unknown) =>
     duration: 4000,
     message: e instanceof Error ? e.message : String(e),
   });
+/**
+ * Sources of one answer. Those resolved when the answer was written win: the
+ * paper text the model saw may be segmented differently after a reload. The
+ * current paper fills in IDs the stored list lacks (still streaming, or written
+ * in a form older versions did not recognise).
+ */
+function answerCitations(
+  message: { markdown: string; citations?: readonly SourceCitation[] },
+  paper: Parameters<typeof citations>[1] | undefined,
+): SourceCitation[] {
+  const stored = [...(message.citations ?? [])];
+  if (!paper) return stored;
+  return [...stored, ...citations(message.markdown, paper).filter((c) => !stored.some((s) => s.label === c.label))];
+}
 function ConversationPanel({
   service,
   sid,
@@ -112,9 +127,7 @@ function ConversationPanel({
       })
       .map((m) => {
         const versions = messageVersions(session, m.id);
-        const verified = service.paper
-          ? citations(m.markdown, service.paper)
-          : m.citations;
+        const verified = answerCitations(m, service.paper);
         const normalized = normalizeSourceMarkers(m.markdown);
         const unresolved =
           m.role === "assistant" &&
@@ -178,9 +191,7 @@ function ConversationPanel({
   };
   const locate = (label: string) => {
     const c = session.messages
-      .flatMap((m) =>
-        service.paper ? citations(m.markdown, service.paper) : m.citations,
-      )
+      .flatMap((m) => answerCitations(m, service.paper))
       .find((c) => c.label === label);
     if (c) onLocate(c.anchor);
     else toast.show({ message: "未能定位这条出处。" });

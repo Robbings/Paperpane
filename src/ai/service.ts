@@ -44,7 +44,7 @@ import {
   sourceLabel,
 } from "./context";
 import { createModelClient, type ModelInput } from "./model-client";
-import { defaultCards } from "./defaults";
+import { currentCardPrompt, defaultCards } from "./defaults";
 import { mergeRecords, adoptRecord } from "./merge";
 import { appendClipboardImages } from './attachments';
 const outputBudget = (
@@ -1295,7 +1295,7 @@ export class ResearchService implements ConversationService {
         await this.flush();
         const specification = cards.map((c) => ({
           id: c.id,
-          prompt: c.prompt,
+          prompt: currentCardPrompt(c),
           output: c.output,
           listStyle: c.listStyle,
           schema: c.schema ? JSON.parse(c.schema) : undefined,
@@ -1373,7 +1373,7 @@ export class ResearchService implements ConversationService {
                 JSON.stringify(specification),
             },
           ],
-          'Return NDJSON only, one complete JSON object per line: {"id":"card id","content":...}. For markdown content is a Markdown string. For list content is an array of strings or {title,text}. For fields content is an object satisfying that card JSON Schema. Cite paper statements with [^sN]. No fences, no extra fields.',
+          'Keep every card short and direct: plain words, no preamble, no filler, no restating the task. Return NDJSON only, one complete JSON object per line: {"id":"card id","content":...}. For markdown content is a Markdown string. For list content is an array of strings or {title,text}. For fields content is an object satisfying that card JSON Schema. Cite paper statements with [^sN]. No fences, no extra fields.',
           modelId,
           controller.signal,
           (d) => {
