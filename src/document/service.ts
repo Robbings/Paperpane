@@ -95,7 +95,7 @@ export function createDocumentService(database = new PaperDatabase(), options: {
       // Cancellation ends before this short atomic commit. Never report cancelled after saving.
       run.saving = true;
       const receipt = await database.commitImport({ blob: run.source.kind === 'local' ? run.source.file : new Blob([bytes], { type: 'application/pdf' }), sha256, filename, pageCount, sourceUrl, bibliography,
-        syncScope: run.source.kind === 'url' && run.source.intent === 'browse' ? 'record-only' : 'record-and-file' });
+        syncScope: run.source.intent === 'browse' ? 'record-only' : 'record-and-file' });
       receipts.set(id, { ...receipt, browserSource });
       if(receipt.translationQueued){
         // Translation is a separate, durable job. Its startup must not turn a saved PDF into a failed import.

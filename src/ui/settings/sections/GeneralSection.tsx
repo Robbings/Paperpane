@@ -48,7 +48,11 @@ export function GeneralSection({ state, onPreference, onRetry }: GeneralSectionP
         </SettingRow>
       </SettingGroup>
 
-
+      <SettingGroup title="文献库">
+        <SettingRow label="自动加入文献库" hint="在阅读器中打开的论文自动收藏到文献库；关闭时用阅读器工具栏的收藏按钮手动加入">
+          <Switch hideLabel label="自动加入文献库" checked={p.autoAddToLibrary} onChange={(v) => onPreference('autoAddToLibrary', v)} />
+        </SettingRow>
+      </SettingGroup>
 
       <SettingGroup title="选中文字">
         <SelectionBarSettings value={p.selectionBar} onChange={(bar) => onPreference('selectionBar', bar)} />

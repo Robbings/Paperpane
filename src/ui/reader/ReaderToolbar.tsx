@@ -94,7 +94,8 @@ export function ReaderToolbar(props: ReaderToolbarProps) {
     ...(!tools&&props.onToggleTranslation?[{id:'translation',label:props.translationOpen?'关闭译文':'译文',icon:'translate'} as MenuEntry]:[]),
     ...(!tools?[{id:'marker',label:'自动高亮',icon:'marker',checked:props.autoHighlight},{id:'view',label:'页面显示',icon:'pageDisplay'}] as MenuEntry[]:[]),
     ...(!spacious?[{id:'settings',label:'阅读设置',icon:'settings'} as MenuEntry]:[]),
-    ...(!spacious&&props.onSave?[{id:'save',label:props.saved?'编辑收藏':'收藏到文献库',icon:'bookmark'} as MenuEntry]:[]),
+    // Only the narrowest toolbar has no room left for the 收藏 button itself.
+    ...(!pages&&props.onSave?[{id:'save',label:props.saved?'编辑收藏':'加入文献库',icon:'bookmark'} as MenuEntry]:[]),
     ...(!spacious?[{kind:'separator',id:'sep-files'} as MenuEntry]:[]),
     {id:'search',label:props.findOpen?'关闭查找':'查找',icon:'search',shortcut:FIND_SHORTCUT},
     {id:'open',label:'打开论文',icon:'file'},
@@ -131,7 +132,8 @@ export function ReaderToolbar(props: ReaderToolbarProps) {
   return <GlassSurface as="header" tone="bar" radius="pill" className="pp-toolbar" data-density={density} data-title={titleVisible?'shown':'hidden'} onContextMenu={event=>{event.preventDefault();setMenu({kind:'context',x:event.clientX,y:event.clientY,align:'start'});}}>
     {tools&&<IconButton icon={props.sidebarOpen?'sidebarShown':'sidebar'} label={props.sidebarOpen?'隐藏侧栏':'显示侧栏'} shape="pill" aria-pressed={props.sidebarOpen} onClick={props.onToggleSidebar}/>}
     {titleVisible?<Tooltip label={header.title} className="pp-toolbar__title-wrap"><span className="pp-toolbar__title">{header.title}</span></Tooltip>:<span className="pp-visually-hidden">{header.title}</span>}
-    {spacious&&props.onSave&&<IconButton ref={props.saveRef} icon={props.saved?'bookmarkFilled':'bookmark'} label={props.saved?'已在文献库，点按编辑':'收藏到文献库'} shape="pill" onClick={props.onSave}/>}
+    {/* Always on the first level: the title gives way before this button does. */}
+    {pages&&props.onSave&&<IconButton ref={props.saveRef} icon={props.saved?'bookmarkFilled':'bookmark'} label={props.saved?'已在文献库，点按编辑':'加入文献库'} shape="pill" active={props.saveOpen} aria-haspopup="dialog" aria-expanded={props.saveOpen} tooltip={!props.saveOpen} onClick={props.onSave}/>}
     {pages&&<div className="pp-toolbar__group">
       <form className="pp-toolbar__pill pp-toolbar__page" onSubmit={submitPage}>
         <input aria-label="页码" className="pp-toolbar__page-input" inputMode="numeric" value={pageDraft} onChange={e=>setPageDraft(e.target.value.replace(/\D/g,''))} onBlur={()=>setPageDraft(String(pageIndex+1))}/><span className="pp-toolbar__page-total">/ {header.pageCount}</span>

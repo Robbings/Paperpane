@@ -274,6 +274,46 @@ export class LibraryDatabase extends PaperDatabase {
       tx.objectStore(PREFERENCES).put({ key: 'view', value: { ...(previous?.value ?? libraryDefaults), ...structuredClone(patch) } });
     });
   }
+  /**
+   * Saves the reader's 收藏 popover in one transaction: adds the open paper to the
+   * library (its PDF then syncs with it) or edits its entry. Only changed
+   * bibliographic fields are marked as edited.
+   */
+  async saveDocumentEntry(ref: DocumentRef, entry: { title: string; authors: string[]; venue?: string; year?: number; folderId: string | null; tags: readonly LibraryTagInput[] }): Promise<LibraryItem> {
+    const title = entry.title.trim();
+    if (!title || title.length > 100_000) throw new LibraryFault('INVALID_INPUT', '标题不能为空');
+    if (entry.year !== undefined && (!Number.isInteger(entry.year) || entry.year < 1 || entry.year > 9999)) throw new LibraryFault('INVALID_INPUT', '年份应为 1–9999 的整数');
+    const authors = entry.authors.map(a => a.trim()).filter(Boolean);
+    const labels = entry.tags.map(tag => ({ id: tag.id, label: tag.label.trim(), normalized: tag.label.trim().normalize('NFKC').toLocaleLowerCase() }));
+    if (labels.some(tag => !tag.label || tag.label.length > 100)) throw new LibraryFault('INVALID_INPUT', '标签应为 1–100 个字符');
+    return this.run('readwrite', async tx => {
+      const document = required(await req(tx.objectStore('documents').get(ref.documentId)) as StoredDocument | undefined, '论文记录不存在，请重新打开');
+      if (document.deletedAt) throw new LibraryFault('NOT_FOUND', '论文记录已删除，请重新导入');
+      const item = required(await req(tx.objectStore(LIBRARY).index('byDocument').get(ref.documentId)) as LibraryItem | undefined, '文献库条目不存在，请重新打开论文');
+      if (entry.folderId) {
+        const folder = await req(tx.objectStore(FOLDERS).get(entry.folderId)) as LibraryFolder | undefined;
+        if (!folder || folder.deletedAt) throw new LibraryFault('NOT_FOUND', '所选文件夹已删除，请重新选择');
+      }
+      const tagIds: string[] = [];
+      for (const input of labels) {
+        let tag = await req(input.id ? tx.objectStore(TAGS).get(input.id) : tx.objectStore(TAGS).index('byNormalized').get(input.normalized)) as LibraryTag | undefined;
+        if (tag?.deletedAt) tag = undefined;
+        if (!tag) tag = await this.changed(tx, TAGS, { ...stamp(), label: input.label, normalized: input.normalized });
+        tagIds.push(tag.id);
+      }
+      const fields = { title, authors, venue: entry.venue?.trim() || undefined, year: entry.year };
+      const edited = (Object.keys(fields) as (keyof typeof fields)[]).filter(key => JSON.stringify(fields[key]) !== JSON.stringify(item[key]));
+      const adding = !item.inLibrary;
+      if (adding && document.syncScope !== 'record-and-file') await this.changed(tx, 'documents', { ...document, syncScope: 'record-and-file' });
+      return this.changed(tx, LIBRARY, {
+        ...item, ...fields, inLibrary: true, deletedAt: undefined,
+        addedAt: adding ? new Date().toISOString() : item.addedAt,
+        folderId: entry.folderId, folderIds: entry.folderId === item.folderId ? item.folderIds : [],
+        tagIds: [...new Set(tagIds)],
+        editedFields: edited.length ? [...new Set([...(item.editedFields ?? []), ...edited])] : item.editedFields,
+      });
+    });
+  }
   /** Called after PDF import. Existing classification and manually edited metadata win. */
   async retainDocument(ref: DocumentRef, folderId: string | null, firstImport: boolean): Promise<LibraryItem> {
     return this.run('readwrite', async tx => {
@@ -282,7 +322,9 @@ export class LibraryDatabase extends PaperDatabase {
         const folder = await req(tx.objectStore(FOLDERS).get(folderId)) as LibraryFolder | undefined;
         if (!folder || folder.deletedAt) throw new LibraryFault('NOT_FOUND', '导入目标文件夹已删除；PDF 已保存在本机，请重新选择文件夹');
       }
-      return this.changed(tx, LIBRARY, { ...item, inLibrary: true, folderId: firstImport ? folderId : item.folderId });
+      // A paper that was only read before (or never filed) takes the folder it was imported into.
+      const unfiled = item.folderId === null && !item.folderIds?.length;
+      return this.changed(tx, LIBRARY, { ...item, inLibrary: true, folderId: firstImport || unfiled ? folderId : item.folderId });
     });
   }
   async importBibliography(inputs: readonly Omit<LibraryItem, keyof RecordStamp | 'inLibrary' | 'addedAt' | 'starred' | 'folderId' | 'tagIds'>[], folderId: string | null): Promise<{ added: number; reused: number }> {

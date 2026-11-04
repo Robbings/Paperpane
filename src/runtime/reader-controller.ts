@@ -14,6 +14,7 @@ import { readingPersistence } from './reading-persistence';
 import { pdfSourceUrl } from '@/browser-entry/pdf';
 import { browser } from 'wxt/browser';
 import { hasImportOrigin, requestImportOrigin } from '@/document/permissions';
+import { PreferenceStore } from '@/data/preference-store';
 
 type ExternalImport = {
   url: string;
@@ -119,7 +120,7 @@ export class ReaderController {
         external.phase = 'importing';
       } else {
         external.phase = 'importing';
-        const result = await this.imports.service.importDocument({ kind: 'url', url: external.url, intent: 'import', browserTabId: external.browserTabId });
+        const result = await this.imports.service.importDocument({ kind: 'url', url: external.url, intent: await this.importIntent(), browserTabId: external.browserTabId });
         if (!result.ok) throw new Error(result.error.message);
         external.jobId = result.value;
       }
@@ -128,6 +129,19 @@ export class ReaderController {
       if (this.disposed || this.stopping) return;
       external.phase = 'failed'; external.error = error instanceof Error ? error.message : '无法导入论文，请重试。'; this.update();
     }
+  }
+  /** Papers opened here join the library only when the reader asked for that in settings. */
+  async importIntent(): Promise<'browse' | 'import'> {
+    const store = new PreferenceStore();
+    try { return (await store.read()).autoAddToLibrary === true ? 'import' : 'browse'; }
+    catch { return 'browse'; }
+    finally { void store.close(); }
+  }
+  /** Opens a PDF file from this device (file picker, drop or popup). */
+  async openLocalFile(file: File) {
+    if (this.disposed) return;
+    const result = await this.imports.service.importDocument({ kind: 'local', file, intent: await this.importIntent() });
+    if (!result.ok) this.report(result.error.message);
   }
   trackTranslation(session: TranslationSession) { this.translations.add(session); }
   async releaseTranslation(session: TranslationSession) {

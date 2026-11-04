@@ -160,6 +160,8 @@ export function Tree({
       if (moving !== targetId && (canMove?.(moving, targetId) ?? true)) onMove?.(moving, targetId);
       return;
     }
+    // Handled here: an ancestor drop zone (e.g. the whole library) must not import it again.
+    event.stopPropagation();
     onExternalDrop?.(targetId, event.dataTransfer);
   };
 

@@ -142,7 +142,7 @@
   /* The flex item is the tooltip wrapper: it must be allowed to shrink. */
   flex: 0 1 auto;
   min-width: 96px;
-  max-width: 320px;
+  max-width: 220px;
   margin-right: 6px;
 }
 
@@ -1361,4 +1361,36 @@
   --pp-text-md: calc(13px * var(--pp-read-scale));
   --pp-text-quote: calc(13.5px * var(--pp-read-scale));
   --pp-text-lg: calc(15px * var(--pp-read-scale));
+}
+
+/* ---- Dropping a PDF on the reader -------------------------------------------------- */
+.pp-reader-drop {
+  position: fixed;
+  inset: 0;
+  z-index: var(--pp-z-modal, 1000);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: rgba(20, 20, 24, 0.16);
+  pointer-events: none;
+}
+
+.pp-reader-drop__card {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 6px;
+  padding: var(--pp-space-8) 56px;
+  outline: 2px dashed var(--pp-accent);
+  outline-offset: -10px;
+  color: var(--pp-text-2);
+  text-align: center;
+}
+
+.pp-reader-drop__card svg {
+  color: var(--pp-accent);
+}
+
+.pp-reader-drop__card strong {
+  color: var(--pp-text);
 }

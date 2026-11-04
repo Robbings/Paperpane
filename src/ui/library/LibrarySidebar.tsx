@@ -13,6 +13,8 @@ export interface CollectionCounts {
 }
 
 interface LibrarySidebarProps {
+  /** PDF files dropped onto a folder are imported straight into it. */
+  onImportFiles?: (files: File[], folderId: string) => void;
   collection: Collection;
   onCollection: (collection: Collection) => void;
   folders: readonly FolderView[];
@@ -173,10 +175,11 @@ export function LibrarySidebar(props: LibrarySidebarProps) {
             onMove={props.onMoveFolder}
             // A folder cannot move into itself or one of its own subfolders.
             canMove={(id, parentId) => !isDescendant(id, parentId)}
-            acceptsExternal={(types) => types.includes(PAPER_DRAG_TYPE)}
+            acceptsExternal={(types) => types.includes(PAPER_DRAG_TYPE) || (!!props.onImportFiles && types.includes('Files'))}
             onExternalDrop={(folderId, data) => {
               const papers = data.getData(PAPER_DRAG_TYPE);
               if (papers) props.onMovePapers(JSON.parse(papers) as string[], folderId);
+              else if (data.files.length) props.onImportFiles?.(Array.from(data.files).filter((file) => file.type === 'application/pdf' || file.name.toLowerCase().endsWith('.pdf')), folderId);
             }}
           />
         )}
