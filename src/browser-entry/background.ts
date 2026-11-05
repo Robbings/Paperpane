@@ -113,7 +113,8 @@ export function installBrowserEntry() {
   browser.webRequest.onHeadersReceived.addListener(details => {
     enqueue(details.tabId, async () => {
       const direct = isPdfResponse(details);
-      const value: PdfTab = { pageUrl: details.url, pdfUrl: direct ? details.url : undefined,
+      const pageUrl = pdfSourceUrl(details.url);
+      const value: PdfTab = { pageUrl, pdfUrl: direct ? pageUrl : undefined,
         direct, completed: false, requestId: details.requestId };
       const disposition = details.responseHeaders?.find(header => header.name.toLowerCase() === 'content-disposition');
       if (/^attachment(?:;|$)/i.test(disposition?.value?.trim() ?? '')) await browser.storage.session.remove(navigationKey(details.tabId));
@@ -170,6 +171,12 @@ export function installBrowserEntry() {
     try { pdfSourceUrl(raw); } catch { return { tabId, title: tab.title ?? '', block: 'restricted' }; }
     const known = (await browser.storage.session.get(tabKey(tabId)))[tabKey(tabId)] as PdfTab | undefined;
     let pdfUrl = completedPdfUrl(tab, known);
+    // Scholar's embedded reader can keep the tab 'loading' after the main PDF
+    // response completed. A manual action can attest the current top document
+    // without waiting for another extension's iframe or changing navigation.
+    if (!pdfUrl && inspectExisting && !tab.pendingUrl && known?.direct && known.completed && pdfSourceUrl(raw) === known.pageUrl) {
+      if (await preparePdfPage(tabId, known.pageUrl)) pdfUrl = known.pdfUrl;
+    }
     // The extension may have been enabled after this PDF was opened. Only a manual
     // action can use this fallback, and only the current top-level PDF may attest it.
     if (inspectExisting && !known && tab.status === 'complete' && !tab.pendingUrl) {

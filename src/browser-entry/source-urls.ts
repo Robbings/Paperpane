@@ -1,5 +1,7 @@
+import { publisherPdfUrl } from './publisher-pdf.ts';
 export interface PaperSource { id: string; label: string }
 const sources: Record<string, PaperSource> = {
+  'science.org': { id:'science',label:'Science' },
   'aclanthology.org': { id:'acl',label:'ACL Anthology' },
   'openreview.net': { id:'openreview',label:'OpenReview' },
   'openaccess.thecvf.com': { id:'cvf',label:'CVF Open Access' },
@@ -34,6 +36,7 @@ export function paperSource(raw:string):PaperSource|undefined {
 
 /** Only documented, deterministic paper routes. Unknown landing pages stay unknown. */
 export function sourcePdfUrl(raw:string):string|undefined {
+  const publisher=publisherPdfUrl(raw);if(publisher)return publisher;
   const url=httpUrl(raw);if(!url||url.port)return;
   const source=paperSource(url.href);if(!source)return;
   const path=url.pathname,origin=url.origin;

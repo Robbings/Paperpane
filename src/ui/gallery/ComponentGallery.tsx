@@ -509,7 +509,7 @@ function DialogSection() {
 
 function ToastSection() {
   return (
-    <Section id="toast" title="轻提示" note="出现在页面顶部，鼠标停留时暂停计时；错误提示要手动关闭。逻辑代码也可以直接调用 toast.show()。">
+    <Section id="toast" title="轻提示" note="出现在页面顶部，鼠标停留时暂停计时；错误提示停留稍久后自动消失。逻辑代码也可以直接调用 toast.show()。">
       <Demo label="类型">
         <Button onClick={() => toast.show({ message: '已复制到剪贴板' })}>普通</Button>
         <Button onClick={() => toast.show({ message: '笔记已保存到本机', tone: 'success' })}>成功</Button>

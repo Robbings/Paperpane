@@ -1,3 +1,4 @@
+import { cleanOverviewTags } from '@/ai/overview-metadata';
 import type { ResearchTextRenderer } from '@/ai/markdown';
 import { useId, useRef, useState, type ReactNode } from 'react';
 import { Button, Icon, IconButton, Markdown, MarkdownInline, Menu, Skeleton } from '@/ui/components';
@@ -37,7 +38,9 @@ export function OverviewSection(props: OverviewSectionProps) {
   const bodyId = useId();
   const running = result.state === 'running' || result.state === 'queued';
   const lead = card.display === 'lead';
-  const content = result.content;
+  const content: OverviewContent | undefined = result.content?.output === 'list' && card.listStyle === 'tags'
+    ? { ...result.content, items: cleanOverviewTags(result.content.items.map(item => item.text)).map(text => ({ text })) }
+    : result.content;
 
   const marker = (label: string): ReactNode => {
     const source = result.sources?.find((s) => s.label === label);

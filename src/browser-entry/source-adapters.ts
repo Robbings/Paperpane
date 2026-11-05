@@ -35,6 +35,7 @@ function scholarResults(doc:Document):PdfCandidate[]{
 }
 
 const primarySelectors:Record<string,string>={
+  science:'a[href*="/doi/pdf/"],a[href*="/doi/epdf/"]',
   acl:'a[href*=".pdf" i]',openreview:'a.citation_pdf_url,a[href*="/pdf?"]',
   cvf:'a[href*="/papers/"][href*=".pdf" i]',pmlr:'a[href*=".pdf" i]',neurips:'a[href*="-Paper"][href*=".pdf" i]',
   huggingface:'a[href*="arxiv.org/abs/"],a[href*="arxiv.org/pdf/"]',
@@ -54,7 +55,7 @@ export function scanPaperSources(doc:Document):{exclusive:boolean;candidates:Pdf
   let url:string|undefined;
   const metadata=meta?.content.trim();
   if(metadata&&!metadata.startsWith('#')){
-    try{const candidate=pdfSourceUrl(new URL(metadata,doc.baseURI).href);if(candidate!==pdfSourceUrl(doc.location.href))url=candidate;}catch{/* Fall through to explicit links or known routes. */}
+    try{const candidate=pdfSourceUrl(new URL(metadata,doc.baseURI).href);if(candidate!==pdfSourceUrl(doc.location.href))url=sourcePdfUrl(candidate)??candidate;}catch{/* Fall through to explicit links or known routes. */}
   }
   const known=sourcePdfUrl(doc.location.href);
   if(!url)for(const primary of primaryLinks){try{

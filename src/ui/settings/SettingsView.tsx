@@ -37,6 +37,7 @@ interface SettingsViewProps {
   onGuide?: () => void;
   /** Changes when the provider picker should open on the models page. */
   addProviderRequest?: number;
+  onAddProviderHandled?: () => void;
 }
 
 const sections: { id: SettingsSection; label: string; icon: IconName }[] = [
@@ -297,7 +298,7 @@ export function SettingsView(props: SettingsViewProps) {
         <ScrollArea className="pp-settings__scroll" viewportClassName="pp-settings__viewport">
           <div className="pp-settings__content">
             {section === 'models' ? (
-              <ModelsSection key={epoch} draft={draft} onChange={edit} page={page} note={note} problems={problems} addRequest={props.addProviderRequest} />
+              <ModelsSection key={epoch} draft={draft} onChange={edit} page={page} note={note} problems={problems} addRequest={props.addProviderRequest} onAddRequestHandled={props.onAddProviderHandled} />
             ) : section === 'translation' ? (
               <TranslationSection
                 key={epoch}

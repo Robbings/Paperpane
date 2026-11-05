@@ -1,3 +1,4 @@
+import { paperpaneNavigationUrl, publisherPdfUrl } from '@/browser-entry/publisher-pdf';
 import { defineContentScript } from 'wxt/utils/define-content-script';
 import { browser } from 'wxt/browser';
 import { mountArxivButton } from '@/browser-entry/arxiv-button';
@@ -12,6 +13,7 @@ export default defineContentScript({
   async main(ctx) {
     if (document.contentType !== 'text/html' && document.contentType !== 'application/xhtml+xml') return;
     const open = async (pdfUrl: string) => {
+      pdfUrl = publisherPdfUrl(pdfUrl) ?? pdfUrl;
       // Keep the navigation in the clicked site's browser context (cookies and referrer).
       const marker = 'about:blank#paperpane-' + crypto.getRandomValues(new Uint32Array(4)).join('-');
       const destination = window.open(marker, '_blank');
@@ -24,7 +26,7 @@ export default defineContentScript({
         // Only navigate our blank page. The user may already have closed or reused it.
         if (destination.closed || destination.location.href !== marker) throw new Error('新标签页已关闭或页面已改变。');
         destination.opener = null;
-        destination.location.replace(pdfUrl);
+        destination.location.replace(paperpaneNavigationUrl(pdfUrl));
       } catch (error) {
         try {
           if (!destination.closed && destination.location.href === marker) destination.close();
@@ -41,7 +43,7 @@ export default defineContentScript({
       url ??= scanPaperSources(document).candidates[0]?.url;
       if (!url) {
         const meta = document.querySelector<HTMLMetaElement>('meta[name="citation_pdf_url"]')?.content.trim();
-        try { if (meta && !meta.startsWith('#')) url = new URL(meta, document.baseURI).href; } catch { /* Invalid metadata. */ }
+        try { if (meta && !meta.startsWith('#')) url = publisherPdfUrl(new URL(meta, document.baseURI).href) ?? new URL(meta, document.baseURI).href; } catch { /* Invalid metadata. */ }
       }
       reply({ url });
     };

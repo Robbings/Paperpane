@@ -1,3 +1,5 @@
+import { LibraryDatabase } from "@/data/library-database";
+import { cleanOverviewTags, overviewMetadata } from "./overview-metadata";
 import { contextLimit, reasoningValues, outputLimit } from './model-capabilities';
 import { Validator } from "jsonschema";
 import {
@@ -101,6 +103,7 @@ export class ResearchService implements ConversationService {
     readonly ref: DocumentRef,
     private extract: (signal: AbortSignal) => Promise<ExtractedPaper>,
     preferences: Preferences,
+    private background = false,
   ) {
     this.preferences = preferences;
     this.key = `ai-v1:${ref.documentId}:${ref.fileVersion}`;
@@ -222,14 +225,14 @@ export class ResearchService implements ConversationService {
         },
       );
       this.paper = await this.extract(this.lifecycle.signal);
-      if (!this.disposed) await this.ensureDiscussion();
+      if (!this.disposed && !this.background) await this.ensureDiscussion();
     } catch (e) {
       this.error = errorText(e);
     } finally {
       this.loading = false;
       this.notify();
     }
-    if (!this.disposed && this.paper && this.view?.models.length)
+    if (!this.disposed && !this.background && this.paper && this.view?.models.length)
       void this.overview();
   }
   private async reload() {
@@ -1247,8 +1250,11 @@ export class ResearchService implements ConversationService {
       reasoning: route?.reasoning,
       language: this.preferences.answerLanguage,
     });
-    if (!force && this.record.overviews.some((r) => r.signature === signature))
-      return;
+    const completed = () => this.record.overviews.some(r => r.signature === signature &&
+      this.record.cards.filter(c => c.visible).every(c => r.results[c.id]?.state === 'completed'));
+    if (!force && completed()) {
+      await this.syncLibraryMetadata(); return;
+    }
     const controller = new AbortController();
     this.controllers.set("overview", controller);
     let ownedRun: OverviewRun | undefined;
@@ -1264,7 +1270,7 @@ export class ResearchService implements ConversationService {
         }
         if (
           !force &&
-          this.record.overviews.some((r) => r.signature === signature)
+          completed()
         )
           return;
         const previousId = this.record.activeOverviewId;
@@ -1344,6 +1350,10 @@ export class ResearchService implements ConversationService {
                 })),
               };
             }
+            if (content?.output === "list" && card.listStyle === "tags") {
+              content.items = cleanOverviewTags(content.items.map((item: { text: string }) => item.text)).map(text => ({ text }));
+              if (!content.items.length) continue;
+            }
             if (!content) continue;
             run.results[card.id] = {
               state: "completed",
@@ -1373,7 +1383,7 @@ export class ResearchService implements ConversationService {
                 JSON.stringify(specification),
             },
           ],
-          'Keep every card short and direct: plain words, no preamble, no filler, no restating the task. Return NDJSON only, one complete JSON object per line: {"id":"card id","content":...}. For markdown content is a Markdown string. For list content is an array of strings or {title,text}. For fields content is an object satisfying that card JSON Schema. Cite paper statements with [^sN]. No fences, no extra fields.',
+          'Keep every card short and direct: plain words, no preamble, no filler, no restating the task. Return NDJSON only, one complete JSON object per line: {"id":"card id","content":...}. For markdown content is a Markdown string. For list content is an array of strings or {title,text}. For fields content is an object satisfying that card JSON Schema. Cite paper statements with [^sN], except tags/keywords: tags must be plain terms without citations or Markdown. No fences, no extra fields.',
           modelId,
           controller.signal,
           (d) => {
@@ -1409,11 +1419,24 @@ export class ResearchService implements ConversationService {
     } finally {
       try {
         if (ownedRun) { this.changed(); await this.flush(); }
+        await this.syncLibraryMetadata();
       } finally {
         if (this.controllers.get("overview") === controller) this.controllers.delete("overview");
         this.notify();
       }
     }
+  }
+  async syncLibraryMetadata() {
+    const run = this.record.overviews.find(r => r.id === this.record.activeOverviewId) ?? this.record.overviews.at(-1);
+    const value = overviewMetadata(run);
+    if (!value.abstract && !value.tags?.length) return;
+    const db = new LibraryDatabase();
+    try {
+      await db.saveOverviewMetadata(this.ref, value);
+      const channel = new BroadcastChannel('paperpane-documents');
+      channel.postMessage({ kind: 'invalidate' }); channel.close();
+    } catch (e) { this.error = errorText(e); }
+    finally { await db.close(); }
   }
   stopOverview() {
     this.controllers.get("overview")?.abort();
@@ -1425,6 +1448,7 @@ export class ResearchService implements ConversationService {
     this.record.activeOverviewId = runId;
     this.changed();
     await this.flush();
+    await this.syncLibraryMetadata();
   }
   async saveCards(cards: OverviewCardDef[]) {
     for (const c of cards)

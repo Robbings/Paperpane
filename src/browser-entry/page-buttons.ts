@@ -1,3 +1,4 @@
+import { publisherPdfUrl } from './publisher-pdf';
 import { createPdfButton } from './button';
 import { isPdfLink, pdfSourceUrl } from './pdf';
 import { scanPaperSources } from './source-adapters';
@@ -15,9 +16,9 @@ export function mountPdfPage(doc: Document, open: (url: string) => Promise<void>
         if (source.closest('[data-paperpane-entry]')) continue;
         const raw = source.getAttribute('href') ?? source.getAttribute('src') ?? source.getAttribute('data');
         if (!raw) continue;
-        let url: string; try { url = pdfSourceUrl(new URL(raw, doc.baseURI).href); } catch { continue; }
+        let url: string; try { url = publisherPdfUrl(new URL(raw, doc.baseURI).href) ?? pdfSourceUrl(new URL(raw, doc.baseURI).href); } catch { continue; }
         const type = source.getAttribute('type') ?? '';
-        if (!isPdfLink(url, type) && !(source.tagName === 'A' && /^(?:view|download|full[ -]text|查看|下载)?\s*PDF$/i.test(source.textContent?.trim() ?? ''))) continue;
+        if (!publisherPdfUrl(url) && !isPdfLink(url, type) && !(source.tagName === 'A' && /^(?:view|download|full[ -]text|查看|下载)?\s*PDF$/i.test(source.textContent?.trim() ?? ''))) continue;
         if(seen.has(url))continue;seen.add(url);
         candidates.push({ source, url, floating: source.tagName !== 'A' });
       }

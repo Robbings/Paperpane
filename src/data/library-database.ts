@@ -80,6 +80,34 @@ export class LibraryDatabase extends PaperDatabase {
       await this.changed(tx, 'documents', { ...document, title, bibliography });
     });
   }
+  /** Apply shared AI metadata atomically, preserving edited abstracts and manual tags. */
+  async saveOverviewMetadata(ref: DocumentRef, value: { abstract?: string; tags?: string[] }): Promise<void> {
+    await this.run('readwrite', async tx => {
+      const doc = await req(tx.objectStore('documents').get(ref.documentId)) as StoredDocument | undefined;
+      const item = await req(tx.objectStore(LIBRARY).index('byDocument').get(ref.documentId)) as LibraryItem | undefined;
+      if (!doc || doc.deletedAt || doc.fileVersion !== ref.fileVersion || !item || item.deletedAt || !item.inLibrary) return;
+      const key = `overview-library:${ref.documentId}:${ref.fileVersion}`;
+      const previous = (await req(tx.objectStore('meta').get(key)))?.value as { abstract?: string; tags?: string[]; tagIds?: string[] } | undefined;
+      if (JSON.stringify({ abstract: previous?.abstract, tags: previous?.tags }) === JSON.stringify(value)) return;
+      let tagIds = item.tagIds;
+      const generated: string[] = [];
+      if (value.tags) {
+        tagIds = tagIds.filter(id => !previous?.tagIds?.includes(id));
+        for (const label of value.tags) {
+          const normalized = label.normalize('NFKC').toLocaleLowerCase();
+          let tag = await req(tx.objectStore(TAGS).index('byNormalized').get(normalized)) as LibraryTag | undefined;
+          if (tag?.deletedAt) continue;
+          if (!tag) tag = await this.changed(tx, TAGS, { ...stamp(), label, normalized });
+          // Existing manual tags are never owned or removed by the generator.
+          if (!tagIds.includes(tag.id)) generated.push(tag.id);
+          tagIds = [...new Set([...tagIds, tag.id])];
+        }
+      }
+      const next = { ...item, tagIds, ...(!item.editedFields?.includes('abstract') && value.abstract ? { abstract: value.abstract } : {}) };
+      if (JSON.stringify(next) !== JSON.stringify(item)) await this.changed(tx, LIBRARY, next);
+      tx.objectStore('meta').put({ key, value: { ...value, tagIds: value.tags ? generated : previous?.tagIds } });
+    });
+  }
   async query(query: LibraryQuery, limit: number): Promise<Omit<LibraryState, 'query'>> {
     return this.run('readonly', async tx => {
       const folders = (await req(tx.objectStore(FOLDERS).getAll()) as LibraryFolder[]).filter(f => !f.deletedAt);

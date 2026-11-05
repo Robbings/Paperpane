@@ -28,12 +28,17 @@ test('background enables only observed completed PDFs and rejects old page entry
  const message=(type,extra={},from=sender)=>new Promise((resolve,reject)=>{const timer=setTimeout(()=>reject(Error('Message not handled: '+type)),200);handlers.message({type,tabId:7,...extra},from,value=>{clearTimeout(timer);resolve(value)});});
  const details={tabId:7,requestId:'one',url:tab.url,type:'main_frame',statusCode:200,responseHeaders:[{name:'Content-Type',value:'application/pdf'}]};
  assert.equal((await message('GET_PDF_STATE')).value.pdfUrl,undefined);
- handlers.onBeforeRequest(details);handlers.onHeadersReceived(details);
+ handlers.onBeforeRequest(details);handlers.onHeadersReceived({...details,url:details.url+'#gsr=0'});
  assert.equal((await message('GET_PDF_STATE')).value.pdfUrl,undefined);
  handlers.onCompleted(details);assert.equal((await message('GET_PDF_STATE')).value.pdfUrl,tab.url);
  await message('OPEN_TAB_PDF');assert.equal(created.length,1);
  assert.equal((await message('OPEN_CURRENT_PDF',{}, {id:'test',url:tab.url,frameId:0,tab:{id:7}})).ok,true);assert.equal(created.length,2);
  assert.equal((await message('OPEN_CURRENT_PDF',{}, {id:'test',url:'https://evil.test/',frameId:0,tab:{id:7}})).ok,false);
+ // Another reader's iframe may stay loading after the top-level PDF completed.
+ globalThis.__manualBrowser.scripting.executeScript=async()=>[{result:true}];tab.status='loading';
+ assert.equal((await message('GET_PDF_STATE')).value.pdfUrl,tab.url);
+ tab.pendingUrl='https://papers.test/other';assert.equal((await message('GET_PDF_STATE')).value.pdfUrl,undefined);
+ delete tab.pendingUrl;tab.status='complete';globalThis.__manualBrowser.scripting.executeScript=async()=>[];
  handlers.onBeforeRequest({...details,requestId:'two'});handlers.onHeadersReceived({...details,requestId:'two',statusCode:429});handlers.onCompleted({...details,requestId:'two'});
  assert.equal((await message('GET_PDF_STATE')).value.pdfUrl,undefined);
  assert.equal((await message('OPEN_TAB_PDF')).ok,false);

@@ -1,10 +1,11 @@
+import { publisherPdfUrl } from '../browser-entry/publisher-pdf';
 import { ImportFault, abortIfNeeded } from './errors';
 import { deferDownload, downloadBlockedUntil, rateLimitedDownload } from './download-cooldown';
 /** Per-file input limit. Full-buffer parsing/hashing still require additional memory. */
 export const MAX_PDF_BYTES = 256 * 1024 * 1024;
 export function parseSourceUrl(raw: string): URL {
   let url: URL;
-  try { url = new URL(raw.trim()); } catch { throw new ImportFault({ code: 'INVALID_INPUT', message: '请输入完整的 PDF 链接', recovery: [] }); }
+  try { url = new URL(publisherPdfUrl(raw) ?? raw.trim()); } catch { throw new ImportFault({ code: 'INVALID_INPUT', message: '请输入完整的 PDF 链接', recovery: [] }); }
   if (!['http:', 'https:'].includes(url.protocol) || url.username || url.password) throw new ImportFault({ code: 'INVALID_INPUT', message: '仅支持不包含用户名或口令的 HTTP(S) 链接', recovery: [] });
   url.hash = ''; return url;
 }

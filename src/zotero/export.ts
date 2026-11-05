@@ -4,6 +4,7 @@ import { TransferStore } from '@/data/transfer-store';
 import { AnnotationDatabase } from '@/data/annotation-database';
 import { toZoteroAnnotations } from './annotations';
 import { plainNote } from './notes';
+import { exportNotes } from '@/domain/notes/export';
 import { pdfViews } from './pdf-geometry';
 import { stable } from '@/sync/merge';
 import { md5 } from './md5';
@@ -76,6 +77,26 @@ export async function exportZotero(client:ZoteroClient,ids:readonly string[],col
       if(local.shortNote?.trim()&&local.shortNote!==link.importedShortNote){
         if(!link.noteKey){link.noteKey=zoteroKey();await checkpoint();}
         const saved=await save({key:link.noteKey,itemType:'note',parentItem:link.itemKey,note:plainNote(local.shortNote),tags:[]},link.noteVersion);link.noteVersion=saved.version;await checkpoint();
+      }
+      const notes = await exportNotes([local], false);
+      if(notes){
+        const hash=md5(new Uint8Array(await notes.arrayBuffer()));
+        link.notesAttachment??={key:zoteroKey()};await checkpoint();
+        const target=link.notesAttachment;
+        let attachment=await existing(target.key);
+        if(attachment){
+          if(attachment.data.itemType!=='attachment'||attachment.data.parentItem!==link.itemKey)throw new Error('远程笔记附件标识冲突');
+          if(target.version!==undefined&&attachment.version!==target.version){
+            // Recover a completed upload with a lost response, never replace a remote edit.
+            if((target.uploaded&&target.hash===hash)||attachment.data.md5!==hash)throw new ZoteroError(412,'Zotero 笔记附件有改动，请先保留远程版本');
+            target.uploaded=true;target.hash=hash;
+          }
+        }else attachment=await save({key:target.key,itemType:'attachment',parentItem:link.itemKey,linkMode:'imported_file',title:'Paperpane 阅读笔记',filename:'Paperpane-notes.zip',contentType:'application/zip',tags:[]});
+        target.version=attachment.version;await checkpoint();
+        if(!target.uploaded||target.hash!==hash){
+          await client.upload(target.key,notes,'Paperpane-notes.zip',attachment.data.md5,signal);
+          target.uploaded=true;target.hash=hash;target.version=(await client.item(target.key,signal)).version;await checkpoint();
+        }
       }
       link.version=(await client.item(link.itemKey,signal)).version;await checkpoint();
       onResult({key:id,title,ok:true,message:'已导出到 Zotero',warnings});
