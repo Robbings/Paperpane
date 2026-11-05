@@ -5,7 +5,7 @@ import {pathToFileURL} from 'node:url';
 const {chromium}=await import(process.env.PAPERPANE_PLAYWRIGHT_MODULE?pathToFileURL(process.env.PAPERPANE_PLAYWRIGHT_MODULE).href:'playwright');
 const out=resolve('backups/source-validation');await mkdir(out,{recursive:true});
 const pdf=await readFile(process.env.PAPERPANE_TEST_PDF??resolve('backups/arxiv-validation/1706.03762.pdf'));
-const extension=resolve('.output/chrome-mv3');
+const extension=resolve(process.env.PAPERPANE_EXTENSION ?? '.output/chrome-mv3');
 const context=await chromium.launchPersistentContext(resolve('browser-profiles/source-validation-'+Date.now()),{executablePath:process.env.PAPERPANE_CHROMIUM,headless:true,viewport:{width:1600,height:1000},ignoreDefaultArgs:['--disable-extensions'],args:[`--disable-extensions-except=${extension}`,`--load-extension=${extension}`]});
 const errors=[];context.on('page',page=>page.on('pageerror',e=>errors.push(e.message)));
 const row=(id,title,url,right='')=>`<div class="gs_r gs_or gs_scl" data-cid="${id}" id="${id}">${right?`<div class="gs_ggs gs_fl"><div class="gs_or_ggsm"><a href="${right}"><span class="gs_ctg2">[PDF]</span> repository.test</a></div></div>`:''}<div class="gs_ri"><h3 class="gs_rt"><a href="${url}">${title}</a></h3><div class="gs_fl"><a href="#cite">引用</a></div></div></div>`;
@@ -14,9 +14,9 @@ const direct='https://repository.test/download?sig=a%2Fb';
 const wrapped='https://scholar.google.com/scholar_url?url='+encodeURIComponent(direct);
 const html=`<html><head><title>Scholar test</title><style>body{font:14px Arial;margin:24px}.gs_r{min-height:100px;margin-bottom:20px;border-bottom:1px solid #ddd;max-width:1100px}.gs_ggs{float:right;width:230px}a{color:#1644bb}.gs_rt{font-size:19px}.gs_ri{max-width:750px}</style></head><body>${row('r1','Paper one','https://publisher.test/article/one',wrapped)}${row('r2','OpenReview paper','https://openreview.net/forum?id=paper-two')}${row('r3','HTML only','https://publisher.test/article/html')}<div id="r4" class="gs_r gs_scl" data-cid="r4"><div class="gs_ggs"><a href="https://publisher.test/full-text">[HTML] publisher.test</a></div><h3 class="gs_rt"><a href="https://publisher.test/article/four">HTML article</a></h3></div>${row('r5','ACL paper','https://aclanthology.org/2024.acl-long.1/')}${row('r6','Unavailable PDF','https://publisher.test/article/six','https://repository.test/login.pdf')}</body></html>`;
 const fullHtml=html.replace('</body>',`<div id="r7" class="gs_r gs_scl"><h3 class="gs_rt"><span class="gs_ct1">[PDF]</span><a href="https://repository.test/heading?token=heading%2Fpdf">PDF title result</a></h3></div><div id="r8" class="gs_r gs_scl"><h3 class="gs_rt"><span class="gs_ct1">[CITATION]</span>Citation only</h3></div></body>`);
-async function openedBy(page,selector,expected){const created=context.waitForEvent('page',tab=>tab.url().startsWith('chrome-extension:')&&new URL(tab.url()).pathname==='/reader.html');await page.locator(selector).click();const reader=await created;await reader.waitForURL(url=>url.searchParams.has('documentId'),{timeout:30000});await reader.locator('.textLayer span').first().waitFor({timeout:30000});assert.equal(new URL(reader.url()).searchParams.get('originalPdf'),expected);await reader.close();}
+async function openedBy(page,selector,expected){await page.bringToFront();const created=context.waitForEvent('page',tab=>tab.url().startsWith('chrome-extension:')&&new URL(tab.url()).pathname==='/reader.html');await page.locator(selector).click();const reader=await created;await reader.waitForURL(url=>url.searchParams.has('documentId'),{timeout:30000});await reader.locator('.textLayer span').first().waitFor({timeout:30000});assert.equal(new URL(reader.url()).searchParams.get('originalPdf'),expected);await reader.close();}
 try{
-  const worker=context.serviceWorkers()[0]??await context.waitForEvent('serviceworker');const root=`chrome-extension://${new URL(worker.url()).host}`;
+  const worker=context.serviceWorkers()[0]??await context.waitForEvent('serviceworker');const root=`chrome-extension://${new URL(worker.url()).host}`;await worker.evaluate(()=>chrome.storage.local.set({onboarding:{welcomed:true,guided:true}}));
   const settings=await context.newPage();await settings.goto(root+'/options.html');
   await context.route('https://repository.test/**',route=>route.fulfill(route.request().url().endsWith('/login.pdf')?{contentType:'text/html',body:'<html>Sign in required</html>'}:{contentType:'application/pdf',body:pdf}));
   await context.route('https://openreview.net/pdf?**',route=>route.fulfill({contentType:'application/pdf',body:pdf}));
@@ -39,10 +39,10 @@ try{
   await scholar.locator('#dynamic [data-paperpane-button]').waitFor();
   await scholar.locator('#dynamic .gs_ggs').evaluate(el=>{el.innerHTML='<a href="https://repository.test/replaced.pdf">[PDF] replaced</a>';});
   await scholar.locator('#dynamic [data-paperpane-button]').waitFor();await openedBy(scholar,'#dynamic [data-paperpane-button]','https://repository.test/replaced.pdf');
-  const show=settings.getByRole('switch',{name:'显示网页打开按钮',exact:true});await show.click();
-  await scholar.locator('[data-paperpane-button]').first().waitFor({state:'detached'});await show.click();await scholar.locator('#r1 [data-paperpane-button]').waitFor();
+  const show=async value=>{const result=await settings.evaluate(showPdfButtons=>chrome.runtime.sendMessage({type:'SET_BROWSER_ENTRY',patch:{showPdfButtons}}),value);assert(result.ok);};await show(false);
+  await scholar.locator('[data-paperpane-button]').first().waitFor({state:'detached'});await show(true);await scholar.locator('#r1 [data-paperpane-button]').waitFor();
   console.log('PASS: Scholar reused links, delayed results, replaced download DOM and global hide/show');
-  const failedCreated=context.waitForEvent('page');await scholar.locator('#r6 [data-paperpane-button]').click();const failed=await failedCreated;await failed.getByText('论文导入失败',{exact:true}).waitFor();await failed.close();
+  const failedCreated=context.waitForEvent('page');await scholar.locator('#r6 [data-paperpane-button]').click();const failed=await failedCreated;await failed.getByText('Sign in required',{exact:true}).waitFor();assert.equal(scholar.isClosed(),false);await failed.close();
   const hk='https://scholar.google.com.hk/scholar?q=paperpane-test';await context.route(hk,route=>route.fulfill({contentType:'text/html',body:fullHtml}));const regional=await context.newPage();await regional.goto(hk);await regional.locator('#r1 [data-paperpane-button]').waitFor();
   console.log('PASS: Scholar regional host and non-PDF download failure');
   const signedAcl='https://aclanthology.org/2024.acl-long.2/',signedAclPdf='https://aclanthology.org/2024.acl-long.2.pdf?token=a%2Fb';
@@ -105,4 +105,4 @@ try{
     const count=await live.locator('[data-paperpane-source="google-scholar"]').count();await live.screenshot({path:resolve(out,'live-google-scholar.png')});
     console.log(count>0?`PASS: real Google Scholar page injected ${count} result buttons`:'UNVERIFIED: live Scholar did not expose usable results (access restriction or no PDF); fixture coverage passed');
   }
-}finally{await context.close();}
+}catch(error){for(const page of context.pages())console.log('PAGE',page.url(),(await page.locator('body').innerText().catch(()=>'' )).slice(0,600),await page.locator('[data-paperpane-button]').evaluateAll(nodes=>nodes.map(n=>({text:n.textContent,title:n.title}))).catch(()=>[]));throw error;}finally{await context.close();}

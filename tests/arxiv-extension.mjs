@@ -9,7 +9,7 @@ const { chromium } = await import(process.env.PAPERPANE_PLAYWRIGHT_MODULE
 const output = resolve('backups/arxiv-validation');
 await mkdir(output, { recursive: true });
 const pdf = await readFile(process.env.PAPERPANE_TEST_PDF ?? resolve(output, '1706.03762.pdf'));
-const extension = resolve('.output/chrome-mv3');
+const extension = resolve(process.env.PAPERPANE_EXTENSION ?? '.output/chrome-mv3');
 const context = await chromium.launchPersistentContext(resolve('browser-profiles/arxiv-validation-' + Date.now()), {
   executablePath: process.env.PAPERPANE_CHROMIUM,
   headless: true,
@@ -37,6 +37,10 @@ async function rendered(page) {
 try {
   const worker = context.serviceWorkers()[0] ?? await context.waitForEvent('serviceworker');
   const root = `chrome-extension://${new URL(worker.url()).host}`;
+  await worker.evaluate(() => chrome.storage.local.set({onboarding:{welcomed:true,guided:true}}));
+  const preferences = await context.newPage(); await preferences.goto(root + '/options.html');
+  await preferences.getByRole('switch', {name:'自动加入文献库',exact:true}).click();
+  await preferences.waitForFunction(async()=>{const db=await new Promise(r=>{const q=indexedDB.open('paperpane');q.onsuccess=()=>r(q.result)});return await new Promise(r=>{const q=db.transaction('meta').objectStore('meta').get('readerPreferences');q.onsuccess=()=>{db.close();r(q.result?.value?.autoAddToLibrary===true)}})});await preferences.close();
   const library = await context.newPage();
   await library.goto(`${root}/library.html`);
   await library.getByRole('button', { name: '导入', exact: true }).waitFor();
@@ -103,6 +107,7 @@ try {
   }, `${root}/chunks/${databaseChunk}`);
   assert.equal((await snapshot(reader)).items[0].inLibrary, true, 'explicit import without bibliography restores membership');
   const secondCreated = context.waitForEvent('page', page => page.url().startsWith(root + '/reader.html'));
+  await arxiv.bringToFront();
   await arxiv.locator('#paperpane-open-arxiv').click();
   const secondReader = await secondCreated;
   await rendered(secondReader);
@@ -152,4 +157,7 @@ try {
     await liveReader.screenshot({ path: resolve(output, 'arxiv-live-reader.png') });
     console.log('PASS: live arxiv.org page → real network download → installed extension reader');
   }
+} catch (error) {
+  for (const page of context.pages()) console.log('PAGE', page.url(), (await page.locator('body').innerText().catch(() => '')).slice(0, 600), await page.locator('[data-paperpane-button]').evaluateAll(nodes=>nodes.map(n=>({text:n.textContent,title:n.title}))).catch(()=>[]));
+  throw error;
 } finally { await context.close(); }

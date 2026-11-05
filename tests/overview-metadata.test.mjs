@@ -14,7 +14,7 @@ test('overview/library share plain, unique bounded tags and a citation-free abst
 });
 test('Paperpane navigations opt out of Scholar takeover and preserve page selection',()=>{
  assert.equal(paperpaneNavigationUrl('https://papers.test/a.pdf#page=3'),'https://papers.test/a.pdf#page=3&gsr=0');
- assert.equal(paperpaneNavigationUrl('https://www.science.org/doi/epdf/10.1126/test'),'https://www.science.org/doi/pdf/10.1126/test#gsr=0');
+ assert.equal(paperpaneNavigationUrl('https://www.science.org/doi/epdf/10.1126/test'),'https://www.science.org/doi/epdf/10.1126/test#gsr=0');
 });
 test('shared metadata persists atomically, updates only generated tags, preserves edits and rejects stale PDF versions',async()=>{
  const {outputFiles}=await build({entryPoints:['src/data/library-database.ts'],alias:{'@':resolve('src')},bundle:true,platform:'node',format:'esm',write:false});

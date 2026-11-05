@@ -23,7 +23,7 @@ export function createPdfButton(doc: Document, open: () => Promise<void>, label 
     event.preventDefault(); event.stopPropagation();
     if (button.disabled) return;
     button.disabled = true; button.textContent = '正在打开…';
-    try { await open(); button.textContent = '已打开 · 再次打开'; button.title = ''; }
+    try { await open(); button.textContent = '已转交纸间 · 再次打开'; button.title = ''; }
     catch (error) { button.textContent = '打开失败 · 点击重试'; button.title = error instanceof Error ? error.message : '请刷新页面重试。'; }
     finally { button.disabled = false; }
   });

@@ -45,3 +45,27 @@ test('finishing an import cannot close a reused or navigating PDF tab', async ()
   await closeImportedPdf(source);
   assert.deepEqual(removed, [8]);
 });
+
+test('HTML reader transfer assembles all ranges, rejects gaps, HTML and changing files', async () => {
+ const pageUrl='https://publisher.test/doi/epdf/10.1234/paper';
+ const resource='https://publisher.test/doi/pdfdirect/10.1234/paper?hmac=signed';
+ const data=new Uint8Array(1500000).fill(65);data.set(new TextEncoder().encode('%PDF-1.7\n'));
+ const original={fetch:globalThis.fetch,document:globalThis.document,location:globalThis.location};
+ let fault='',calls=[];
+ globalThis.document={contentType:'text/html'};globalThis.location={href:pageUrl};
+ api.runtime={sendMessage:async()=>({ok:true,value:{pdfUrl:resource,sourcePageUrl:pageUrl}})};
+ api.scripting={executeScript:async o=>[{documentId:'viewer-document',result:await o.func(...o.args)}]};
+ globalThis.fetch=async (url,options)=>{
+  assert.equal(url,resource);assert.equal(options.credentials,'include');
+  const [,a,b]=/^bytes=(\d+)-(\d+)$/.exec(options.headers.Range);const start=Number(a),end=Math.min(Number(b),data.length-1);calls.push([start,end]);
+  if(fault==='html')return new Response('<html>verify</html>',{headers:{'content-type':'text/html'}});
+  return new Response(data.slice(start,end+1),{status:206,headers:{'content-type':'application/pdf','content-range':`bytes ${start+(fault==='gap'?1:0)}-${end}/${data.length}`,etag:fault==='change'&&start?'v2':'v1'}});
+ };
+ try{
+  const result=await readBrowserPdf(8,resource,new AbortController().signal,()=>{});
+  assert.deepEqual(result.bytes,data);assert.deepEqual(calls,[[0,1048575],[1048576,1499999]]);
+  for(fault of ['gap','html','change'])await assert.rejects(readBrowserPdf(8,resource,new AbortController().signal,()=>{}),e=>e.detail.code==='NETWORK');
+  fault='';globalThis.location.href='https://publisher.test/other';
+  await assert.rejects(readBrowserPdf(8,resource,new AbortController().signal,()=>{}),e=>e.detail.code==='NETWORK');
+ }finally{Object.assign(globalThis,original);}
+});

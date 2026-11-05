@@ -1,11 +1,11 @@
-/** Science's ePDF URL is an HTML reader; /doi/pdf is the corresponding PDF. */
+/** Keep Science viewer URLs intact; the signed file is discovered inside the reader. */
 export function publisherPdfUrl(raw: string): string | undefined {
   try {
     const url = new URL(raw.trim());
     if (!['https:', 'http:'].includes(url.protocol) || url.username || url.password) return;
     if (!['science.org', 'www.science.org'].includes(url.hostname) || url.port) return;
-    if (!/^\/doi\/(?:epdf|pdf|full|abs)\/10\.\d{4,9}\/.+/.test(url.pathname)) return;
-    url.pathname = url.pathname.replace(/^\/doi\/(?:epdf|full|abs)\//, '/doi/pdf/');
+    if (!/^\/doi\/(?:epdf|pdfdirect|pdf|full|abs)\/10\.\d{4,9}\/.+/.test(url.pathname)) return;
+    url.pathname = url.pathname.replace(/^\/doi\/(?:full|abs)\//, '/doi/epdf/');
     url.hash = '';
     return url.href;
   } catch { return; }

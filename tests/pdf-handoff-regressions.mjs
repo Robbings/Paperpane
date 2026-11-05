@@ -14,14 +14,14 @@ context.setDefaultTimeout(20000);
 try{
  const worker=context.serviceWorkers().find(w=>w.url().endsWith('/background.js'))??await context.waitForEvent('serviceworker',w=>w.url().endsWith('/background.js'));
  const root=`chrome-extension://${new URL(worker.url()).host}`;await worker.evaluate(()=>chrome.storage.local.set({onboarding:{welcomed:true,guided:true}}));
- const pdfUrl='https://www.science.org/doi/pdf/10.1126/science.aao0185?referrer=fixture';
- await context.route('https://www.science.org/**',route=>route.fulfill(route.request().url().includes('/doi/pdf/')?{status:302,headers:{location:localPdf}}:{contentType:'text/html',body:'<!doctype html><title>Science ePDF</title><h1>Science article</h1>'}));
+ const pdfUrl='https://www.science.org/doi/pdfdirect/10.1126/science.aao0185?hmac=fixture-signature';
+ await context.route('https://www.science.org/**',route=>route.fulfill(route.request().url().includes('/doi/pdfdirect/')?{contentType:'application/pdf',body:bytes}:{contentType:'text/html',body:`<!doctype html><title>Science ePDF fixture</title><h1>Science article</h1><canvas></canvas><a href="/doi/pdf/10.1126/science.aao0185?download=true">Download PDF</a><script>fetch(${JSON.stringify(pdfUrl)}).then(r=>r.arrayBuffer());</script>`}));
  const source=await context.newPage();await source.goto('https://www.science.org/doi/epdf/10.1126/science.aao0185?referrer=fixture');
  const button=source.locator('[data-paperpane-button]').first();await button.waitFor();
  const readerPromise=context.waitForEvent('page',p=>p.url().startsWith(root+'/reader.html'));
  await button.click();const reader=await readerPromise;await reader.waitForURL(u=>u.searchParams.has('documentId'),{timeout:45000});
- await reader.locator('.textLayer span').first().waitFor();assert.equal(new URL(reader.url()).searchParams.get('originalPdf'),localPdf);
- console.log('PASS Science ePDF handoff reads corresponding PDF with Scholar Reader installed:',!!process.env.PAPERPANE_SCHOLAR_EXTENSION);
+ await reader.locator('.textLayer span').first().waitFor();assert.equal(new URL(reader.url()).searchParams.get('originalPdf'),pdfUrl);
+ console.log('PASS Science-style signed viewer fixture imports with Scholar Reader installed:',!!process.env.PAPERPANE_SCHOLAR_EXTENSION);
  await reader.screenshot({path:out+'/science-reader.png'});
  // Existing PDF documents that Scholar has already replaced remain importable.
  const direct=await context.newPage();await direct.goto(localPdf);await direct.waitForLoadState('load');
