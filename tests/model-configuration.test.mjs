@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { endpointUrl, modelConfigurationStatus, resolveConfiguredModel, supportsModelOperation } from '../src/ai/model-configuration.ts';
+import { cleanPasted, endpointUrl, modelConfigurationStatus, resolveConfiguredModel, supportsModelOperation } from '../src/ai/model-configuration.ts';
 import { deriveSettingsStatus } from '../src/runtime/settings-status.ts';
 
 const settings = protocol => ({
@@ -70,4 +70,11 @@ test('pasted native request paths normalize without changing destination or acce
  assert.equal(endpointUrl('https://api.anthropic.com/v1/messages'),'https://api.anthropic.com/v1');
  assert.equal(endpointUrl('https://generativelanguage.googleapis.com/v1beta/models/gemini:streamGenerateContent'),'https://generativelanguage.googleapis.com/v1beta');
  assert.throws(()=>endpointUrl('https://key:secret@example.com/v1'));
+});
+
+test('invisible characters copied with an address or key are dropped',()=>{
+ // A trailing zero-width space used to turn /v3/models into /v3%E2%80%8B/models (HTTP 404).
+ assert.equal(endpointUrl('https://ark.cn-beijing.volces.com/api/coding/v3\u200B'),'https://ark.cn-beijing.volces.com/api/coding/v3');
+ assert.equal(endpointUrl('\uFEFF https://api.example.com/\u2060v1\u200D/ '),'https://api.example.com/v1');
+ assert.equal(cleanPasted(' \u200Bsk-ab\u00ADc\u200C\n'),'sk-abc');
 });
