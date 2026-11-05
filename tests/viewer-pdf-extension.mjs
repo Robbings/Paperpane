@@ -15,12 +15,12 @@ const server=createServer((req,res)=>{
  if(u.pathname.startsWith('/doi/pdfdirect/')){
   if(u.searchParams.get('token')!=='signed%value'){res.writeHead(403);res.end();return;}
   const range=/^bytes=(\d+)-(\d+)$/.exec(req.headers.range??'');
-  if(!range){res.writeHead(200,{'Content-Type':'text/html'});res.end('A viewer needs a range request');return;}
+  if(!range){res.writeHead(200,{'Content-Type':'text/html; charset=utf-8'});res.end('A viewer needs a range request');return;}
   const start=Number(range[1]),end=Math.min(Number(range[2]),start+511,bytes.length-1);requested.push([start,end]);
   res.writeHead(206,{'Content-Type':'application/pdf','Content-Range':`bytes ${start}-${end}/${bytes.length}`,'ETag':'"v1"','Cache-Control':'no-store','Content-Length':end-start+1});res.end(bytes.subarray(start,end+1));return;
  }
- res.writeHead(200,{'Content-Type':'text/html'});
- if(u.pathname==='/challenge'){res.end('<title>Just a moment...</title><form id="challenge-form"></form><a href="/paper.pdf">PDF</a>');return;}
+ res.writeHead(200,{'Content-Type':'text/html; charset=utf-8'});
+ if(u.pathname==='/challenge'){res.end('<title>请稍候…</title><h2>正在进行安全验证</h2><a href="/paper.pdf">PDF</a>');return;}
  const target='/doi/pdfdirect/10.1234/example?token=signed%25value';
  res.end(`<title>Embedded PDF reader</title><h1>Embedded paper</h1><canvas></canvas><a href="${target}">Download PDF</a><script>fetch(${JSON.stringify(target)},{headers:{Range:'bytes=0-511'}}).then(r=>r.arrayBuffer());</script>`);
 });
@@ -37,7 +37,7 @@ try{
  assert(requested.some(([start])=>start>0));assert.equal(page.isClosed(),false);await reader.reload();await reader.locator('.textLayer span').first().waitFor();
  console.log('PASS signed viewer PDF: all ranges, eight pages, retained source, refresh');
  const verify=await context.newPage();await verify.goto(base+'/challenge');await verify.waitForTimeout(500);assert.equal(await verify.locator('[data-paperpane-button]').count(),0);
- await verify.evaluate(()=>{document.title='Article';document.querySelector('form').remove()});await verify.locator('[data-paperpane-button]').waitFor();
+ await verify.evaluate(()=>{document.title='Article';document.querySelector('h2').remove()});await verify.locator('[data-paperpane-button]').waitFor();
  console.log('PASS challenge suppression and detection resuming after verification');
  await reader.screenshot({path:out+'/reader.png'});
 }catch(error){for(const p of context.pages())console.log('PAGE',p.url(),(await p.locator('body').innerText().catch(()=>'' )).slice(0,1600));console.log('RANGES',requested);throw error;}finally{await context.close();server.closeAllConnections();await new Promise(ok=>server.close(ok));}

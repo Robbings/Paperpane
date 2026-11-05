@@ -2,7 +2,7 @@ import test from 'node:test';import assert from 'node:assert/strict';import {bui
 const out=resolve('backups/tests/viewer-pdf.mjs');await build({entryPoints:['src/browser-entry/viewer-pdf.ts'],outfile:out,bundle:true,platform:'node',format:'esm'});
 const {isVerificationPage,pdfResourceHint,samePdfArticle,observeViewerPdfs}=await import(pathToFileURL(out));
 test('explicit challenge pages are excluded without matching article text',()=>{
- for(const title of ['Just a moment...','Security check','Access denied'])assert(isVerificationPage({title,querySelector:()=>null}));
+ for(const title of ['Just a moment...','Security check','Access denied','请稍候…','请稍等...','正在进行安全验证'])assert(isVerificationPage({title,querySelector:()=>null}));
  for(const title of ['Verification of quantum algorithms','arXiv.org','Google Scholar'])assert(!isVerificationPage({title,querySelector:()=>null}));
  assert(isVerificationPage({title:'Science',querySelector:()=>({})}));
 });

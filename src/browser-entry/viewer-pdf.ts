@@ -2,7 +2,7 @@ import { isPdfLink, pdfSourceUrl } from './pdf';
 
 /** Only explicit interstitials: article text mentioning verification is not a blocker. */
 export function isVerificationPage(doc: Document): boolean {
-  return /^(?:just a moment|security check|access denied|verify (?:you are human|your identity)|checking your browser|人机验证|安全验证)[.!…\s]*$/i.test(doc.title.trim())
+  return /^(?:just a moment|security check|access denied|verify (?:you are human|your identity)|checking your browser|人机验证|安全验证|请稍候|请稍等|正在验证|正在进行安全验证)[.!…\s]*$/i.test(doc.title.trim())
     || !!doc.querySelector('#challenge-form, #cf-challenge-running, form[action*="/cdn-cgi/challenge"], #captcha-form');
 }
 export function pdfResourceHint(raw: string): boolean {
