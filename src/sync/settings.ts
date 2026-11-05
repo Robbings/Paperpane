@@ -2,7 +2,11 @@ import { PaperDatabase } from '@/data/database';
 import type { DavConnection } from './webdav-client';
 const request=<T>(r:IDBRequest<T>)=>new Promise<T>((ok,no)=>{r.onsuccess=()=>ok(r.result);r.onerror=()=>no(r.error);});
 export interface SyncState {phase:'idle'|'running'|'failed'|'conflicts'|'success';message?:string;lastSuccess?:string;conditional?:boolean}
-export interface TransferConnections {dav?:{url:string;username:string;hasPassword:boolean;automatic:boolean;conditional:boolean};zotero?:{userId:string;hasKey:boolean;writable:boolean}}
+export interface TransferConnections {dav?:{url:string;username:string;hasPassword:boolean;automatic:boolean;conditional:boolean};zotero?:{userId:string;hasKey:boolean;writable:boolean;fileStorage?:ZoteroFileStorage}}
+/** Where exported PDFs and note archives go: Zotero's own storage, or the WebDAV Zotero desktop syncs files with. */
+export type ZoteroFileStorage='zotero'|'webdav';
+/** WebDAV only applies while one is connected; otherwise files go to Zotero's storage. */
+export const zoteroFileStorage=(view:TransferConnections):ZoteroFileStorage=>view.dav&&view.zotero?.fileStorage==='webdav'?'webdav':'zotero';
 /** Credentials never leave the request owner via a UI snapshot or backup. */
 export class ConnectionStore extends PaperDatabase {
   async raw<T>(key:string):Promise<T|undefined>{const db=await this.open();return (await request(db.transaction('meta').objectStore('meta').get(key)))?.value;}
@@ -30,7 +34,10 @@ export class ConnectionStore extends PaperDatabase {
     });
   }
   async saveZotero(key:string,userId:string,writable:boolean){
-    await this.changeConnections(view=>{view.zotero={userId,hasKey:!!key,writable};return {'transfer-secret-zotero':key};});
+    await this.changeConnections(view=>{view.zotero={userId,hasKey:!!key,writable,...(view.zotero?.fileStorage?{fileStorage:view.zotero.fileStorage}:{})};return {'transfer-secret-zotero':key};});
+  }
+  async saveZoteroStorage(fileStorage:ZoteroFileStorage){
+    await this.changeConnections(view=>{if(!view.zotero)throw new Error('请先连接 Zotero');view.zotero={...view.zotero,fileStorage};return {};});
   }
   async disconnect(service:'dav'|'zotero'){
     await this.changeConnections(view=>{delete view[service];return {[service==='dav'?'transfer-secret-dav':'transfer-secret-zotero']:undefined,...(service==='dav'?{'transfer-sync-state':{phase:'idle'}}:{})};});

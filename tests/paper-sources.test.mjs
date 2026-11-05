@@ -30,3 +30,9 @@ test('Scholar 常见地区域名与链接包装不二次解码签名参数',()=>
   assert.equal(unwrapScholarLink('https://scholar.google.com/scholar_url?url='+encodeURIComponent('javascript:alert(1)')),undefined);
   assert.equal(sourcePdfUrl('https://hal.science/hal-01234567/document?token=a%2Fb'),'https://hal.science/hal-01234567/document?token=a%2Fb');
 });
+
+test('Science keeps reader routes and signed resources intact',()=>{
+ assert.equal(sourcePdfUrl('https://www.science.org/doi/epdf/10.1126/science.aao0185?referrer=https%3A%2F%2Fwww.science.org%2Fdoi%2Fepdf%2F10.1126%2Fscience.aao0185 '),'https://www.science.org/doi/epdf/10.1126/science.aao0185?referrer=https%3A%2F%2Fwww.science.org%2Fdoi%2Fepdf%2F10.1126%2Fscience.aao0185');
+ assert.equal(sourcePdfUrl('https://www.science.org/doi/full/10.1126/science.aao0185'),'https://www.science.org/doi/epdf/10.1126/science.aao0185');
+ for(const url of ['https://www.science.org/doi/epdf/not-a-doi','https://science.org.evil.test/doi/epdf/10.1126/test'])assert.equal(sourcePdfUrl(url),undefined);
+});

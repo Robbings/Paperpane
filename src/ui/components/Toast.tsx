@@ -11,7 +11,7 @@ export interface ToastOptions {
   tone?: ToastTone;
   /** One action, e.g. "撤销" after a delete or "重试" after a failure. */
   action?: { label: string; onAction: () => void };
-  /** Milliseconds before it starts to fade; errors stay until dismissed unless one is given. */
+  /** Milliseconds before it starts to fade; hover or focus pauses the countdown. */
   duration?: number;
 }
 
@@ -67,7 +67,7 @@ const FADE = 900;
 
 function defaultDuration(entry: ToastEntry): number | null {
   if (entry.duration !== undefined) return entry.duration;
-  if (entry.tone === 'error') return null;
+  if (entry.tone === 'error') return 5000;
   return entry.action ? 4000 : 1800;
 }
 

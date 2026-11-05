@@ -1,11 +1,11 @@
 import { useEffect, useRef, useState } from 'react';
-import { Button, Dialog, ProgressBar, Switch, TextField, toast } from '@/ui/components';
+import { Button, Dialog, ProgressBar, Segmented, Switch, TextField, toast } from '@/ui/components';
 import { requestImportOrigin } from '@/document/permissions';
 import { useSync } from '@/runtime/use-sync';
 import { useTransfer } from '@/runtime/use-transfer';
 import { cloudBackups, downloadCloudBackup, uploadCloudBackup } from '@/sync/cloud-backup';
 import { synchronize } from '@/sync/engine';
-import { ConnectionStore } from '@/sync/settings';
+import { ConnectionStore, zoteroFileStorage, type ZoteroFileStorage } from '@/sync/settings';
 import { WebDavClient } from '@/sync/webdav-client';
 import { ZoteroClient } from '@/zotero/client';
 import { SettingGroup, SettingRow } from '../SettingRow';
@@ -348,6 +348,16 @@ function ZoteroGroup() {
       await db.close();
     }
   };
+  const storage = async (value: ZoteroFileStorage) => {
+    const db = new ConnectionStore();
+    try {
+      await db.saveZoteroStorage(value);
+    } catch (error) {
+      failed(error, '没能保存');
+    } finally {
+      await db.close();
+    }
+  };
   const disconnect = async () => {
     const db = new ConnectionStore();
     try {
@@ -372,6 +382,31 @@ function ZoteroGroup() {
           <Button size="sm" variant="primary" disabled={busy || !key.trim()} onClick={() => void connect()}>
             {busy ? '连接中…' : '连接'}
           </Button>
+        </SettingRow>
+      )}
+      {zotero?.writable && (
+        <SettingRow
+          label="导出的 PDF 存到"
+          hint={
+            connections.dav
+              ? 'Zotero 桌面端用 WebDAV 同步附件时选 WebDAV，PDF 会写进同一服务器的 zotero 文件夹'
+              : '连接上方的 WebDAV 后，可以改存到 Zotero 用的 WebDAV'
+          }
+        >
+          {connections.dav ? (
+            <Segmented
+              label="导出的 PDF 存到"
+              size="sm"
+              value={zoteroFileStorage(connections)}
+              options={[
+                { value: 'zotero', label: 'Zotero 存储' },
+                { value: 'webdav', label: 'WebDAV' },
+              ]}
+              onChange={(value) => void storage(value)}
+            />
+          ) : (
+            <span className="pp-set-value">Zotero 存储</span>
+          )}
         </SettingRow>
       )}
       {!zotero && (

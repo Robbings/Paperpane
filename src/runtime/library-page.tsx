@@ -7,6 +7,7 @@ import type { PaperView } from '@/ui/library/types';
 import { Button, Dialog, EmptyState, Toaster, toast } from '@/ui/components';
 import { createLibraryService } from '@/domain/library/service';
 import { createLibraryImports } from '@/domain/library/imports';
+import { createOverviewEnrichment } from '@/domain/library/overview-enrichment';
 import { createLibraryEnrichment } from '@/domain/library/enrichment';
 import type { LibraryImportJob, LibraryPatch, LibraryRow } from '@/contracts/library';
 import type { Result } from '@/contracts/common';
@@ -15,7 +16,8 @@ export function createLibraryRuntime() {
   const owner = createLibraryService();
   const imports = createLibraryImports(owner.database, owner.invalidate);
   const enrichment = createLibraryEnrichment(owner.database, owner.service, imports, owner.invalidate);
-  return { ...owner, imports, dispose() { enrichment.dispose(); imports.dispose(); owner.dispose(); void owner.database.close(); } };
+  const overview = createOverviewEnrichment(owner.database, owner.service, owner.invalidate);
+  return { ...owner, imports, dispose() { overview.dispose(); enrichment.dispose(); imports.dispose(); owner.dispose(); void owner.database.close(); } };
 }
 type Runtime = ReturnType<typeof createLibraryRuntime>;
 const errorToast = (error: unknown) => toast.show({ tone: 'error', message: error instanceof Error ? error.message : '操作失败，请重试' });
@@ -51,6 +53,9 @@ export function LibraryPage({ owner }: { owner: Runtime }) {
     try {
       const items = await Promise.all(ids.map(id => owner.database.getItem(id)));
       if (items.some(item => !item)) throw new Error('部分条目已不存在，请重新选择');
+      const { exportNotes } = await import('@/domain/notes/export');
+      const notes = await exportNotes(items as LibraryRow[]);
+      if (notes) downloadFile(notes, 'Paperpane-notes.zip');
       const { exportCitations } = await import('@/domain/library/bibliography');
       const text = exportCitations(items as LibraryRow[], format);
       if (format === 'csv') downloadFile(new Blob([text], { type: 'text/csv;charset=utf-8' }), 'Paperpane-citations.csv');

@@ -50,6 +50,7 @@ export function SettingsPage({ preferences }: SettingsPageProps) {
         status={settings.status}
         onGuide={() => setGuide(true)}
         addProviderRequest={addProvider}
+        onAddProviderHandled={() => setAddProvider(0)}
       />
       <WelcomeDialog
         open={welcome.welcome}

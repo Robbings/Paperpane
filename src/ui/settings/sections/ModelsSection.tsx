@@ -47,6 +47,7 @@ export function ModelsSection({
   note,
   problems,
   addRequest,
+  onAddRequestHandled,
 }: {
   /** Saved as it changes: default models and request limits. */
   draft: SettingsDraft;
@@ -57,6 +58,7 @@ export function ModelsSection({
   problems: ReadonlyMap<string, string>;
   /** Changes when something outside (the setup guide) asks to add a provider. */
   addRequest?: number;
+  onAddRequestHandled?: () => void;
 }) {
   const view = page.value;
   const [editor, setEditor] = useState<ModelConfigView | null>(null);
@@ -90,8 +92,8 @@ export function ModelsSection({
     model?: string;
   } | null>(null);
   useEffect(() => {
-    if (addRequest) setAdding(true);
-  }, [addRequest]);
+    if (addRequest) { setAdding(true); onAddRequestHandled?.(); }
+  }, [addRequest, onAddRequestHandled]);
   const operation = useRef<AbortController | null>(null),
     endpoint = view.endpoints.find((e) => e.id === active),
     models = view.models.filter((m) => m.endpointId === active);

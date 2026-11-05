@@ -292,7 +292,7 @@ export function LibraryView(props: LibraryViewProps) {
                 移动到
               </Button>
               <Button ref={batchRefs.export} size="sm" variant="quiet" icon="quote" aria-haspopup="menu" onClick={() => setBatchMenu(batchMenu === 'export' ? null : 'export')}>
-                导出引用
+                导出
               </Button>
               <Button size="sm" variant="danger" icon="trash" onClick={() => setConfirmRemove(selectedIds)}>
                 移出
@@ -339,7 +339,7 @@ export function LibraryView(props: LibraryViewProps) {
           onApply={choices => props.onAddTags?.([...selectedIds], choices)} onClose={() => setBatchMenu(null)} />
       ) : batchMenu && (
         <Menu
-          label={batchMenu === 'tag' ? '加标签' : batchMenu === 'move' ? '移动到文件夹' : '导出引用'}
+          label={batchMenu === 'tag' ? '加标签' : batchMenu === 'move' ? '移动到文件夹' : '导出'}
           entries={batchEntries[batchMenu]}
           anchor={anchorOf(batchMenu)}
           triggerRef={batchRefs[batchMenu]}

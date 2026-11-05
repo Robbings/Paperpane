@@ -40,11 +40,24 @@ async function allowedFileAccess(): Promise<boolean> {
   try { return await browser.extension.isAllowedFileSchemeAccess(); } catch { return false; }
 }
 /** The PDF a paper's landing page links to, as its content script reports it. */
-async function pagePdfCandidate(tabId: number): Promise<string | undefined> {
+async function pagePdfCandidate(tabId: number): Promise<{ url?: string; resources?: string[]; pageUrl?: string }> {
   try {
-    const reply = await browser.tabs.sendMessage(tabId, { type: 'PAPERPANE_PAGE_PDF' }, { frameId: 0 }) as { url?: string } | undefined;
-    return reply?.url ? pdfSourceUrl(reply.url) : undefined;
-  } catch { return; }
+    return await browser.tabs.sendMessage(tabId, { type: 'PAPERPANE_PAGE_PDF' }, { frameId: 0 }) ?? {};
+  } catch { return {}; }
+}
+
+/** A new reader is successful only after its import has produced a document. */
+async function waitForReaderImport(tabId: number) {
+  const { promise, resolve, reject } = Promise.withResolvers<void>();
+  const check = (tab: Browser.tabs.Tab) => {
+    if (tab.id === tabId && tab.url && new URL(tab.url).searchParams.has('documentId')) resolve();
+  };
+  const updated: Parameters<typeof browser.tabs.onUpdated.addListener>[0] = (_id, _change, tab) => check(tab);
+  const removed = (id: number) => { if (id === tabId) reject(new Error('纸间标签页已关闭，请重试。')); };
+  browser.tabs.onUpdated.addListener(updated); browser.tabs.onRemoved.addListener(removed);
+  const timeout = setTimeout(() => reject(new Error('PDF 尚未完成导入，请查看纸间标签页中的提示后重试。')), 90000);
+  try { check(await browser.tabs.get(tabId)); await promise; }
+  finally { clearTimeout(timeout); browser.tabs.onUpdated.removeListener(updated); browser.tabs.onRemoved.removeListener(removed); }
 }
 
 export function installBrowserEntry() {
@@ -63,7 +76,7 @@ export function installBrowserEntry() {
     else if (fromTab) target.searchParams.set('browserTab', String(tabId));
     else target.searchParams.set('session', 'site');
     const source = await browser.tabs.get(tabId);
-    await browser.tabs.create({ url: target.href, windowId: source.windowId, openerTabId: tabId });
+    return await browser.tabs.create({ url: target.href, windowId: source.windowId, openerTabId: tabId });
   }
 
   async function preparePdfPage(tabId: number, url: string) {
@@ -111,15 +124,24 @@ export function installBrowserEntry() {
     });
   }, filter);
   browser.webRequest.onHeadersReceived.addListener(details => {
+    // HTML readers load their PDFs as resources instead of top-level navigations.
+    if (details.type !== 'main_frame') {
+      const mime = details.responseHeaders?.find(h => h.name.toLowerCase() === 'content-type')?.value?.split(';')[0]?.trim().toLowerCase();
+      if (details.tabId >= 0 && details.statusCode >= 200 && details.statusCode < 300 && mime === 'application/pdf') {
+        void browser.tabs.sendMessage(details.tabId, { type: 'PDF_RESOURCE_RESPONSE', url: details.url }, { frameId: 0 }).catch(() => {});
+      }
+      return;
+    }
     enqueue(details.tabId, async () => {
       const direct = isPdfResponse(details);
-      const value: PdfTab = { pageUrl: details.url, pdfUrl: direct ? details.url : undefined,
+      const pageUrl = pdfSourceUrl(details.url);
+      const value: PdfTab = { pageUrl, pdfUrl: direct ? pageUrl : undefined,
         direct, completed: false, requestId: details.requestId };
       const disposition = details.responseHeaders?.find(header => header.name.toLowerCase() === 'content-disposition');
       if (/^attachment(?:;|$)/i.test(disposition?.value?.trim() ?? '')) await browser.storage.session.remove(navigationKey(details.tabId));
       await browser.storage.session.set({ [tabKey(details.tabId)]: value });
     });
-  }, filter, ['responseHeaders']);
+  }, { urls: filter.urls, types: ['main_frame', 'xmlhttprequest', 'sub_frame', 'object'] }, ['responseHeaders']);
   browser.webRequest.onCompleted.addListener(details => {
     enqueue(details.tabId, async () => {
       const key = tabKey(details.tabId);
@@ -155,7 +177,7 @@ export function installBrowserEntry() {
   browser.tabs.onRemoved.addListener(tabId => {
     enqueue(tabId, async () => { await browser.storage.session.remove([tabKey(tabId), navigationKey(tabId)]); });
   });
-  async function currentPdf(tabId: number, inspectExisting = false) {
+  async function currentPdf(tabId: number, inspectExisting = false, resourceUrl?: string) {
     const tab = await browser.tabs.get(tabId), raw = tab.url ?? '';
     if (raw.startsWith(extensionUrl)) return { tabId, title: tab.title ?? '纸间', block: /^\/(reader|reader-proof)\.html$/.test(new URL(raw).pathname)?'in-reader':'in-paperpane' };
     if (raw.startsWith('file:')) {
@@ -170,6 +192,12 @@ export function installBrowserEntry() {
     try { pdfSourceUrl(raw); } catch { return { tabId, title: tab.title ?? '', block: 'restricted' }; }
     const known = (await browser.storage.session.get(tabKey(tabId)))[tabKey(tabId)] as PdfTab | undefined;
     let pdfUrl = completedPdfUrl(tab, known);
+    // Scholar's embedded reader can keep the tab 'loading' after the main PDF
+    // response completed. A manual action can attest the current top document
+    // without waiting for another extension's iframe or changing navigation.
+    if (!pdfUrl && inspectExisting && !tab.pendingUrl && known?.direct && known.completed && pdfSourceUrl(raw) === known.pageUrl) {
+      if (await preparePdfPage(tabId, known.pageUrl)) pdfUrl = known.pdfUrl;
+    }
     // The extension may have been enabled after this PDF was opened. Only a manual
     // action can use this fallback, and only the current top-level PDF may attest it.
     if (inspectExisting && !known && tab.status === 'complete' && !tab.pendingUrl) {
@@ -177,21 +205,43 @@ export function installBrowserEntry() {
       if (await preparePdfPage(tabId, expected)) pdfUrl = expected;
     }
     // A paper's landing page: the page script knows which PDF belongs to it.
-    let candidateUrl: string | undefined;
-    if (!pdfUrl && inspectExisting) {
-      candidateUrl = await pagePdfCandidate(tabId);
+    let candidateUrl: string | undefined, sourcePageUrl: string | undefined;
+    if (!pdfUrl && inspectExisting && !tab.pendingUrl) {
+      const page = await pagePdfCandidate(tabId);
+      candidateUrl = page.url;
+      const resource = resourceUrl ?? page.url;
+      if (resource && page.pageUrl === pdfSourceUrl(raw) && page.resources?.includes(resource)) {
+        pdfUrl = pdfSourceUrl(resource); sourcePageUrl = page.pageUrl;
+      }
     }
-    return { tabId, title: tab.title ?? new URL(raw).hostname, displayUrl: new URL(raw).host + new URL(raw).pathname, pdfUrl, candidateUrl, block: pdfUrl || candidateUrl ? undefined : 'not-pdf' };
+    return { tabId, title: tab.title ?? new URL(raw).hostname, displayUrl: new URL(raw).host + new URL(raw).pathname, pdfUrl, candidateUrl, sourcePageUrl, block: pdfUrl || candidateUrl ? undefined : 'not-pdf' };
   }
 
   browser.runtime.onMessage.addListener((message, sender, sendResponse) => {
-    const supported = ['BEGIN_PDF_NAVIGATION', 'OPEN_CURRENT_PDF', 'OPEN_ARXIV_PAPER', 'OPEN_PDF', 'REPORT_PAGE_PDF', 'GET_PDF_STATE', 'OPEN_TAB_PDF', 'OPEN_ORIGINAL_PDF', 'SET_BROWSER_ENTRY'];
+    const supported = ['OPEN_VIEWER_PDF', 'VIEWER_PDF_READY', 'BEGIN_PDF_NAVIGATION', 'OPEN_CURRENT_PDF', 'OPEN_ARXIV_PAPER', 'OPEN_PDF', 'REPORT_PAGE_PDF', 'GET_PDF_STATE', 'OPEN_TAB_PDF', 'OPEN_ORIGINAL_PDF', 'SET_BROWSER_ENTRY'];
     if (!supported.includes(message?.type)) return;
     void (async () => {
       try {
         if (sender.id !== browser.runtime.id || !sender.url) throw new Error('无效的纸间入口。');
         const fromExtension = sender.url.startsWith(extensionUrl);
-        if (message.type === 'BEGIN_PDF_NAVIGATION') {
+        if (message.type === 'OPEN_VIEWER_PDF' || message.type === 'VIEWER_PDF_READY') {
+          if (sender.frameId !== 0 || sender.tab?.id === undefined || fromExtension) throw new Error('请从论文网页打开 PDF。');
+          const tabId = sender.tab.id;
+          await tails.get(tabId);
+          const state = await currentPdf(tabId, true, message.type === 'OPEN_VIEWER_PDF' ? pdfSourceUrl(message.pdfUrl) : undefined);
+          if (!('sourcePageUrl' in state) || !state.sourcePageUrl || !state.pdfUrl || state.sourcePageUrl !== pdfSourceUrl(sender.url)) {
+            if (message.type === 'VIEWER_PDF_READY') { sendResponse({ ok: true }); return; }
+            throw new Error('网页中的 PDF 已改变，请刷新原页面后重试。');
+          }
+          if (message.type === 'VIEWER_PDF_READY') {
+            const key = navigationKey(tabId);
+            const pending = (await browser.storage.session.get(key))[key] as PdfNavigation | undefined;
+            if (!pending || pending.url !== state.sourcePageUrl) { sendResponse({ ok: true }); return; }
+            await browser.storage.session.remove(key);
+          }
+          const reader = await openReader(tabId, state.pdfUrl);
+          if (message.type === 'OPEN_VIEWER_PDF' && reader.id !== undefined) await waitForReaderImport(reader.id);
+        } else if (message.type === 'BEGIN_PDF_NAVIGATION') {
           if (sender.frameId !== 0 || sender.tab?.id === undefined || fromExtension) throw new Error('请从论文网页打开 PDF。');
           const url = pdfSourceUrl(message.pdfUrl);
           const tabId = sender.tab.id;
@@ -222,7 +272,7 @@ export function installBrowserEntry() {
           if (message.type === 'GET_PDF_STATE' || message.type === 'OPEN_TAB_PDF') {
             if (!Number.isInteger(message.tabId)) throw new Error('当前标签页已不可用。');
             await tails.get(message.tabId);
-            const state = await currentPdf(message.tabId, true);
+            const state = await currentPdf(message.tabId, true, typeof message.pdfUrl === 'string' ? pdfSourceUrl(message.pdfUrl) : undefined);
             if (message.type === 'GET_PDF_STATE') { sendResponse({ ok: true, value: state }); return; }
             if ('pdfUrl' in state && state.pdfUrl) await openReader(state.tabId, state.pdfUrl);
             else if ('candidateUrl' in state && state.candidateUrl) await openReader(state.tabId, state.candidateUrl, false);

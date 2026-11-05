@@ -3,7 +3,9 @@ import type { LibraryItem } from '@/contracts/library';
 import { collectionPlan, type ImportDestination } from '@/zotero/catalog';
 import { itemFolders } from './library-records';
 import type { ZoteroData } from '@/zotero/types';
-export interface ZoteroLink {itemKey:string;version?:number;attachmentKey?:string;attachmentVersion?:number;fileHash?:string;uploaded?:boolean;collections:string[];annotationKeys?:Record<string,{key:string;version?:number;color?:string;localColor?:string}>;importedShortNote?:string;noteKey?:string;noteVersion?:number;original?:ZoteroData}
+import type { ZoteroFileStorage } from '@/sync/settings';
+/** `storage` says where an uploaded file lives (absent: Zotero's storage); `mtime` is reserved before a WebDAV write so a retry repeats it. */
+export interface ZoteroLink {notesAttachment?:{key:string;version?:number;hash?:string;uploaded?:boolean;storage?:ZoteroFileStorage;mtime?:number};itemKey:string;version?:number;attachmentKey?:string;attachmentVersion?:number;fileHash?:string;uploaded?:boolean;attachmentStorage?:ZoteroFileStorage;fileMtime?:number;collections:string[];annotationKeys?:Record<string,{key:string;version?:number;color?:string;localColor?:string}>;importedShortNote?:string;noteKey?:string;noteVersion?:number;original?:ZoteroData}
 const request=<T>(r:IDBRequest<T>)=>new Promise<T>((ok,no)=>{r.onsuccess=()=>ok(r.result);r.onerror=()=>no(r.error);});
 export class ZoteroMappings extends LibraryDatabase{
   async folders(){const db=await this.open();return (await request(db.transaction('libraryFolders').objectStore('libraryFolders').getAll())).filter(f=>!f.deletedAt) as import('@/contracts/library').LibraryFolder[];}

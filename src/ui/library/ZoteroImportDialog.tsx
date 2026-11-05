@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from 'react';
-import { Button, Checkbox, Dialog, Icon, IconButton, Spinner, TextField, Tree, toast } from '@/ui/components';
-import { ConnectionStore } from '@/sync/settings';
+import { Button, Checkbox, Dialog, HintLabel, Icon, IconButton, Segmented, Spinner, TextField, Tree, toast } from '@/ui/components';
+import { ConnectionStore, zoteroFileStorage, type ZoteroFileStorage } from '@/sync/settings';
 import { ZoteroClient } from '@/zotero/client';
 import type { ZoteroItem, ZoteroCollection } from '@/zotero/types';
 import type { ZoteroTransferItemResult } from '@/zotero/import';
@@ -60,6 +60,9 @@ export function ZoteroImportDialog(props: Props) {
   /** Set when a run ends: the dialog then says it is done and offers 完成. */
   const [finished, setFinished] = useState<number | null>(null);
   const [writable, setWritable] = useState(false);
+  /** Export only: whether a WebDAV is connected, and where PDFs and note archives go. */
+  const [dav, setDav] = useState(false);
+  const [storage, setStorage] = useState<ZoteroFileStorage>('zotero');
   const [password, setPassword] = useState('');
   const [passwordPrompt, setPasswordPrompt] = useState<{ incorrect: boolean; resolve: (value: string | null) => void }>();
   const operation = useRef<AbortController | undefined>(undefined);
@@ -108,6 +111,8 @@ export function ZoteroImportDialog(props: Props) {
         if (abort.signal.aborted) return;
         setClient(connection);
         setWritable(settings.zotero.writable);
+        setDav(!!settings.dav);
+        setStorage(zoteroFileStorage(settings));
         setCollections(tree);
         setState('ready');
         if (!importing && !settings.zotero.writable)
@@ -191,7 +196,7 @@ export function ZoteroImportDialog(props: Props) {
         const ids = props.ids.filter((id) => !retry || failed.has(id));
         batch = ids.length;
         setCount(finished.length + ids.length);
-        await exportZotero(client, ids, collection, abort.signal, done);
+        await exportZotero(client, ids, collection, abort.signal, done, storage);
       }
       props.onDone();
       if (!live.current) return;
@@ -237,6 +242,19 @@ export function ZoteroImportDialog(props: Props) {
   };
 
   const locked = busy || selecting;
+  /** Remembered for the next export and shown in settings. */
+  const chooseStorage = async (value: ZoteroFileStorage) => {
+    if (locked || value === storage) return;
+    setStorage(value);
+    const db = new ConnectionStore();
+    try {
+      await db.saveZoteroStorage(value);
+    } catch (e) {
+      toast.show({ tone: 'error', message: message(e, '没能保存附件存储位置') });
+    } finally {
+      await db.close();
+    }
+  };
   const close = () => {
     if (locked) {
       operation.current?.abort();
@@ -474,6 +492,33 @@ export function ZoteroImportDialog(props: Props) {
               {sidebar}
               {importing && list}
             </div>
+            {!importing && (
+              <div className="pp-zotero-storage">
+                <HintLabel
+                  hint={
+                    dav
+                      ? 'Zotero 桌面端用 WebDAV 同步附件时选 WebDAV：PDF 写进同一服务器的 zotero 文件夹，Zotero 同步后即可打开'
+                      : '连接 WebDAV 后，可以改存到 Zotero 用的 WebDAV'
+                  }
+                >
+                  PDF 存到
+                </HintLabel>
+                {dav ? (
+                  <Segmented
+                    label="PDF 存到"
+                    size="sm"
+                    value={storage}
+                    options={[
+                      { value: 'zotero', label: 'Zotero 存储' },
+                      { value: 'webdav', label: 'WebDAV' },
+                    ]}
+                    onChange={(value) => void chooseStorage(value)}
+                  />
+                ) : (
+                  <span className="pp-zotero-storage__value">Zotero 存储</span>
+                )}
+              </div>
+            )}
             {importing && (
               <ZoteroDestination mode={destination} onMode={setDestination} folder={folder} onFolder={setFolder} folders={props.folders} disabled={locked} />
             )}

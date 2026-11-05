@@ -32,8 +32,6 @@ export function endpointUrl(raw: string): string {
   const url = new URL(cleanPasted(raw));
   if (url.username || url.password || url.search || url.hash || !['http:', 'https:'].includes(url.protocol))
     throw new Error('接口地址应为不含凭据、查询参数的 HTTP(S) 地址。');
-  if (url.protocol === 'http:' && !['localhost', '127.0.0.1', '[::1]'].includes(url.hostname))
-    throw new Error('远程模型接口必须使用 HTTPS。');
   return url.href.replace(/\/$/, '').replace(/\/(?:chat\/completions|responses|messages)$/, '').replace(/\/models\/[^/]+:(?:streamGenerateContent|generateContent)$/, '');
 }
 

@@ -1,23 +1,31 @@
+import { isVerificationPage } from './viewer-pdf';
+import { publisherPdfUrl } from './publisher-pdf';
 import { createPdfButton } from './button';
 import { isPdfLink, pdfSourceUrl } from './pdf';
 import { scanPaperSources } from './source-adapters';
 
 /** Scans local DOM only; no speculative HEAD/fetch requests for a page's links. */
-export function mountPdfPage(doc: Document, open: (url: string) => Promise<void>) {
+export function mountPdfPage(doc: Document, open: (url: string) => Promise<void>, viewerUrl: () => string | undefined = () => undefined) {
   const controls = new Map<Element, { control: HTMLElement; url: string; anchor?:Element }>();
   let timer: ReturnType<typeof setTimeout> | undefined;
   function scan() {
     for (const [source, entry] of controls) if (!source.isConnected || !entry.control.isConnected) { entry.control.remove(); controls.delete(source); }
+    if (isVerificationPage(doc)) {
+      for (const { control } of controls.values()) control.remove();
+      controls.clear(); return;
+    }
     const { candidates, exclusive } = scanPaperSources(doc);
+    const resource = viewerUrl();
+    if (resource && !exclusive && !candidates.length) candidates.push({ source: doc.documentElement, url: resource, floating: true });
     const seen = new Set(candidates.map(candidate => candidate.url));
     if (!exclusive) {
       for (const source of doc.querySelectorAll<HTMLAnchorElement | HTMLEmbedElement | HTMLObjectElement | HTMLIFrameElement>('a[href],embed[src],object[data],iframe[src]')) {
         if (source.closest('[data-paperpane-entry]')) continue;
         const raw = source.getAttribute('href') ?? source.getAttribute('src') ?? source.getAttribute('data');
         if (!raw) continue;
-        let url: string; try { url = pdfSourceUrl(new URL(raw, doc.baseURI).href); } catch { continue; }
+        let url: string; try { url = publisherPdfUrl(new URL(raw, doc.baseURI).href) ?? pdfSourceUrl(new URL(raw, doc.baseURI).href); } catch { continue; }
         const type = source.getAttribute('type') ?? '';
-        if (!isPdfLink(url, type) && !(source.tagName === 'A' && /^(?:view|download|full[ -]text|查看|下载)?\s*PDF$/i.test(source.textContent?.trim() ?? ''))) continue;
+        if (!publisherPdfUrl(url) && !isPdfLink(url, type) && !(source.tagName === 'A' && /^(?:view|download|full[ -]text|查看|下载)?\s*PDF$/i.test(source.textContent?.trim() ?? ''))) continue;
         if(seen.has(url))continue;seen.add(url);
         candidates.push({ source, url, floating: source.tagName !== 'A' });
       }
@@ -44,10 +52,11 @@ export function mountPdfPage(doc: Document, open: (url: string) => Promise<void>
   const observer = new MutationObserver(schedule);
   observer.observe(doc.documentElement, { childList: true, subtree: true, attributes: true, attributeFilter: ['href', 'src', 'data', 'type', 'content'] });
   scan();
-  return () => {
+  const dispose = () => {
     observer.disconnect();
     clearTimeout(timer);
     for (const { control } of controls.values()) control.remove();
     controls.clear();
   };
+  return Object.assign(dispose, { refresh: schedule });
 }
