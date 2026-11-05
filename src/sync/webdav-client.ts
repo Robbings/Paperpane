@@ -50,6 +50,8 @@ export class WebDavClient {
   async put(path:string,body:BodyInit,etag?:string|null,signal?:AbortSignal){const headers:Record<string,string>={};if(etag===null)headers['If-None-Match']='*';else if(etag)headers['If-Match']=etag;const r=await this.request('PUT',path,headers,body,signal);return r.headers.get('ETag');}
   async mkdir(path:string,signal?:AbortSignal){try{await this.request('MKCOL',path,{},undefined,signal);}catch(e){if(!(e instanceof DavError)||![405,301].includes(e.status))throw e;}}
   async remove(path:string,signal?:AbortSignal){try{await this.request('DELETE',path,{},undefined,signal);}catch(e){if(!(e instanceof DavError)||e.status!==404)throw e;}}
+  /** Depth-0 lookup; 404 means absent. Use '' for the base so collections need no redirect. */
+  async exists(path:string,signal?:AbortSignal){try{const r=await this.request('PROPFIND',path,{Depth:'0','Content-Type':'application/xml'},'<?xml version="1.0"?><d:propfind xmlns:d="DAV:"><d:prop><d:resourcetype/></d:prop></d:propfind>',signal);await r.body?.cancel();return true;}catch(e){if(e instanceof DavError&&e.status===404)return false;throw e;}}
   async list(path:string,signal?:AbortSignal){const r=await this.request('PROPFIND',path,{Depth:'1','Content-Type':'application/xml'},'<?xml version="1.0"?><d:propfind xmlns:d="DAV:"><d:prop><d:resourcetype/><d:getcontentlength/></d:prop></d:propfind>',signal);return r.text();}
   async probe(signal?:AbortSignal){
     await this.mkdir('paperpane',signal);const path=`paperpane/probe-${crypto.randomUUID()}.txt`;

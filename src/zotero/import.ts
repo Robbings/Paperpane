@@ -56,14 +56,14 @@ export async function importZotero(client:ZoteroClient,items:readonly ZoteroItem
         warnings.push('没有 PDF，只导入了书目');
       }
       for(const attachment of pdfs){
-        signal.throwIfAborted();let blob:Blob;
+        signal.throwIfAborted();let blob:Blob,storage:'zotero'|'webdav'='zotero';
         try{const r=await client.download(attachment.key,signal),bytes=await responseBytes(r,1024*1024*1024,signal);if(attachment.data.md5&&md5(bytes)!==attachment.data.md5)throw new Error('Zotero 还没同步完，请稍后再试');blob=new Blob([new Uint8Array(bytes)],{type:'application/pdf'});}
-        catch(e){if(!(e instanceof ZoteroError)||![404,409].includes(e.status))throw e;const dav=await connections.dav();if(!dav)throw e;blob=await zoteroArchive(new WebDavClient(dav),attachment.key,attachment.data.filename,signal);if(attachment.data.md5&&md5(new Uint8Array(await blob.arrayBuffer()))!==attachment.data.md5)throw new Error('Zotero 还没同步完，请稍后再试');}
+        catch(e){if(!(e instanceof ZoteroError)||![404,409].includes(e.status))throw e;const dav=await connections.dav();if(!dav)throw e;storage='webdav';blob=await zoteroArchive(new WebDavClient(dav),attachment.key,attachment.data.filename,signal);if(attachment.data.md5&&md5(new Uint8Array(await blob.arrayBuffer()))!==attachment.data.md5)throw new Error('Zotero 还没同步完，请稍后再试');}
         const doc=await importPdfBlob(db,blob,attachment.data.filename??'Zotero.pdf',folderId,signal,askPassword),ref={documentId:doc.id,fileVersion:doc.fileVersion};
         const local=await db.getItemForDocument(doc.id);if(!local)throw new Error('导入后未找到文献记录');
         await db.fileImported(local.id,client.userId,item.data.collections??[],destination);
         const previous=await db.link(client.userId,local.id),link=await metadata(local.id,item);
-        link.attachmentKey=attachment.key;link.attachmentVersion=attachment.version;link.fileHash=doc.file.sha256;link.uploaded=true;
+        link.attachmentKey=attachment.key;link.attachmentVersion=attachment.version;link.fileHash=doc.file.sha256;link.uploaded=true;link.attachmentStorage=storage;delete link.fileMtime;
         await db.saveLink(client.userId,local.id,link);
         const content=await client.children(attachment.key,signal);
         await notes(local.id,[...children.filter(c=>c.data.itemType==='note'),...content.filter(c=>c.data.itemType==='note')],link,warnings,ref);

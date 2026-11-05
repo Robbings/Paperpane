@@ -1,4 +1,5 @@
-import { WebDavClient, DavError } from '@/sync/webdav-client';
+import { zipSync } from 'fflate';
+import { WebDavClient, DavError, type DavConnection } from '@/sync/webdav-client';
 import { davPaths } from '@/sync/cloud-backup';
 import { responseBytes } from '@/sync/engine';
 import { extractZoteroPdf } from '@/transfer/worker-client';
@@ -35,4 +36,30 @@ export async function zoteroArchiveNames(client:WebDavClient,key:string,signal?:
   }
   const full=await responseBytes(next.response,512*1024*1024,signal),current=zipDirectory(full);
   return zipPdfNames(full.subarray(current.start,current.start+current.size),current.count);
+}
+
+/** Zotero keeps files in `<its WebDAV URL>/zotero/`. Paperpane's address may be that URL, the folder itself or a subfolder of it. */
+export async function zoteroFolder(connection:DavConnection,signal?:AbortSignal):Promise<WebDavClient>{
+  const base=new WebDavClient(connection).base,segments=base.pathname.split('/').filter(Boolean),candidates:string[]=[];
+  for(let n=segments.length;n>=0;n--){
+    candidates.push('/'+[...segments.slice(0,n),'zotero'].join('/')+'/');
+    if(n===segments.length&&segments.at(-1)?.toLowerCase()==='zotero')candidates.push(base.pathname);
+  }
+  for(const path of candidates){
+    const folder=new WebDavClient({...connection,url:new URL(path,base.origin).href});
+    try{if(await folder.exists('',signal))return folder;}
+    catch(e){signal?.throwIfAborted();if(e instanceof DavError&&e.status===401)throw e;}
+  }
+  throw new Error('WebDAV 上没有找到 Zotero 的 zotero 文件夹，请确认 Zotero 用的是同一个 WebDAV，并在 Zotero 设置里完成「验证服务器」');
+}
+
+/** Write a file the way Zotero desktop does: drop the stale .prop, then the archive, then its mtime and MD5. */
+export async function putZoteroFile(folder:WebDavClient,key:string,bytes:Uint8Array,filename:string,hash:string,mtime:number,signal?:AbortSignal){
+  if(!/^[A-Z0-9]{8}$/.test(key))throw new Error('Zotero 附件标识无效');
+  // Zotero renames a lone file to the attachment's filename, so non-ASCII names need no %ZB64 form.
+  const entry=/^[\x20-\x7e]+$/.test(filename)&&!/[\\/:]/.test(filename)?filename:key+(filename.match(/\.[A-Za-z0-9]{1,8}$/)?.[0]??'');
+  const archive=zipSync({[entry]:[bytes,{level:0,mtime:new Date(mtime)}]});
+  await folder.remove(`${key}.prop`,signal);
+  await folder.put(`${key}.zip`,new Blob([new Uint8Array(archive)],{type:'application/zip'}),undefined,signal);
+  await folder.put(`${key}.prop`,new Blob([`<properties version="1"><mtime>${mtime}</mtime><hash>${hash}</hash></properties>`],{type:'text/xml'}),undefined,signal);
 }
