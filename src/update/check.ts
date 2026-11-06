@@ -77,12 +77,12 @@ async function fetchLatest(signal?: AbortSignal): Promise<ReleaseView> {
   try {
     response = await fetch(LATEST, { headers: { Accept: 'application/vnd.github+json' }, cache: 'no-store', signal: signal ?? AbortSignal.timeout(15000) });
   } catch {
-    throw new Error('连不上 GitHub，请检查网络');
+    throw new Error('连不上 GitHub');
   }
-  if (response.status === 403 || response.status === 429) throw new Error('GitHub 暂时限制了访问，请稍后再试');
+  if (response.status === 403 || response.status === 429) throw new Error('GitHub 暂时限制访问');
   if (!response.ok) throw new Error(`GitHub 返回 ${response.status}`);
   const data = (await response.json()) as { tag_name?: unknown; html_url?: unknown; body?: unknown; published_at?: unknown; assets?: { name?: unknown }[] };
-  if (typeof data.tag_name !== 'string' || !/^v?\d+(\.\d+)*/.test(data.tag_name)) throw new Error('没读懂最新版本的信息');
+  if (typeof data.tag_name !== 'string' || !/^v?\d+(\.\d+)*/.test(data.tag_name)) throw new Error('版本信息无法识别');
   const suffix = edge() ? '-edge.zip' : '-chrome.zip';
   const asset = data.assets?.map((a) => a.name).find((name): name is string => typeof name === 'string' && name.endsWith(suffix));
   return {
@@ -118,7 +118,7 @@ export async function checkForUpdate({ automatic = false, signal }: { automatic?
   try {
     next = { checkedAt: new Date().toISOString(), latest: await fetchLatest(signal) };
   } catch (error) {
-    next = { ...before, checkedAt: new Date().toISOString(), error: error instanceof Error ? error.message : '检查更新失败' };
+    next = { ...before, checkedAt: new Date().toISOString(), error: error instanceof Error ? error.message : '原因不明' };
   }
   await browser.storage.local.set({ [RESULT_KEY]: next });
   return readUpdate();

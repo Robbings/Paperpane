@@ -425,22 +425,36 @@ body[data-page='popup'] {
 
 /* ---- Update ------------------------------------------------------------------------ */
 
-/* A newer version: laid out like the setup card, with a close button in the corner. */
+/* A newer version: warm, so it reads apart from the blue actions, and closable. */
 .pp-popup__update {
-  position: relative;
   display: grid;
-  grid-template-columns: auto 1fr;
-  gap: 10px 10px;
-  padding: 12px 40px 12px 12px;
+  grid-template-columns: auto 1fr auto;
+  align-items: center;
+  gap: 10px;
+  padding: 12px;
+  background: color-mix(in srgb, var(--pp-warn) 8%, var(--pp-popup-card));
+}
+
+.pp-popup__update-icon {
+  display: grid;
+  place-items: center;
+  width: 32px;
+  height: 32px;
+  border-radius: 9px;
+  background: color-mix(in srgb, var(--pp-warn) 16%, transparent);
+  color: var(--pp-warn);
+}
+
+.pp-popup__update h2 {
+  margin: 0;
+  color: var(--pp-text);
+  font-size: 13.5px;
+  font-weight: var(--pp-weight-semibold);
+  line-height: 1.4;
 }
 
 .pp-popup__update .pp-popup__primary {
   grid-column: 1 / -1;
-  margin-right: -28px;
-}
-
-.pp-popup__update-close {
-  position: absolute;
-  top: 6px;
-  right: 6px;
+  background: var(--pp-warn);
+  color: var(--pp-on-warn);
 }

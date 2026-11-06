@@ -18,8 +18,8 @@ function checkLine(state: UpdateState | null, checking: boolean): string {
   if (!state) return '正在读取…';
   if (state.store) return '由应用商店自动更新';
   if (checking) return '正在检查…';
-  if (state.error) return `上次检查没有成功：${state.error}`;
   if (state.available) return `有新版本 ${state.latest!.version}`;
+  if (state.error) return `检查失败 · ${state.error}`;
   if (state.latest && state.checkedAt) return `已是最新版本 · ${sinceText(state.checkedAt)}检查`;
   return '每天自动检查一次';
 }

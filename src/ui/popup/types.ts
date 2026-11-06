@@ -65,7 +65,7 @@ export interface PopupViewProps {
   onOpenGuide?: () => void;
   status: StatusSummary;
   /** A newer version whose notice has not been closed. */
-  update?: { version: string; current: string };
+  update?: { version: string };
   /** Opens 设置 → 关于, with the release notes and how to install it. */
   onOpenUpdate?: () => void;
   /** Closes the notice for this version; the next version shows it again. */

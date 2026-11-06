@@ -66,7 +66,7 @@ export function SamplePopup() {
         onOpenSettings={(section) => open(`./options.html${section ? `#${section}` : ''}`)}
         setupNeeded={new URLSearchParams(window.location.search).has('setup')}
         onOpenGuide={() => open('./options.html?guide=1#models')}
-        update={update ? { version: '0.1.4', current: '0.1.3' } : undefined}
+        update={update ? { version: '0.1.4' } : undefined}
         onOpenUpdate={() => open('./options.html#about')}
         onDismissUpdate={() => setUpdate(false)}
         status={status}

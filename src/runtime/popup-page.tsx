@@ -26,7 +26,7 @@ export function LivePopupPage() {
     onOpenSettings={section=>open(`/options.html${section?'#'+section:''}`)}
     setupNeeded={!model.loading&&!model.settings.models.length&&!model.settings.translationApis?.length}
     onOpenGuide={()=>{void markOnboarding({welcomed:true}).catch(()=>{});open(GUIDE_URL);}}
-    update={latest&&update.state?{version:latest.version,current:update.state.current}:undefined}
+    update={latest?{version:latest.version}:undefined}
     onOpenUpdate={()=>open('/options.html#about')} onDismissUpdate={()=>latest&&update.dismiss(latest.version)}
     status={{...model.status,local:preferences.state.local==='failed'?'failed':model.status.local}}/>;
 }

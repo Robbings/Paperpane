@@ -79,15 +79,12 @@ export function PopupView(props: PopupViewProps) {
 
       {props.update && (
         <section className="pp-popup__card pp-popup__update" aria-labelledby="pp-popup-update">
-          <span className="pp-popup__setup-icon" aria-hidden="true">
+          <span className="pp-popup__update-icon" aria-hidden="true">
             <Icon name="download" size={17} />
           </span>
-          <div className="pp-popup__setup-text">
-            <h2 id="pp-popup-update">纸间 {props.update.version} 可以更新了</h2>
-            <p>当前是 {props.update.current}。更新时覆盖原来的扩展文件夹，数据会保留。</p>
-          </div>
+          <h2 id="pp-popup-update">纸间 {props.update.version} 可以更新了</h2>
           {props.onDismissUpdate && (
-            <IconButton className="pp-popup__update-close" icon="close" label="不再提示这个版本" onClick={props.onDismissUpdate} />
+            <IconButton icon="close" label="不再提示这个版本" onClick={props.onDismissUpdate} />
           )}
           {props.onOpenUpdate && (
             <button type="button" className="pp-popup__primary" onClick={props.onOpenUpdate}>

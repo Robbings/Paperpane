@@ -30,6 +30,7 @@
   --pp-accent: #2a5bd7;
   --pp-accent-soft: rgba(42, 91, 215, 0.11);
   --pp-on-accent: #ffffff;
+  --pp-on-warn: #ffffff;
   --pp-focus: rgba(42, 91, 215, 0.5);
   --pp-selection: rgba(42, 91, 215, 0.2);
   --pp-ok: #2f8a4e;
@@ -175,6 +176,8 @@
     --pp-trans-link: color-mix(in srgb, var(--pp-accent) 24%, transparent);
     --pp-trans-flash: color-mix(in srgb, var(--pp-accent) 40%, transparent);
     --pp-on-accent: #0f1a33;
+  --pp-on-warn: #2a1804;
+    --pp-on-warn: #2a1804;
     --pp-focus: rgba(127, 166, 255, 0.55);
     --pp-selection: rgba(80, 130, 240, 0.3);
     --pp-ok: #5cc27e;
