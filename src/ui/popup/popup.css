@@ -422,3 +422,40 @@ body[data-page='popup'] {
 .pp-popup__hint button:hover {
   text-decoration: underline;
 }
+
+/* ---- Update ------------------------------------------------------------------------ */
+
+/* A newer version: a faint coral wash, quieter than the blue actions, and closable. */
+.pp-popup__update {
+  display: grid;
+  grid-template-columns: auto 1fr auto;
+  align-items: center;
+  gap: 10px;
+  padding: 12px;
+  background: color-mix(in srgb, var(--pp-coral) 6%, var(--pp-popup-card));
+}
+
+.pp-popup__update-icon {
+  display: grid;
+  place-items: center;
+  width: 32px;
+  height: 32px;
+  border-radius: 9px;
+  background: color-mix(in srgb, var(--pp-coral) 7%, transparent);
+  color: color-mix(in srgb, var(--pp-coral) 65%, var(--pp-text-3));
+}
+
+.pp-popup__update h2 {
+  margin: 0;
+  color: var(--pp-text);
+  font-size: 13.5px;
+  font-weight: var(--pp-weight-semibold);
+  line-height: 1.4;
+}
+
+.pp-popup__update .pp-popup__primary {
+  grid-column: 1 / -1;
+  background: color-mix(in srgb, var(--pp-coral) 13%, transparent);
+  box-shadow: none;
+  color: var(--pp-coral);
+}

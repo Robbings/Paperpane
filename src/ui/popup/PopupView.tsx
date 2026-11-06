@@ -77,6 +77,23 @@ export function PopupView(props: PopupViewProps) {
         <IconButton icon="settings" label="设置" shape="pill" onClick={() => props.onOpenSettings()} />
       </header>
 
+      {props.update && (
+        <section className="pp-popup__card pp-popup__update" aria-labelledby="pp-popup-update">
+          <span className="pp-popup__update-icon" aria-hidden="true">
+            <Icon name="download" size={17} />
+          </span>
+          <h2 id="pp-popup-update">纸间 {props.update.version} 可以更新了</h2>
+          {props.onDismissUpdate && (
+            <IconButton icon="close" label="不再提示这个版本" onClick={props.onDismissUpdate} />
+          )}
+          {props.onOpenUpdate && (
+            <button type="button" className="pp-popup__primary" onClick={props.onOpenUpdate}>
+              查看更新内容和步骤
+            </button>
+          )}
+        </section>
+      )}
+
       {props.setupNeeded && props.onOpenGuide && (
         <section className="pp-popup__card pp-popup__setup" aria-labelledby="pp-popup-setup">
           <span className="pp-popup__setup-icon" aria-hidden="true">

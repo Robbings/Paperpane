@@ -1,4 +1,5 @@
 import { SyncPage } from './sections/SyncPage';
+import { AboutSection } from './sections/AboutSection';
 import { mergeDrafts, mergeOnto } from './merge-settings';
 import { SettingsHeader } from './SettingsHeader';
 import { ModelsSection } from './sections/ModelsSection';
@@ -45,6 +46,7 @@ const sections: { id: SettingsSection; label: string; icon: IconName }[] = [
   { id: 'models', label: '模型', icon: 'model' },
   { id: 'translation', label: '翻译', icon: 'translate' },
   { id: 'sync', label: '同步与备份', icon: 'sync' },
+  { id: 'about', label: '关于', icon: 'info' },
 ];
 
 /** Draft comparison that tells an emptied number field (NaN) apart from "use the default" (null). */
@@ -315,6 +317,8 @@ export function SettingsView(props: SettingsViewProps) {
                 <SettingsHeader title={current.label} saveBar={note} />
                 {section === 'general' ? (
                   <GeneralSection state={props.preferences} onPreference={props.onPreference} onRetry={props.onRetryPreferences} />
+                ) : section === 'about' ? (
+                  <AboutSection />
                 ) : (
                   <SyncPage />
                 )}
