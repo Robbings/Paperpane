@@ -23,7 +23,9 @@ export const readingScale = (fontSize: number) => fontSize / 16;
 export function applyAppearance(preferences: { theme: ThemeMode; uiFontSize: number; uiScale?: number }): void {
   applyTheme(preferences.theme);
   const root = document.documentElement;
-  root.style.fontSize = `${16 * (preferences.uiScale ?? 100) / 100}px`;
+  // The toolbar popup keeps its designed size: it is a small menu, not a working page.
+  const scale = document.body?.dataset.page === 'popup' ? 100 : (preferences.uiScale ?? 100);
+  root.style.fontSize = `${16 * scale / 100}px`;
   root.style.setProperty('--pp-read-scale', String(readingScale(preferences.uiFontSize)));
   delete root.dataset.dimPages;
 }
