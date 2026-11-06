@@ -28,7 +28,30 @@ export class WebDavClient {
         if(value)return value.replace(/&quot;/g,'"').replace(/&apos;/g,"'").replace(/&lt;/g,'<').replace(/&gt;/g,'>').replace(/&amp;/g,'&');
       }
       return null;
-    }catch(e){if(e instanceof DavError&&[405,501].includes(e.status))return null;throw e;}
+    }catch(e){
+      if(!(e instanceof DavError)||![405,500,501].includes(e.status))throw e;
+      // Some DAV bridges try to list a file as a folder for Depth:0. The
+      // parent's Depth:1 listing can still provide its validator. Missing
+      // validators permit downloads/backups, never conditional synchronization.
+      const parent=path.includes('/')?path.slice(0,path.lastIndexOf('/')):'';
+      const name=path.slice(path.lastIndexOf('/')+1);
+      try{
+        const response=await this.request('PROPFIND',parent,{Depth:'1','Content-Type':'application/xml'},'<?xml version="1.0"?><d:propfind xmlns:d="DAV:"><d:prop><d:getetag/></d:prop></d:propfind>',signal);
+        const xml=await response.text();
+        for(const block of xml.matchAll(/<(?:[\w-]+:)?response\b[^>]*>([\s\S]*?)<\/(?:[\w-]+:)?response>/g)){
+          const href=block[1]!.match(/<(?:[\w-]+:)?href\b[^>]*>([\s\S]*?)<\/(?:[\w-]+:)?href>/)?.[1]?.trim();
+          if(!href)continue;
+          let filename;try{filename=decodeURIComponent(new URL(href,this.base).pathname.split('/').at(-1)!);}catch{continue;}
+          if(filename!==name)continue;
+          for(const prop of block[1]!.matchAll(/<(?:[\w-]+:)?propstat\b[^>]*>([\s\S]*?)<\/(?:[\w-]+:)?propstat>/g)){
+            if(!/<(?:[\w-]+:)?status\b[^>]*>HTTP\/\S+ 200(?:\s|<)/.test(prop[1]!))continue;
+            const value=prop[1]!.match(/<(?:[\w-]+:)?getetag\b[^>]*>([\s\S]*?)<\/(?:[\w-]+:)?getetag>/)?.[1]?.trim();
+            if(value)return value.replace(/&quot;/g,'"').replace(/&apos;/g,"'").replace(/&lt;/g,'<').replace(/&gt;/g,'>').replace(/&amp;/g,'&');
+          }
+        }
+        return null;
+      }catch(error){if(error instanceof DavError&&[405,500,501].includes(error.status))return null;throw error;}
+    }
   }
   async get(path:string,signal?:AbortSignal,range?:string){
     let r=await this.request('GET',path,range?{Range:range}:{},undefined,signal);

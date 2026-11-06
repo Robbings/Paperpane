@@ -4,7 +4,7 @@ export interface ModelOption {
   id: Id; displayName: string; providerId: Id; providerName: string;
   /** Display-only origin; never include keys, query strings or userinfo. */
   endpointOrigin: string;
-  capabilities: { vision: boolean; reasoningLevels: readonly string[] };
+  capabilities: { webSearch?: boolean; vision: boolean; reasoningLevels: readonly string[] };
 }
 export interface ModelSnapshot { modelId: Id; displayName: string; providerId: Id; providerName: string }
 export interface ImageAttachment { id: Id; assetId: Id; mimeType: 'image/png' | 'image/jpeg' | 'image/webp'; name: string; anchor: DocumentAnchor }

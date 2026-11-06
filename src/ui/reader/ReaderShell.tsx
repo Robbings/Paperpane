@@ -918,7 +918,7 @@ export function ReaderShell(props: ReaderShellProps) {
           setNoteLayouts((current) => current.map((n) => (n.id === id ? { ...n, open: false } : n)));
           // An empty comment without a highlight would leave nothing to see: drop it.
           const row = annotations.find((a) => a.id === id);
-          if (row && row.highlighted === false && !row.note?.trim()) void interaction.onAnnotationDelete(id);
+          if (row && row.highlighted === false && !row.note?.trim()) void interaction.onAnnotationDelete(id, true);
         }}
         onComment={interaction.onAnnotationComment}
         onRemoveComment={removeComment}

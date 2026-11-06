@@ -43,6 +43,9 @@ export class MarkdownUploadTasks {
   has(id: string) {
     return this.tasks.has(id);
   }
+  hasOwner(owner: string) {
+    return [...this.tasks.values()].some(task => task.owner === owner);
+  }
   firstFailure(owner: string) {
     return [...this.tasks.values()].find(
       (task) => task.owner === owner && task.error !== undefined,

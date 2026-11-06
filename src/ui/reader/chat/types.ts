@@ -10,6 +10,7 @@ export interface ModelView {
   /** Display-only origin, e.g. "api.example.com". */
   endpointOrigin: string;
   vision: boolean;
+  webSearch?: boolean;
   /** Thinking strengths the model accepts, weakest first (e.g. "low", "medium", "high"); empty if none. */
   reasoningLevels: readonly string[];
 }
@@ -72,6 +73,7 @@ export interface ChatSessionView {
   modelId: string;
   /** The chosen thinking strength, one of the model's reasoningLevels. */
   reasoning?: string;
+  webSearch?: boolean;
   /** The active transcript, oldest first. */
   messages: readonly ChatMessageView[];
   draft: { text: string; attachments: readonly AttachmentView[] };

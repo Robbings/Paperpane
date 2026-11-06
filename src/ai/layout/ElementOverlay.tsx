@@ -23,7 +23,11 @@ export function ElementOverlay({reader,document:ref,preferences,preferencesReady
  useEffect(()=>{if(!enabled||hidden||(active&&!elements.some(e=>e.id===active&&allowed(e,preferences)))){candidate.current=undefined;clearTimeout(show.current);show.current=undefined;setActive(undefined);}},[enabled,hidden,elements,preferences.detectPictures,preferences.detectTables,preferences.detectFormulas,active]);
  useEffect(()=>{
  const clear=()=>{clearTimeout(show.current);show.current=undefined;candidate.current=undefined;if(!hovering.current&&!root.current?.contains(document.activeElement)){clearTimeout(hide.current);hide.current=setTimeout(()=>setActive(undefined),180);}};
- const move=(event:PointerEvent)=>{if(state.current.hidden||event.pointerType==='touch'||event.buttons||window.getSelection()?.toString().trim()){clearTimeout(show.current);show.current=undefined;candidate.current=undefined;setActive(undefined);return;}
+ const move=(event:PointerEvent)=>{
+  // A mouse press commonly includes tiny movements before click. Keep the
+  // toolbar mounted throughout that gesture so its button can receive click.
+  if(!state.current.hidden&&root.current?.contains(event.target as Node)){clearTimeout(hide.current);return;}
+  if(state.current.hidden||event.pointerType==='touch'||event.buttons||window.getSelection()?.toString().trim()){clearTimeout(show.current);show.current=undefined;candidate.current=undefined;setActive(undefined);return;}
   if((event.target as Element).closest('[data-pp-overlay], [data-pp-floating]')){if(!root.current?.contains(event.target as Node))clear();return;}
   let found:PaperElement|undefined,area=Infinity;
   for(const e of state.current.elements){if(!allowed(e,state.current.preferences))continue;const p=reader.project(e.anchor,'viewport');if(p.state!=='ready')continue;for(const {rect:r} of p.rects){if(event.clientX>=r.left&&event.clientX<=r.left+r.width&&event.clientY>=r.top&&event.clientY<=r.top+r.height&&r.width*r.height<area){found=e;area=r.width*r.height;}}}

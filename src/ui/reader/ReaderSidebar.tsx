@@ -1,6 +1,6 @@
 import { PageThumbnail, type ThumbnailRenderer } from './PageThumbnail';
 import { useState, type ReactNode } from 'react';
-import { GlassSurface, Segmented } from '@/ui/components';
+import { GlassSurface, Segmented, ScrollArea } from '@/ui/components';
 import type { OutlineItemView } from './types';
 
 interface ReaderSidebarProps {
@@ -52,7 +52,7 @@ export function ReaderSidebar({ open, outline, pageCount, pageIndex, overlay, on
         <p className="pp-sidebar__empty">{navigationMessage ?? '正在读取目录…'}</p>
       ) : tab === 'outline' ? (
         outline.length > 0 ? (
-          <nav aria-label="目录" className="pp-sidebar__scroll pp-outline">
+          <ScrollArea role="navigation" aria-label="目录" className="pp-sidebar__scrollarea" viewportClassName="pp-sidebar__scroll pp-outline">
             {navigationMessage&&<p className="pp-sidebar__empty">{navigationMessage}</p>}
             {outline.map((item) => {
               const current = item.id === currentId;
@@ -70,12 +70,12 @@ export function ReaderSidebar({ open, outline, pageCount, pageIndex, overlay, on
                 </button>
               );
             })}
-          </nav>
+          </ScrollArea>
         ) : (
           <p className="pp-sidebar__empty">{navigationMessage ?? '这篇论文没有可识别的目录。'}</p>
         )
       ) : (
-        <nav className="pp-sidebar__scroll pp-thumbs" aria-label="页面缩略图">
+        <ScrollArea role="navigation" className="pp-sidebar__scrollarea" viewportClassName="pp-sidebar__scroll pp-thumbs" aria-label="页面缩略图">
           {Array.from({ length: pageCount }, (_, index) => (
             <button
               key={index}
@@ -96,7 +96,7 @@ export function ReaderSidebar({ open, outline, pageCount, pageIndex, overlay, on
               <span className="pp-thumb__label">{index + 1}</span>
             </button>
           ))}
-        </nav>
+        </ScrollArea>
       )}
     </GlassSurface>
   );

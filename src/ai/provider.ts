@@ -1,3 +1,4 @@
+import { webSearchOptions, WebSearchCitations } from './web-search';
 import { chatRequestOptions } from './model-providers';
 import { reasoningBody, outputLimit } from './model-capabilities';
 import { endpointUrl, supportsModelOperation } from "./model-configuration";
@@ -144,6 +145,11 @@ export async function streamModel(
         })),
       };
     }
+    if (input.webSearch) {
+      body = { ...(body as Record<string, unknown>), ...webSearchOptions(protocol, c.model.modelId) };
+      if (protocol === 'openai-chat') delete (body as Record<string, unknown>).stream_options;
+    }
+    const web = new WebSearchCitations();
     if (!(await hasImportOrigin(url)))
       throw new Error("请在模型设置中保存并授予此接口访问权限。");
     signal.throwIfAborted();
@@ -265,6 +271,7 @@ export async function streamModel(
         ) {
           const r = obj.response ?? {};
           openUsage(r.usage);
+          if (input.webSearch) web.responses(r.output, received.length);
           const final =
             r.output
               ?.filter((x: any) => x.type === "message")
@@ -282,6 +289,7 @@ export async function streamModel(
         }
       } else if (protocol === "openai-chat") {
         const choice = obj.choices?.[0];
+        if (input.webSearch) for (const annotation of choice?.delta?.annotations ?? []) web.add(annotation.url_citation, received.length);
         add(choice?.delta?.content ?? "");
         if (choice?.finish_reason) {
           stop = choice.finish_reason;
@@ -289,6 +297,10 @@ export async function streamModel(
         }
         openUsage(obj.usage);
       } else if (protocol === "anthropic") {
+        if (input.webSearch) {
+          if (obj.type === 'content_block_start') web.anthropic(obj.content_block, received.length);
+          if (obj.delta?.type === 'citations_delta') web.add(obj.delta.citation, received.length);
+        }
         if (obj.type === "message_start") openUsage(obj.message?.usage);
         if (
           obj.type === "content_block_delta" &&
@@ -376,9 +388,11 @@ export async function streamModel(
         });
       } else if (protocol === "openai-chat") {
         add(obj.choices?.[0]?.message?.content ?? "");
+        if (input.webSearch) for (const annotation of obj.choices?.[0]?.message?.annotations ?? []) web.add(annotation.url_citation, received.length);
         openUsage(obj.usage);
         completed = obj.choices?.[0]?.finish_reason === "stop";
       } else if (protocol === "anthropic") {
+        if (input.webSearch) { let offset = 0; for (const block of obj.content ?? []) { offset += block.type === 'text' ? (block.text ?? '').length : 0; web.anthropic(block, offset); } }
         add(
           (obj.content ?? [])
             .filter((p: any) => p.type === "text")
@@ -396,6 +410,10 @@ export async function streamModel(
       );
     if (!completed)
       throw new Error("模型输出未正常结束，部分内容已保留，可重新生成新版本。");
+    if (input.webSearch) {
+      const final = web.format(received);
+      input.onFinalText?.(final);
+    }
     return usage;
     } catch (error) {
       input.onRequestError?.(error);

@@ -171,7 +171,7 @@ function WebDavGroup() {
               断开
             </Button>
           </SettingRow>
-          <SettingRow label="立即同步" hint="自动合并两端内容，不同改动会另存版本">
+          <SettingRow label="立即同步" hint={dav.conditional ? '自动合并两端内容，不同改动会另存版本' : '服务器未通过文件版本校验，暂不支持多端同步；可以使用下方的云备份'}>
             <span className="pp-set-value">{state.lastSuccess ? `上次 ${sinceText(state.lastSuccess)}` : '尚未同步'}</span>
             {running ? (
               <Button size="sm" variant="quiet" onClick={() => controller.current?.abort()}>

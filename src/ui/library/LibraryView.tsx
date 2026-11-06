@@ -50,7 +50,7 @@ export interface LibraryViewProps {
   onImportZotero?: (folderId:string|null)=>void;
   onExportZotero?: (ids:string[])=>void;
   onRestoreBackup?: ()=>void;
-  onExportCitations: (ids: string[], format: 'bibtex' | 'apa' | 'csv') => void;
+  onExportCitations: (ids: string[], format: 'bibtex' | 'apa' | 'csv' | 'pdf') => void;
 }
 
 type BatchMenu = 'tag' | 'move' | 'export' | null;
@@ -147,6 +147,7 @@ export function LibraryView(props: LibraryViewProps) {
     tag: [...tags].sort((a, b) => a.label.localeCompare(b.label, 'zh-CN')).map((tag) => ({ id: tag.id, label: tag.label, icon: 'tag' as const })),
     move: folderEntries(folders, null).map((entry) => ('checked' in entry ? { ...entry, checked: undefined } : entry)),
     export: [
+      { id: 'pdf', label: '下载 PDF（含批注）' },
       { id: 'bibtex', label: '复制为 BibTeX' },
       { id: 'apa', label: '复制为 APA 格式' },
       { id: 'csv', label: '下载 CSV' },
@@ -347,7 +348,7 @@ export function LibraryView(props: LibraryViewProps) {
             if (batchMenu === 'tag') props.onAddTag(selectedIds, { id, label: tagsById.get(id)?.label ?? id });
             else if (batchMenu === 'move') props.onMovePapers(selectedIds, id === '__root' ? null : id);
             else if(id==='zotero')props.onExportZotero?.([...selectedIds]);
-            else props.onExportCitations(selectedIds, id as 'bibtex' | 'apa' | 'csv');
+            else props.onExportCitations(selectedIds, id as 'bibtex' | 'apa' | 'csv' | 'pdf');
           }}
           onClose={() => setBatchMenu(null)}
         />

@@ -288,6 +288,8 @@
   --pp-glass-shadow: var(--pp-shadow-float);
 }
 
+.pp-sidebar__scrollarea { flex: 1; min-height: 0; }
+
 .pp-sidebar__scroll {
   flex: 1;
   min-height: 0;
