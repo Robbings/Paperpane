@@ -288,6 +288,25 @@
   --pp-glass-shadow: var(--pp-shadow-float);
 }
 
+.pp-sidebar__scrollarea {
+  flex: 1;
+  min-height: 0;
+  /* The panel's right padding is the scrollbar's own lane, clear of the rows and their highlight. */
+  --pp-scrollarea-bar-offset: calc(-1 * var(--pp-space-3));
+}
+
+/* Centred in the lane, so widening on hover never reaches the page numbers. */
+.pp-sidebar__scrollarea .pp-scrollarea__thumb {
+  right: auto;
+  left: 50%;
+  translate: -50% 0;
+}
+
+.pp-sidebar__scrollarea .pp-scrollarea__bar:hover .pp-scrollarea__thumb,
+.pp-sidebar__scrollarea .pp-scrollarea__bar[data-dragging='true'] .pp-scrollarea__thumb {
+  width: 7px;
+}
+
 .pp-sidebar__scroll {
   flex: 1;
   min-height: 0;

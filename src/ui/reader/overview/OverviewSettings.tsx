@@ -248,10 +248,9 @@ export function OverviewSettings({ open, onClose, cards, defaults, onSave }: Ove
                   </Button>
                 ) : (
                   <Button size="sm" variant="quiet" icon="trash" className="pp-ov-settings__remove" onClick={() => remove(selected.id)}>
-                    删除这张卡片
+                    删除
                   </Button>
                 )}
-                {!selected.visible && <span className="pp-ov-settings__note">已隐藏，不会显示也不会生成</span>}
               </div>
             </>
           )}

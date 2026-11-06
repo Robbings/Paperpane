@@ -14,6 +14,7 @@ const context=await chromium.launchPersistentContext(resolve('browser-profiles/r
 const errors=[];context.on('page',p=>p.on('pageerror',e=>errors.push(e.message)));
 try{
  const worker=context.serviceWorkers()[0]??await context.waitForEvent('serviceworker');const root=`chrome-extension://${new URL(worker.url()).host}`;
+ await worker.evaluate(()=>chrome.storage.local.set({onboarding:{welcomed:true,guided:true}}));
  await context.route('https://papers.test/native.pdf',r=>r.fulfill({contentType:'application/pdf',body:Buffer.from(native)}));
  await context.route('https://papers.test/generated.pdf',r=>r.fulfill({contentType:'application/pdf',body:Buffer.from(generated)}));
  const page=await context.newPage();await page.goto(`${root}/reader.html?import=${encodeURIComponent('https://papers.test/native.pdf')}`);

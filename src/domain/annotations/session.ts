@@ -112,11 +112,21 @@ export class AnnotationSession implements AnnotationService {
       const row = await this.db.mutate(this.document, id, revision, {}, operation); this.rows.set(id, row); this.changed(true); return row;
     });
   }
-  async deleteCurrent(id: string): Promise<boolean> {
-    await this.queue; const row = this.rows.get(id); if (!row) return false;
-    const result = await this.remove(id, row.revision);
-    if (result.ok) this.undoRevisions.set(id, result.value.revision);
-    return result.ok;
+  async deleteCurrent(id: string, onlyIfEmpty = false): Promise<boolean> {
+    // Let an editor's unmount flush enter the queue before deciding whether an
+    // empty comment can be discarded. Resolve its revision inside that queue.
+    await Promise.resolve();
+    const result = await this.enqueue(async () => {
+      const row = this.rows.get(id);
+      if (!row || row.deletedAt) return false;
+      if (onlyIfEmpty && this.drafts.has(id)) return false;
+      if (this.drafts.has(id)) throw new AnnotationFault('CONFLICT', '此批注有尚未保存的草稿，请先保存或处理冲突。');
+      if (onlyIfEmpty && (row.kind === 'highlight' || row.comment.trim())) return false;
+      const saved = await this.db.mutate(this.document, id, row.revision, {}, 'delete');
+      this.rows.set(id, saved); this.undoRevisions.set(id, saved.revision);
+      this.changed(true); return true;
+    });
+    return result.ok && result.value;
   }
   async restoreDeleted(id: string): Promise<void> {
     await this.queue; const revision = this.undoRevisions.get(id);
@@ -151,6 +161,10 @@ export class AnnotationSession implements AnnotationService {
       const captured = structuredClone(layout); this.layoutDrafts.set(layout.id, captured);
       void this.enqueue(async () => {
         if (this.blocked.has(`layout:${layout.id}`)) return;
+        if (this.rows.get(layout.id)?.deletedAt) {
+          if (this.layoutVersions.get(layout.id) === version) this.layoutDrafts.delete(layout.id);
+          return;
+        }
         try {
           const row = await this.db.layout(this.document, captured, this.layouts.get(layout.id)?.revision);
           this.layouts.set(layout.id, row);

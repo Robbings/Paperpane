@@ -6,6 +6,8 @@ export interface ModelInput {
   images?: string[];
 }
 export interface ModelRequest {
+  webSearch?: boolean;
+  onFinalText?: (text: string) => void;
   /** Cancels queued dispatch without aborting requests that have already started. */
   queueSignal?: AbortSignal;
   onDispatch?: () => void;

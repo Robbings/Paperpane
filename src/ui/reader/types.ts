@@ -124,7 +124,7 @@ export interface ReaderInteraction {
   onAnnotationComment: (annotationId: string, comment: string) => void;
   /** Resolves after saving; returned undo is tied to that deletion revision. Null means deletion failed. */
   onAnnotationCommentDelete?: (annotationId: string) => Promise<(() => void | Promise<void>) | null>;
-  onAnnotationDelete: (annotationId: string) => void | Promise<boolean>;
+  onAnnotationDelete: (annotationId: string, onlyIfEmpty?: boolean) => void | Promise<boolean>;
   /** Undoes a delete (offered right after deleting). */
   onAnnotationRestore?: (annotationId: string) => void | Promise<void>;
   /** Where an annotation's text is on screen now, or null when its page is not rendered. Read while drawing a note's connector. */

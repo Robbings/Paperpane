@@ -12,6 +12,8 @@ interface ChatComposerProps {
   modelId: string;
   /** The session's thinking strength; the picker shows only for models that have levels. */
   reasoning?: string;
+  webSearch?: boolean;
+  onWebSearch?: (enabled: boolean) => void;
   /** An answer is being generated: the send button becomes stop. */
   busy: boolean;
   draftSaveFailed?: boolean;
@@ -222,6 +224,11 @@ export function ChatComposer(props: ChatComposerProps) {
             </button>
           </Tooltip>
         )}
+        {props.onWebSearch && <Tooltip label={model?.webSearch ? '使用当前模型服务联网搜索，可能产生搜索费用' : '当前接口尚未接入搜索；可选择支持搜索的 Responses、Claude 或专用搜索模型'}>
+          <button type="button" className="pp-composer__chip" aria-label="联网搜索" aria-pressed={!!props.webSearch} disabled={busy || !model?.webSearch} onClick={() => props.onWebSearch?.(!props.webSearch)}>
+            <Icon name="search" size={14} /><span className="pp-composer__chip-text">联网{props.webSearch ? ' · 开' : ''}</span>
+          </button>
+        </Tooltip>}
         {props.draftSaveFailed && <span className="pp-composer__warn">草稿未能保存</span>}
         <span className="pp-composer__spacer" />
         {props.onLatest && <Button className="pp-composer__latest" variant="quiet" size="sm" onClick={props.onLatest}>回到最新</Button>}

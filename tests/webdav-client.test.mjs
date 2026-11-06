@@ -43,3 +43,20 @@ test('real cross-origin fetch removes authorization before following a download 
  try{const client=new WebDavClient({url:`http://127.0.0.1:${dav.address().port}/`,username:'test',password:'fixture'});const result=await client.get('paperpane/manifest.json');assert.equal(result.etag,'"origin"');assert.equal(await result.response.text(),'signed bytes');assert.equal(leaked,undefined);}
  finally{dav.closeAllConnections();storage.closeAllConnections();await Promise.all([new Promise(ok=>dav.close(ok)),new Promise(ok=>storage.close(ok))]);}
 });
+test('OpenList file PROPFIND failure does not break readable backups or enable unsafe sync',async()=>{
+ const calls=[];const client=new WebDavClient({url:'https://dav.test/root/',username:'u',password:'p'},async(url,o)=>{
+  calls.push([String(url),o.method,o.headers.get('Depth')]);
+  if(o.method==='GET'){const r=new Response('paperpane-connection-test');Object.defineProperty(r,'redirected',{value:true});return r;}
+  if(o.method==='PROPFIND'&&o.headers.get('Depth')==='0')return new Response('Children cannot be listed from an item that is not a folder',{status:500});
+  if(o.method==='PROPFIND')return new Response('<d:multistatus xmlns:d="DAV:"/>',{status:207});
+  return new Response('');
+ });
+ assert.deepEqual(await client.probe(),{readable:true,writable:true,conditional:false});assert(calls.some(x=>x[1]==='PROPFIND'&&x[2]==='1'));assert.equal(calls.at(-1)[1],'DELETE');
+});
+test('parent ETag fallback selects only the requested file, preserving escaped validators',async()=>{
+ const client=new WebDavClient({url:'https://dav.test/root/',username:'u',password:'p'},async(url,o)=>{
+  if(o.method==='GET')return redirected();
+  if(o.headers.get('Depth')==='0')return new Response('',{status:500});
+  return new Response('<d:multistatus xmlns:d="DAV:"><d:response><d:href>/root/paperpane/other.json</d:href><d:propstat><d:prop><d:getetag>&quot;wrong&quot;</d:getetag></d:prop><d:status>HTTP/1.1 200 OK</d:status></d:propstat></d:response><d:response><d:href>/root/paperpane/manifest.json</d:href><d:propstat><d:prop><d:getetag>&quot;right&quot;</d:getetag></d:prop><d:status>HTTP/1.1 200 OK</d:status></d:propstat></d:response></d:multistatus>',{status:207});
+ });assert.equal((await client.get('paperpane/manifest.json')).etag,'"right"');
+});

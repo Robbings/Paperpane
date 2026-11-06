@@ -15,7 +15,7 @@ export function portableMeta(row:TransferRecord):TransferRecord|undefined{
     if(record.value?.view){record.value.keys={};record.value.view.endpoints=record.value.view.endpoints.map((e:any)=>({...e,hasKey:false}));record.value.view.sync={...record.value.view.sync,hasPassword:false};delete record.value.view.sync.password;}
     return record;
   }
-  if(key==='readerPreferences'||/^(transfer-version:|notes:v1:|translation:|ai-v1:|transcription:|element-copy:|formula-plan:|zotero-map:|zotero-note:|zotero-original:)/.test(key))return structuredClone(row);
+  if(key==='readerPreferences'||key==='overview-template-v1'||/^(transfer-version:|notes:v1:|translation:|ai-v1:|transcription:|element-copy:|formula-plan:|zotero-map:|zotero-note:|zotero-original:)/.test(key))return structuredClone(row);
   return undefined;
 }
 const equal=(a:unknown,b:unknown)=>stable(a)===stable(b);

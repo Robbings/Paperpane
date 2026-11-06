@@ -49,14 +49,21 @@ export function LibraryPage({ owner }: { owner: Runtime }) {
     window.addEventListener('beforeunload', beforeUnload);
     return () => window.removeEventListener('beforeunload', beforeUnload);
   }, [imports]);
-  async function exportSelected(ids: string[], format: 'bibtex' | 'apa' | 'csv') {
+  async function exportSelected(ids: string[], format: 'bibtex' | 'apa' | 'csv' | 'pdf') {
     try {
       const items = await Promise.all(ids.map(id => owner.database.getItem(id)));
       if (items.some(item => !item)) throw new Error('部分条目已不存在，请重新选择');
+      const pdf = format === 'pdf' ? await (await import('@/domain/library/export-pdfs')).exportLibraryPdfs(items as LibraryRow[]) : undefined;
       const { exportNotes } = await import('@/domain/notes/export');
       const notes = await exportNotes(items as LibraryRow[]);
       if (notes) downloadFile(notes, 'Paperpane-notes.zip');
+      if (pdf) {
+        downloadFile(pdf.blob, pdf.name);
+        if (pdf.missing.length) toast.show({ tone: 'warning', message: `已导出 PDF；${pdf.missing.length} 条书目没有 PDF，已跳过` });
+        return;
+      }
       const { exportCitations } = await import('@/domain/library/bibliography');
+      if (format === 'pdf') return;
       const text = exportCitations(items as LibraryRow[], format);
       if (format === 'csv') downloadFile(new Blob([text], { type: 'text/csv;charset=utf-8' }), 'Paperpane-citations.csv');
       else {

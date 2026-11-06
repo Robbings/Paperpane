@@ -38,6 +38,7 @@ export interface ResearchMessage extends ChatMessage {
 export interface ResearchConversation extends Omit<Conversation, "messages"> {
   messages: ResearchMessage[];
   reasoning?: string;
+  webSearch?: boolean;
   initialPromptId?: string;
   textSources?: import("@/contracts/document").SelectionSnapshot[];
 }

@@ -218,6 +218,7 @@ function ConversationPanel({
         models={service.models().map((m) => ({
           ...m,
           vision: m.capabilities.vision,
+          webSearch: m.capabilities.webSearch,
           reasoningLevels: m.capabilities.reasoningLevels,
         }))}
         sessions={service.record.sessions

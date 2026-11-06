@@ -52,6 +52,7 @@ export interface ChatPanelProps {
   onModel: (modelId: string) => void;
   /** Sets the session's thinking strength. */
   onReasoning?: (level: string) => void;
+  onWebSearch?: (enabled: boolean) => void;
   /** Starts picking a region of the paper to attach as an image. */
   onCaptureRegion?: () => void;
   onPasteImages?: (files: File[]) => void;
@@ -264,6 +265,8 @@ export function ChatPanel(props: ChatPanelProps) {
           onStop={props.onStop}
           onLatest={scroll.away?scroll.pin:undefined}
           onModel={props.onModel}
+          webSearch={session?.webSearch}
+          onWebSearch={props.onWebSearch}
           reasoning={session?.reasoning}
           onReasoning={props.onReasoning}
           onCaptureRegion={props.onCaptureRegion}

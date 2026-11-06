@@ -1,4 +1,4 @@
-import { cancelMarkdownUploads } from '@/domain/notes/assets';
+import { cancelMarkdownUploads, markdownWork } from '@/domain/notes/assets';
 import { NotesEditorPanel } from '@/ui/markdown/NotesEditorPanel';
 import { useResearch } from './use-research';
 import { useCallback, useEffect, useRef, useState } from 'react';
@@ -94,7 +94,7 @@ export function LiveReaderPage() {
     onAnnotationColor:(id,color)=>owner?.colorAnnotation(id,color),
     onAnnotationComment:(id,comment)=>owner?.annotations?.edit(id,{comment}),
     onAnnotationCommentDelete:async id=>{cancelMarkdownUploads('comment:'+id);return owner?.annotations?.deleteComment(id)??null;},
-    onAnnotationDelete:async id=>{cancelMarkdownUploads('comment:'+id);const ok=await owner?.annotations?.deleteCurrent(id)??false;if(ok)owner?.reader.dismissMenu();return ok;},
+    onAnnotationDelete:async (id,onlyIfEmpty)=>{if(onlyIfEmpty&&markdownWork.uploads.hasOwner('comment:'+id))return false;if(!onlyIfEmpty)cancelMarkdownUploads('comment:'+id);const ok=await owner?.annotations?.deleteCurrent(id,onlyIfEmpty)??false;if(ok)owner?.reader.dismissMenu();return ok;},
     onAnnotationRestore:async id=>{await owner?.annotations?.restoreDeleted(id);},
     annotationRects:id=>{const row=owner?.item(id);return row ? owner?.rects(row.anchor)??null : null;},
     subscribeGeometry:listener=>owner?.reader.subscribeProjection('viewport',listener)??(()=>{}),
