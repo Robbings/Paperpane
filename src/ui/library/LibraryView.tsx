@@ -147,7 +147,7 @@ export function LibraryView(props: LibraryViewProps) {
     tag: [...tags].sort((a, b) => a.label.localeCompare(b.label, 'zh-CN')).map((tag) => ({ id: tag.id, label: tag.label, icon: 'tag' as const })),
     move: folderEntries(folders, null).map((entry) => ('checked' in entry ? { ...entry, checked: undefined } : entry)),
     export: [
-      { id: 'pdf', label: '下载 PDF（含批注）' },
+      { id: 'pdf', label: '下载 PDF' },
       { id: 'bibtex', label: '复制为 BibTeX' },
       { id: 'apa', label: '复制为 APA 格式' },
       { id: 'csv', label: '下载 CSV' },

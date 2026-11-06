@@ -323,7 +323,6 @@ function ConversationPanel({
             redraw((n) => n + 1);
           });
         }}
-        onWebSearch={(v) => void service.setWebSearch(sid, v).catch(report)}
         onReasoning={(v) => void service.reasoning(sid, v)}
         onCaptureRegion={onCapture}
         onPasteImages={(files)=>{
