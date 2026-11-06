@@ -5,11 +5,13 @@ import { useBrowserEntry } from './use-browser-entry';
 import { useLocalPreferences } from './use-local-preferences';
 import { useModelSettings } from './use-model-settings';
 import { usePopupData } from './use-popup-data';
+import { useUpdate } from './use-update';
 import { GUIDE_URL, markOnboarding } from './onboarding';
 
 export function LivePopupPage() {
   const preferences = useLocalPreferences(), model = useModelSettings(), entry = useBrowserEntry();
-  const data=usePopupData();
+  const data=usePopupData(), update=useUpdate();
+  const latest=update.state?.available&&!update.state.dismissed?update.state.latest:undefined;
   const [error, setError] = useState<string>();
   const open = (path: string) => { void browser.tabs.create({ url:new URL(path,browser.runtime.getURL('/')).href }).catch(() => setError('无法打开页面，请重试。')); };
   return <PopupView activeTab={data.activeTab}
@@ -24,5 +26,7 @@ export function LivePopupPage() {
     onOpenSettings={section=>open(`/options.html${section?'#'+section:''}`)}
     setupNeeded={!model.loading&&!model.settings.models.length&&!model.settings.translationApis?.length}
     onOpenGuide={()=>{void markOnboarding({welcomed:true}).catch(()=>{});open(GUIDE_URL);}}
+    update={latest&&update.state?{version:latest.version,current:update.state.current}:undefined}
+    onOpenUpdate={()=>open('/options.html#about')} onDismissUpdate={()=>latest&&update.dismiss(latest.version)}
     status={{...model.status,local:preferences.state.local==='failed'?'failed':model.status.local}}/>;
 }

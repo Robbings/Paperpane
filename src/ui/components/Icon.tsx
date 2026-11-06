@@ -38,6 +38,8 @@ const paths = {
   lock: 'M7 11h10v8H7z M9 11V8.5a3 3 0 0 1 6 0V11',
   file: 'M7 4h7l4 4v12H7z M14 4v4h4',
   upload: 'M12 15V5 M8 9l4-4 4 4 M5 15v4h14v-4',
+  download: 'M12 5v10 M8 11l4 4 4-4 M5 15v4h14v-4',
+  info: 'M12 20a8 8 0 1 0 0-16 8 8 0 0 0 0 16z M12 11v5 M12 8v.3',
   close: 'M6.5 6.5l11 11 M17.5 6.5l-11 11',
   chevronDown: 'M7 10l5 5 5-5',
   chevronUp: 'M7 14l5-5 5 5',

@@ -422,3 +422,25 @@ body[data-page='popup'] {
 .pp-popup__hint button:hover {
   text-decoration: underline;
 }
+
+/* ---- Update ------------------------------------------------------------------------ */
+
+/* A newer version: laid out like the setup card, with a close button in the corner. */
+.pp-popup__update {
+  position: relative;
+  display: grid;
+  grid-template-columns: auto 1fr;
+  gap: 10px 10px;
+  padding: 12px 40px 12px 12px;
+}
+
+.pp-popup__update .pp-popup__primary {
+  grid-column: 1 / -1;
+  margin-right: -28px;
+}
+
+.pp-popup__update-close {
+  position: absolute;
+  top: 6px;
+  right: 6px;
+}

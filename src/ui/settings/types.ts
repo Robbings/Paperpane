@@ -283,14 +283,14 @@ export interface StatusSummary {
   syncMessage?: string;
 }
 
-export type SettingsSection = 'general' | 'models' | 'translation' | 'sync';
+export type SettingsSection = 'general' | 'models' | 'translation' | 'sync' | 'about';
 
 /** Old addresses (#features, #advanced, #privacy) land on the section that took them over. */
 export function sectionFromHash(hash: string): SettingsSection {
   const id = hash.replace(/^#/, '');
   if (id === 'features') return 'translation';
   if (id === 'advanced') return 'models';
-  return id === 'general' || id === 'models' || id === 'translation' || id === 'sync' ? id : 'general';
+  return id === 'general' || id === 'models' || id === 'translation' || id === 'sync' || id === 'about' ? id : 'general';
 }
 
 /** Turns a saved snapshot into an editable draft: every secret starts as "keep". */
