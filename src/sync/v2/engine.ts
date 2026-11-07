@@ -9,6 +9,7 @@ import { versionRows } from '../versions';
 import { DavError, WebDavClient } from '../webdav-client';
 import { responseBytes } from '../engine';
 import { loadAutomerge, type AutomergeApi } from './automerge';
+import { migrateFromV1 } from './migrate';
 import { CHANGES, HEADS, ROOT, listed, newWriter, pack, publishPointer, readPointers, register, unpack } from './discovery';
 import { capture, decode, encode, leafOf, overlappingText, read, settleConflicts, stored, type Leaf } from './entries';
 
@@ -41,6 +42,8 @@ interface State {
   published?: string;
   /** Writers seen so far, so a damaged registry cannot hide them. */
   writers?: string[];
+  /** The first version's library on this server was merged in (once per device and server). */
+  migrated?: boolean;
 }
 
 export interface SyncReport {
@@ -50,6 +53,8 @@ export interface SyncReport {
   /** Change files listed on the server. */
   files: number;
   docBytes: number;
+  /** The cloud backup made before migrating from the first version. */
+  backup?: string;
 }
 
 export async function synchronizeV2(signal: AbortSignal, options: { store?: TransferStore; connections?: ConnectionStore; client?: WebDavClient } = {}): Promise<SyncReport> {
@@ -80,7 +85,8 @@ export async function synchronizeV2(signal: AbortSignal, options: { store?: Tran
       let last = state.last, published = state.published;
       const writers = new Set(state.writers ?? []);
       let registered = true;
-      const save = () => ({ [STATE]: { where, doc: A.save(doc as any), seen: [...seen], queue, ready, writer, last, published, writers: [...writers] } satisfies State });
+      let migrated = !!state.migrated;
+      const save = () => ({ [STATE]: { where, doc: A.save(doc as any), seen: [...seen], queue, ready, writer, last, published, writers: [...writers], migrated } satisfies State });
       const folders = async () => {
         for (const dir of ['paperpane', ROOT, CHANGES, HEADS, 'paperpane/assets']) await client.mkdir(dir, signal);
         ready = true;
@@ -169,6 +175,15 @@ export async function synchronizeV2(signal: AbortSignal, options: { store?: Tran
       };
 
       if (!ready) await folders();
+
+      if (!migrated) {
+        await connections.write('transfer-sync-state', { ...previous, phase: 'running', message: '正在迁移旧版同步数据…' });
+        const result = await migrateFromV1(client, store, canonical(syncSnapshot(await store.snapshot(true))), where, signal);
+        report.backup = result.backup;
+        migrated = true;
+        await persist();
+        await connections.write('transfer-sync-state', { ...previous, phase: 'running', message: '正在同步…' });
+      }
 
       // 1. This device's edits since the last sync become one change, saved before any network step.
       const snapshot = canonical(syncSnapshot(await store.snapshot(true)));

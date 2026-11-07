@@ -4,7 +4,7 @@ import { requestImportOrigin } from '@/document/permissions';
 import { useSync } from '@/runtime/use-sync';
 import { useTransfer } from '@/runtime/use-transfer';
 import { cloudBackups, downloadCloudBackup, uploadCloudBackup } from '@/sync/cloud-backup';
-import { synchronize } from '@/sync/engine';
+import { synchronizeV2 } from '@/sync/v2/engine';
 import { ConnectionStore, zoteroFileStorage, type ZoteroFileStorage } from '@/sync/settings';
 import { WebDavClient } from '@/sync/webdav-client';
 import { ZoteroClient } from '@/zotero/client';
@@ -62,8 +62,7 @@ function WebDavGroup() {
       await db.saveDav(connection, capability.conditional, dav?.automatic ?? false);
       setPassword('');
       setEditing(false);
-      if (capability.conditional) done('WebDAV 已连接');
-      else toast.show({ tone: 'warning', message: '已连接，但这个服务器不支持可靠的同步，只能做云备份' });
+      done('WebDAV 已连接');
     } catch (error) {
       failed(error, '连接失败');
     } finally {
@@ -77,8 +76,8 @@ function WebDavGroup() {
     const abort = new AbortController();
     controller.current = abort;
     try {
-      await synchronize(abort.signal);
-      done('同步完成');
+      const report = await synchronizeV2(abort.signal);
+      done(report.versions ? `同步完成，另存了 ${report.versions} 个版本` : '同步完成');
     } catch (error) {
       if (!abort.signal.aborted) failed(error, '同步失败');
     } finally {
@@ -118,8 +117,6 @@ function WebDavGroup() {
     <Badge tone="busy">同步中</Badge>
   ) : state.phase === 'failed' ? (
     <Badge tone="warn">同步失败</Badge>
-  ) : !dav.conditional ? (
-    <Badge tone="warn">仅云备份</Badge>
   ) : (
     <Badge tone="ok">已连接</Badge>
   );
@@ -171,20 +168,20 @@ function WebDavGroup() {
               断开
             </Button>
           </SettingRow>
-          <SettingRow label="立即同步" hint={dav.conditional ? '自动合并两端内容，不同改动会另存版本' : '服务器未通过文件版本校验，暂不支持多端同步；可以使用下方的云备份'}>
+          <SettingRow label="立即同步" hint="自动合并各设备的改动；同一处被改成不同内容时，另一份会存为版本">
             <span className="pp-set-value">{state.lastSuccess ? `上次 ${sinceText(state.lastSuccess)}` : '尚未同步'}</span>
             {running ? (
               <Button size="sm" variant="quiet" onClick={() => controller.current?.abort()}>
                 取消
               </Button>
             ) : (
-              <Button size="sm" disabled={!dav.conditional} onClick={() => void sync()}>
+              <Button size="sm" onClick={() => void sync()}>
                 同步
               </Button>
             )}
           </SettingRow>
           <SettingRow label="自动同步" hint="浏览器开着时每五分钟同步一次">
-            <Switch label="自动同步" hideLabel checked={dav.automatic} disabled={running || !dav.conditional} onChange={(value) => void automatic(value)} />
+            <Switch label="自动同步" hideLabel checked={dav.automatic} disabled={running} onChange={(value) => void automatic(value)} />
           </SettingRow>
           <SyncConflicts />
           <ZoteroDiscovery />
