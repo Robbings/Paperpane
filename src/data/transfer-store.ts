@@ -69,7 +69,8 @@ export class TransferStore extends PaperDatabase {
       if(Object.keys(entries).length){const channel=new BroadcastChannel('paperpane-transfer');channel.postMessage({type:'status'});channel.close();}
     }catch(error){try{tx.abort();}catch{}await completion.catch(()=>{});throw error;}
   }
-  async restore(snapshot:TransferSnapshot,expected?:TransferSnapshot,external?:TransferConflict['external']):Promise<TransferResult>{
+  /** `state` meta rows are written in the same transaction, so sync bookkeeping never runs ahead of or behind the data. */
+  async restore(snapshot:TransferSnapshot,expected?:TransferSnapshot,external?:TransferConflict['external'],state?:Record<string,unknown>):Promise<TransferResult>{
     const db=await this.open();
     if(snapshot.databases.length!==1||snapshot.databases[0]?.name!==db.name||snapshot.databases[0].version>db.version)throw new Error('备份数据库版本不兼容');
     const incoming=snapshot.databases[0].stores;
@@ -88,6 +89,12 @@ export class TransferStore extends PaperDatabase {
       for(const tag of incoming.libraryTags??[]){const found=current.libraryTags.find(t=>t.normalized===tag.normalized);if(found)mapping.set(String(tag.id),String(found.id));}
       for(const item of incoming.libraryItems??[]){const docId=mapping.get(String(item.documentId))??item.documentId;const found=current.libraryItems.find(i=>docId&&i.documentId===docId);if(found)mapping.set(String(item.id),String(found.id));}
       const result:TransferResult={imported:0,unchanged:0,conflicts:0,preserved:0,warnings:[]};
+      // Rows by key: a large library would otherwise compare every row against every other.
+      const keyOf=(name:string,r:any)=>String(name==='meta'||name==='libraryPreferences'?r.key:r.id);
+      const index=(name:string,rows:any[]|undefined)=>{const map=new Map<string,any>();for(const r of rows??[])map.set(keyOf(name,r),r);return map;};
+      const currentBy=new Map<string,Map<string,any>>(),expectedBy=new Map<string,Map<string,any>>();
+      const currentOf=(name:string)=>currentBy.get(name)??currentBy.set(name,index(name,current[name as keyof typeof current])).get(name)!;
+      const expectedOf=(name:string)=>expectedBy.get(name)??expectedBy.set(name,index(name,expected?.databases[0]?.stores[name]?.map(r=>remap(r,mapping)))).get(name)!;
       for(const [name,rows] of Object.entries(incoming))for(const original of rows){
         const portable=name==='meta'?portableMeta(original):original;if(!portable)continue;
         const row=remap(portable,mapping) as TransferRecord;
@@ -95,15 +102,15 @@ export class TransferStore extends PaperDatabase {
         const key=String(name==='meta'||name==='libraryPreferences'?row.key:row.id);
         if(!key||key==='undefined')throw new Error('恢复记录缺少标识');
         if(name==='meta'&&key.startsWith('transfer-version:')){const existing=current.meta.find(r=>r.key===key);if(!existing||String((row.value as any)?.savedAt)<String(existing.value?.savedAt))tx.objectStore('meta').put(row);continue;}
-        const old=current[name as keyof typeof current]?.find((r:any)=>String(name==='meta'||name==='libraryPreferences'?r.key:r.id)===key);
+        const old=currentOf(name).get(key);
         if(!old){tx.objectStore(name).put(durable(name,row));result.imported++;}
         else if(equal(payload(old),payload(row))){
           if(name==='documents'&&(old.file as any)?.availability!==(row.file as any)?.availability)tx.objectStore(name).put(durable(name,row));
           result.unchanged++;
         }
-        else if(expected?.databases[0]?.stores[name]?.some(r=>equal(payload(remap(r,mapping)),payload(old)))){tx.objectStore(name).put(durable(name,row));result.imported++;}
+        else if(expectedOf(name).has(key)&&equal(payload(expectedOf(name).get(key)),payload(old))){tx.objectStore(name).put(durable(name,row));result.imported++;}
         else{
-          const base=expected?.databases[0]?.stores[name]?.map(r=>remap(r,mapping)).find(r=>String(name==='meta'||name==='libraryPreferences'?r.key:r.id)===key);
+          const base=expectedOf(name).get(key);
           const entity=[db.name,name,key].map(encodeURIComponent).join('/');
           const merged=mergeEntities(base?{[entity]:payload(base)}:{},{[entity]:payload(old)},{[entity]:payload(row)});
           const next=merged.records[entity]!;
@@ -114,6 +121,7 @@ export class TransferStore extends PaperDatabase {
         }
       }
       if(external)await this.updateExternal(tx,external);
+      for(const [key,value] of Object.entries(state??{}))tx.objectStore('meta').put({key,value});
       for(const asset of snapshot.assets){if(asset.database!==db.name)throw new Error('文件来源数据库无效');const {database,...data}=asset;tx.objectStore('assets').put(data);}
       if(!snapshot.complete)result.warnings.push('这份备份不含 PDF 和图片');
       if(snapshot.version===1)result.warnings.push('旧版备份，可能缺少部分笔记');

@@ -8,9 +8,9 @@ export function stable(value: unknown): string {
 }
 const same = (a: unknown, b: unknown) => stable(a) === stable(b);
 const object = (v: any): v is Record<string, any> => !!v && typeof v === 'object' && !Array.isArray(v);
-const quiet = new Set(['revision','updatedAt','save','documentKey','position','lastReadAt','activeDiscussionId','activeExplanationId','activeOverviewId','explanationWindows','layout','generation','usage','context','state','error']);
-const setFields = new Set(['tagIds','folderIds','sources','collections','editedFields']);
-const textFields = new Set(['markdown','comment','shortNote','text']);
+export const quiet = new Set(['revision','updatedAt','save','documentKey','position','lastReadAt','activeDiscussionId','activeExplanationId','activeOverviewId','explanationWindows','layout','generation','usage','context','state','error']);
+export const setFields = new Set(['tagIds','folderIds','sources','collections','editedFields']);
+export const textFields = new Set(['markdown','comment','shortNote','text']);
 const preferred = (a: any, b: any) => stable(a) > stable(b) ? a : b;
 
 /** Combine disjoint edits only. Overlapping replacements are preserved as versions. */
