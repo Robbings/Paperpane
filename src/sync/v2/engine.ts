@@ -9,19 +9,19 @@ import { versionRows } from '../versions';
 import { DavError, WebDavClient } from '../webdav-client';
 import { responseBytes } from '../engine';
 import { loadAutomerge, type AutomergeApi } from './automerge';
+import { CHANGES, HEADS, ROOT, listed, newWriter, pack, publishPointer, readPointers, register, unpack } from './discovery';
 import { capture, decode, encode, leafOf, overlappingText, read, settleConflicts, stored, type Leaf } from './entries';
 
 // 同步第二版：合并交给 Automerge，云端只放不可变文件。
 //
 //   paperpane/sync-v2/changes/<sha256>.bin   一批改动；文件名就是内容哈希，写了不再改
+//   paperpane/sync-v2/heads, writers.json    用来发现新文件，见 discovery.ts
 //   paperpane/assets/<sha256>.pdf|png        附件，沿用第一版
 //
-// 每台设备只追加新文件，从不改写已有文件，所以服务器不必支持条件写入；
-// 同名文件内容必然相同，重传也不会覆盖别人的东西。
+// 改动文件只追加、从不改写，所以服务器不必支持条件写入；同名文件内容必然相同，
+// 重传也不会覆盖别人的东西。
 
-const DIR = 'paperpane/sync-v2/changes';
 const STATE = 'transfer-sync-v2';
-const NAME = /^[a-f0-9]{64}\.bin$/;
 
 interface State {
   /** Server and account the document belongs to. */
@@ -34,6 +34,13 @@ interface State {
   queue: { name: string; bytes: Uint8Array }[];
   /** The folders exist on the server; checked again only when a write says otherwise. */
   ready?: boolean;
+  /** This device's writer id, and the newest change file it wrote (queued or not). */
+  writer?: string;
+  last?: string;
+  /** The head this device's pointer was last confirmed to hold. */
+  published?: string;
+  /** Writers seen so far, so a damaged registry cannot hide them. */
+  writers?: string[];
 }
 
 export interface SyncReport {
@@ -69,9 +76,13 @@ export async function synchronizeV2(signal: AbortSignal, options: { store?: Tran
       const seen = new Set(state.seen);
       const queue = [...state.queue];
       let ready = !!state.ready;
-      const save = () => ({ [STATE]: { where, doc: A.save(doc as any), seen: [...seen], queue, ready } satisfies State });
+      const writer = state.writer ?? newWriter();
+      let last = state.last, published = state.published;
+      const writers = new Set(state.writers ?? []);
+      let registered = true;
+      const save = () => ({ [STATE]: { where, doc: A.save(doc as any), seen: [...seen], queue, ready, writer, last, published, writers: [...writers] } satisfies State });
       const folders = async () => {
-        for (const dir of ['paperpane', 'paperpane/sync-v2', DIR, 'paperpane/assets']) await client.mkdir(dir, signal);
+        for (const dir of ['paperpane', ROOT, CHANGES, HEADS, 'paperpane/assets']) await client.mkdir(dir, signal);
         ready = true;
       };
       /** A write into a folder that went missing recreates the folders once. */
@@ -89,48 +100,71 @@ export async function synchronizeV2(signal: AbortSignal, options: { store?: Tran
         const heads = A.getHeads(before as any);
         if (heads.join() === A.getHeads(doc as any).join()) return;
         // From nothing, the whole compressed document is far smaller than the list of changes.
-        const bytes = heads.length ? A.saveSince(doc as any, heads) : A.save(doc as any);
-        queue.push({ name: (await sha256(bytes)) + '.bin', bytes });
+        const chunk = heads.length ? A.saveSince(doc as any, heads) : A.save(doc as any);
+        const bytes = pack({ writer, prev: last ?? null }, chunk);
+        last = (await sha256(bytes)) + '.bin';
+        queue.push({ name: last, bytes });
       };
       /** The base plus downloaded changes only, for showing the other side's text in a version. */
       let theirs: Record<string, unknown> | undefined;
+      /** Finds unmerged change files by following each writer's chain back from its newest file. */
       const pull = async () => {
-        const names = await client.names(DIR, signal);
-        report.files = names.filter((n) => NAME.test(n)).length;
+        const found = await readPointers(client, writers, signal);
+        for (const w of found.writers) writers.add(w);
+        registered = found.registered.includes(writer);
+        const ownHeads = found.heads.get(writer) ?? [];
+        if (published && !ownHeads.includes(published)) published = undefined; // a lost pointer write: publish again
+        const stack = [...[...found.heads.values()].flat(), ...(await listed(client, signal))];
         const got: string[] = [];
-        for (const name of names) {
+        while (stack.length) {
           signal.throwIfAborted();
-          if (!NAME.test(name) || seen.has(name)) continue;
+          const name = stack.pop()!;
+          if (seen.has(name) || got.includes(name)) continue;
           let bytes: Uint8Array;
           try {
-            bytes = await responseBytes(await client.download(`${DIR}/${name}`, signal), 256 * 1024 * 1024, signal);
+            bytes = await responseBytes(await client.download(`${CHANGES}/${name}`, signal), 256 * 1024 * 1024, signal);
           } catch (e) {
-            // A listed file can still be on its way (or briefly missing): try again next time.
+            // Named but not readable yet (or briefly missing): try again next time.
             if (signal.aborted) throw e;
             continue;
           }
           if ((await sha256(bytes)) !== name.slice(0, 64)) continue;
-          doc = A.loadIncremental(doc as any, bytes);
-          if (theirs) theirs = A.loadIncremental(theirs as any, bytes);
+          const { header, chunk } = unpack(bytes);
+          doc = A.loadIncremental(doc as any, chunk);
+          if (theirs) theirs = A.loadIncremental(theirs as any, chunk);
           got.push(name);
           report.downloaded++;
+          if (header?.prev && !seen.has(header.prev)) stack.push(header.prev);
+          if (header) writers.add(header.writer);
         }
         // Changes waiting for ones not downloaded yet stay queued inside the document;
         // their files are only marked done once nothing is missing.
         if (!A.getMissingDeps(doc as any, A.getHeads(doc as any)).length) for (const name of got) seen.add(name);
+        report.files = seen.size;
       };
       const flush = async () => {
         while (queue.length) {
           signal.throwIfAborted();
           const item = queue[0]!;
-          await write(`${DIR}/${item.name}`, new Blob([new Uint8Array(item.bytes)]));
+          await write(`${CHANGES}/${item.name}`, new Blob([new Uint8Array(item.bytes)]));
           // Read back: some bridges answer before the file is really stored.
-          const back = await responseBytes(await client.download(`${DIR}/${item.name}`, signal), 256 * 1024 * 1024, signal);
+          const back = await responseBytes(await client.download(`${CHANGES}/${item.name}`, signal), 256 * 1024 * 1024, signal);
           if ((await sha256(back)) !== item.name.slice(0, 64)) throw new Error('上传的同步文件校验失败');
           seen.add(item.name);
           queue.shift();
           report.uploaded++;
           await persist();
+        }
+        // Only now that the files are readable may the pointer name them.
+        if (last && last !== published && !queue.length) {
+          writers.add(writer);
+          await publishPointer(client, write, writer, last, published ? [published] : [], writers, signal);
+          published = last;
+          await persist();
+        }
+        if (!registered && published) {
+          await register(client, write, writer, writers, signal);
+          registered = true;
         }
       };
 
