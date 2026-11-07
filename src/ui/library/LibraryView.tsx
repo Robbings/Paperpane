@@ -10,6 +10,7 @@ import { ImportTasks, jobPending, UrlImportDialog } from './ImportTasks';
 import { BatchTagPopover, type BatchTagChoice, type BatchTagApplyResult } from './BatchTagPopover';
 import { LibraryToolbar, type ImportKind } from './LibraryToolbar';
 import { folderEntries, folderPath, PaperDetail } from './PaperDetail';
+import { TrashList, type TrashKind, type TrashView } from './TrashList';
 import type { FolderView, LibraryImports, LibraryQuery, LibraryViewPreferences, PaperView, TagView } from './types';
 import './library.css';
 
@@ -44,6 +45,14 @@ export interface LibraryViewProps {
   onRenameFolder: (id: string, name: string) => void;
   onMoveFolder: (id: string, parentId: string | null) => void;
   onDeleteFolder: (id: string) => void;
+  /** What deleting a folder takes to the trash with it, for the confirmation. */
+  onPreviewDeleteFolder?: (id: string) => Promise<{ folders: number; papers: number }>;
+  /** The trash, when it is the open collection; null while loading. */
+  trash?: TrashView | null;
+  trashDays?: number;
+  onRestoreTrash?: (kind: TrashKind, id: string) => void;
+  onPurgeTrash?: (kind: TrashKind, id: string) => void;
+  onEmptyTrash?: () => void;
   onImport: (kind: ImportKind, files: File[], folderId: string | null) => void;
   /** The import queue and link import; without it the toolbar shows only file imports. */
   imports?: LibraryImports;
@@ -67,6 +76,9 @@ export function LibraryView(props: LibraryViewProps) {
   const [activeId, setActiveId] = useState<string | null>(papers[0]?.id ?? null);
   const [renamingId, setRenamingId] = useState<string | null>(null);
   const [confirmRemove, setConfirmRemove] = useState<string[] | null>(null);
+  const [confirmFolder, setConfirmFolder] = useState<{ id: string; name: string; folders: number; papers: number } | null>(null);
+  const [confirmPurge, setConfirmPurge] = useState<{ kind: TrashKind; id: string; name: string } | 'all' | null>(null);
+  const trashDays = props.trashDays ?? 30;
   const [batchMenu, setBatchMenu] = useState<BatchMenu>(null);
   const [dropping, setDropping] = useState(false);
   const dragDepth = useRef(0);
@@ -113,6 +125,7 @@ export function LibraryView(props: LibraryViewProps) {
     : query.collection.kind === 'recent' ? '最近阅读'
     : query.collection.kind === 'starred' ? '已标星'
     : query.collection.kind === 'unfiled' ? '未分类'
+    : query.collection.kind === 'trash' ? '回收站'
     : folderPath(folders, query.collection.folderId);
 
   const filtering = query.text.trim() !== '' || query.tagIds.length > 0;
@@ -212,8 +225,10 @@ export function LibraryView(props: LibraryViewProps) {
         onRenameCancel={() => setRenamingId(null)}
         onMoveFolder={props.onMoveFolder}
         onDeleteFolder={(id) => {
-          if (currentFolder === id) changeQuery({ collection: { kind: 'all' } });
-          props.onDeleteFolder(id);
+          const name = folders.find((f) => f.id === id)?.name ?? '文件夹';
+          const ask = (preview: { folders: number; papers: number }) => setConfirmFolder({ id, name, ...preview });
+          if (props.onPreviewDeleteFolder) void props.onPreviewDeleteFolder(id).then(ask, () => ask({ folders: 0, papers: 0 }));
+          else ask({ folders: 0, papers: 0 });
         }}
         onMovePapers={props.onMovePapers}
       />
@@ -223,7 +238,8 @@ export function LibraryView(props: LibraryViewProps) {
         <section className="pp-lib-list" aria-label={heading}>
           <LibraryToolbar
             heading={heading}
-            count={total}
+            countUnit={query.collection.kind === 'trash' ? '项' : undefined}
+            count={query.collection.kind === 'trash' ? (props.trash ? props.trash.folders.length + props.trash.papers.length : 0) : total}
             text={query.text}
             onText={(text) => changeQuery({ text })}
             fields={query.fields}
@@ -251,6 +267,16 @@ export function LibraryView(props: LibraryViewProps) {
             detailOpen={detailOpen}
             onToggleDetail={() => props.onPrefs({ detailOpen: !detailOpen })}
           />
+          {query.collection.kind === 'trash' ? (
+            <TrashList
+              trash={props.trash ?? null}
+              days={trashDays}
+              onRestore={(kind, id) => props.onRestoreTrash?.(kind, id)}
+              onPurge={(kind, id, name) => setConfirmPurge({ kind, id, name })}
+              onEmpty={() => setConfirmPurge('all')}
+            />
+          ) : (
+          <>
           <LibraryTable
             papers={papers}
             tagsById={tagsById}
@@ -296,10 +322,12 @@ export function LibraryView(props: LibraryViewProps) {
                 导出
               </Button>
               <Button size="sm" variant="danger" icon="trash" onClick={() => setConfirmRemove(selectedIds)}>
-                移出
+                删除
               </Button>
               <IconButton icon="close" label="取消选择" size="md" shape="pill" onClick={() => setSelectedIds([])} />
             </GlassSurface>
+          )}
+          </>
           )}
         </section>
       </main>
@@ -357,8 +385,8 @@ export function LibraryView(props: LibraryViewProps) {
       <Dialog
         open={confirmRemove !== null}
         onClose={() => setConfirmRemove(null)}
-        title={confirmRemove && confirmRemove.length > 1 ? `把 ${confirmRemove.length} 篇论文移出文献库？` : '把这篇论文移出文献库？'}
-        description="只是不再出现在文献库里。PDF 文件、批注和笔记都会保留，再次收藏即可恢复。"
+        title={confirmRemove && confirmRemove.length > 1 ? `把 ${confirmRemove.length} 篇论文移到回收站？` : '把这篇论文移到回收站？'}
+        description={`${trashDays} 天内可以在回收站恢复；之后连同 PDF、批注和笔记一起彻底删除。`}
         footer={
           <>
             <Button onClick={() => setConfirmRemove(null)}>取消</Button>
@@ -370,7 +398,65 @@ export function LibraryView(props: LibraryViewProps) {
                 setConfirmRemove(null);
               }}
             >
-              移出
+              移到回收站
+            </Button>
+          </>
+        }
+      />
+
+      <Dialog
+        open={confirmFolder !== null}
+        onClose={() => setConfirmFolder(null)}
+        title={`删除文件夹「${confirmFolder?.name ?? ''}」？`}
+        description={
+          confirmFolder && (confirmFolder.folders || confirmFolder.papers)
+            ? `其中的 ${[confirmFolder.folders ? `${confirmFolder.folders} 个子文件夹` : '', confirmFolder.papers ? `${confirmFolder.papers} 篇论文` : ''].filter(Boolean).join('和 ')}会一起移到回收站，${trashDays} 天内可以整体恢复。同时放在其他文件夹里的论文不会被删除。`
+            : `文件夹会移到回收站，${trashDays} 天内可以恢复。`
+        }
+        footer={
+          <>
+            <Button onClick={() => setConfirmFolder(null)}>取消</Button>
+            <Button
+              variant="danger"
+              onClick={() => {
+                if (confirmFolder) {
+                  // Leave the folder being deleted, or one inside it.
+                  for (let at: string | null = currentFolder; at; at = folders.find((f) => f.id === at)?.parentId ?? null)
+                    if (at === confirmFolder.id) { changeQuery({ collection: { kind: 'all' } }); break; }
+                  props.onDeleteFolder(confirmFolder.id);
+                }
+                setConfirmFolder(null);
+              }}
+            >
+              删除
+            </Button>
+          </>
+        }
+      />
+
+      <Dialog
+        open={confirmPurge !== null}
+        onClose={() => setConfirmPurge(null)}
+        title={confirmPurge === 'all' ? '清空回收站？' : `彻底删除「${confirmPurge?.name ?? ''}」？`}
+        description={
+          confirmPurge === 'all'
+            ? '回收站里的所有论文和文件夹会连同 PDF、批注、笔记和对话一起删除，无法恢复。已连接同步的其他设备也会删除。'
+            : confirmPurge?.kind === 'folder'
+              ? '文件夹和一起删除的论文会连同 PDF、批注、笔记和对话一起删除，无法恢复。已连接同步的其他设备也会删除。'
+              : '论文会连同 PDF、批注、笔记和对话一起删除，无法恢复。已连接同步的其他设备也会删除。'
+        }
+        footer={
+          <>
+            <Button onClick={() => setConfirmPurge(null)}>取消</Button>
+            <Button
+              variant="danger"
+              onClick={() => {
+                if (confirmPurge === 'all') props.onEmptyTrash?.();
+                else if (confirmPurge) props.onPurgeTrash?.(confirmPurge.kind, confirmPurge.id);
+                setConfirmPurge(null);
+              }}
+            >
+              彻底删除
             </Button>
           </>
         }

@@ -153,7 +153,7 @@ function SampleReader() {
           },
           onRemove: () => {
             setSaved(false);
-            toast.show({ message: '已移出文献库，批注和笔记仍然保留', action: { label: '撤销', onAction: () => setSaved(true) } });
+            toast.show({ message: '已移到回收站', action: { label: '撤销', onAction: () => setSaved(true) } });
           },
           onCreateFolder: (parentId, name) => {
             const id = `f-${Date.now()}`;

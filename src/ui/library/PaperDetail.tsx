@@ -223,7 +223,7 @@ export function PaperDetail(props: PaperDetailProps) {
         </Button>
         <span className="pp-lib-detail__spacer" />
         <Button variant="danger" icon="trash" onClick={() => props.onRemove(paper.id)}>
-          移出
+          删除
         </Button>
       </div>
 

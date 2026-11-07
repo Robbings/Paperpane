@@ -113,7 +113,7 @@ export class LibraryDatabase extends PaperDatabase {
       const folders = (await req(tx.objectStore(FOLDERS).getAll()) as LibraryFolder[]).filter(f => !f.deletedAt);
       const tags = (await req(tx.objectStore(TAGS).getAll()) as LibraryTag[]).filter(t => !t.deletedAt);
       const pref = await req(tx.objectStore(PREFERENCES).get('view'));
-      const counts = { all: 0, recent: 0, starred: 0, unfiled: 0, folders: Object.fromEntries(folders.map(f => [f.id, 0])) };
+      const counts = { all: 0, recent: 0, starred: 0, unfiled: 0, trash: 0, folders: Object.fromEntries(folders.map(f => [f.id, 0])) };
       const folderSets = new Map(folders.map(f => [f.id, descendants(folders, f.id)]));
       const tagMap = new Map(tags.map(t => [t.id, t.label]));
       const items: LibraryRow[] = []; let total = 0;
@@ -143,6 +143,8 @@ export class LibraryDatabase extends PaperDatabase {
           const current = cursor.result; if (!current) { resolve(); return; }
           const item = current.value as LibraryItem;
           if (item.deletedAt) { current.continue(); return; }
+          // Trashed papers appear only in the trash, which has its own listing.
+          if (item.trashedAt) { if (!item.trashBatch) counts.trash++; current.continue(); return; }
           const accept = (doc?: StoredDocument) => {
             try {
               const r = row(item, doc);
@@ -152,6 +154,7 @@ export class LibraryDatabase extends PaperDatabase {
               }
               if (r.lastReadAt) counts.recent++;
               let matches = query.collection.kind === 'recent' ? !!r.lastReadAt : item.inLibrary;
+              if (query.collection.kind === 'trash') matches = false;
               if (query.collection.kind === 'starred') matches &&= item.starred;
               if (query.collection.kind === 'unfiled') matches &&= !itemFolders(item).length;
               if (query.collection.kind === 'folder') matches &&= itemFolders(item).some(id => folderSets.get((query.collection as {folderId:string}).folderId)?.has(id));
@@ -182,6 +185,7 @@ export class LibraryDatabase extends PaperDatabase {
         const rows = ref ? await req(annotations.getAll([ref.documentId, ref.fileVersion])) : [];
         item.annotationCount = rows.filter(annotation => !annotation.deletedAt).length;
       }));
+      counts.trash += (await req(tx.objectStore(FOLDERS).getAll()) as LibraryFolder[]).filter(f => f.deletedAt && f.trashBatch && !f.parentId).length;
       return { items, total, folders, tags, counts, preferences: pref?.value ?? structuredClone(libraryDefaults), unavailableSearchFields: ['body', 'summary'], collectionTagIds: [...collectionTags] };
     }, [...stores, 'annotations']);
   }
@@ -260,7 +264,9 @@ export class LibraryDatabase extends PaperDatabase {
   async membership(ids: readonly string[], inLibrary: boolean): Promise<{ id: string; revision: string }[]> {
     return this.run('readwrite', async tx => {
       const changed = [];
-      for (const item of await this.items(tx, ids)) changed.push(await this.changed(tx, LIBRARY, { ...item, inLibrary }));
+      const at = new Date().toISOString();
+      // Removing sends the paper to the trash; adding takes it out again.
+      for (const item of await this.items(tx, ids)) changed.push(await this.changed(tx, LIBRARY, { ...item, inLibrary, trashedAt: inLibrary ? undefined : at, trashBatch: undefined }));
       return changed.map(({ id, revision }) => ({ id, revision }));
     });
   }
@@ -269,7 +275,58 @@ export class LibraryDatabase extends PaperDatabase {
       for (const expected of items) {
         const [item] = await this.items(tx, [expected.id]);
         if (item!.revision !== expected.revision) throw new LibraryFault('CONFLICT', '条目已有后续修改，无法直接撤销；可重新收藏');
-        await this.changed(tx, LIBRARY, { ...item!, inLibrary: true });
+        await this.changed(tx, LIBRARY, { ...item!, inLibrary: true, trashedAt: undefined, trashBatch: undefined });
+      }
+    });
+  }
+  /** What deleting a folder takes to the trash with it. */
+  async folderDeletion(id: string): Promise<{ folders: number; papers: number }> {
+    return this.run('readonly', async tx => {
+      const all = (await req(tx.objectStore(FOLDERS).getAll()) as LibraryFolder[]).filter(f => !f.deletedAt);
+      const tree = descendants(all, id);
+      const entries = (await req(tx.objectStore(LIBRARY).getAll()) as LibraryItem[]).filter(p => p.inLibrary && !p.trashedAt);
+      return { folders: tree.size - 1, papers: entries.filter(p => itemFolders(p).length && itemFolders(p).every(f => tree.has(f))).length };
+    });
+  }
+  /** The trash: deleted folders (each with what went with it) and papers removed on their own. */
+  async trash(): Promise<{ folders: { id: string; name: string; deletedAt: string; batch: string; folders: number; papers: number }[]; papers: { id: string; title: string; trashedAt: string }[] }> {
+    return this.run('readonly', async tx => {
+      const folders = (await req(tx.objectStore(FOLDERS).getAll()) as LibraryFolder[]).filter(f => f.deletedAt && f.trashBatch);
+      const items = (await req(tx.objectStore(LIBRARY).getAll()) as LibraryItem[]).filter(p => p.trashedAt && !p.deletedAt);
+      const roots = folders.filter(f => !folders.some(o => o.id === f.parentId && o.trashBatch === f.trashBatch));
+      return {
+        folders: roots.map(f => ({ id: f.id, name: f.name, deletedAt: f.deletedAt!, batch: f.trashBatch!, folders: folders.filter(o => o.trashBatch === f.trashBatch).length - 1, papers: items.filter(p => p.trashBatch === f.trashBatch).length })).sort((a, b) => b.deletedAt.localeCompare(a.deletedAt)),
+        papers: items.filter(p => !p.trashBatch || !folders.some(f => f.trashBatch === p.trashBatch)).map(p => ({ id: p.id, title: p.title, trashedAt: p.trashedAt! })).sort((a, b) => b.trashedAt.localeCompare(a.trashedAt)),
+      };
+    });
+  }
+  /** Takes a paper, or a deleted folder with everything deleted with it, out of the trash. */
+  async restoreFromTrash(kind: 'paper' | 'folder', id: string): Promise<void> {
+    await this.run('readwrite', async tx => {
+      const folders = await req(tx.objectStore(FOLDERS).getAll()) as LibraryFolder[];
+      const live = new Set(folders.filter(f => !f.deletedAt).map(f => f.id));
+      if (kind === 'paper') {
+        const [item] = await this.items(tx, [id]);
+        // Folders still in the trash are dropped from its memberships.
+        const kept = itemFolders(item!).filter(f => live.has(f));
+        await this.changed(tx, LIBRARY, { ...item!, inLibrary: true, trashedAt: undefined, trashBatch: undefined, folderId: kept[0] ?? null, folderIds: kept.slice(1) });
+        return;
+      }
+      const batch = required(folders.find(f => f.id === id && f.deletedAt), '这个文件夹不在回收站里').trashBatch;
+      const restored = folders.filter(f => f.deletedAt && f.trashBatch && f.trashBatch === batch);
+      for (const f of restored) live.add(f.id);
+      for (const f of restored) await this.changed(tx, FOLDERS, { ...f, deletedAt: undefined, trashBatch: undefined, parentId: f.parentId && live.has(f.parentId) ? f.parentId : null });
+      for (const item of (await req(tx.objectStore(LIBRARY).getAll()) as LibraryItem[])) {
+        if (item.trashBatch === batch && item.trashedAt) {
+          const kept = itemFolders(item).filter(f => live.has(f));
+          await this.changed(tx, LIBRARY, { ...item, inLibrary: true, trashedAt: undefined, trashBatch: undefined, folderId: kept[0] ?? null, folderIds: kept.slice(1) });
+        } else if (item.detachedFrom?.some(d => d.batch === batch)) {
+          // Papers that stayed because they were also filed elsewhere go back into these folders.
+          const back = item.detachedFrom.filter(d => d.batch === batch).flatMap(d => d.folders).filter(f => live.has(f));
+          const all = [...new Set([...itemFolders(item), ...back])];
+          const rest = item.detachedFrom.filter(d => d.batch !== batch);
+          await this.changed(tx, LIBRARY, { ...item, folderId: all[0] ?? null, folderIds: all.slice(1), detachedFrom: rest.length ? rest : undefined });
+        }
       }
     });
   }
@@ -288,12 +345,20 @@ export class LibraryDatabase extends PaperDatabase {
         item.parentId = parentId;
       }
       if (action === 'delete') {
-        if (all.some(f => f.parentId === id)) throw new LibraryFault('INVALID_INPUT', '请先清空子文件夹');
+        // The folder, its subfolders and the papers only filed inside them go to the trash
+        // together and come back together. A paper also filed elsewhere stays, minus these folders.
+        const tree = descendants(all, id), batch = crypto.randomUUID(), at = new Date().toISOString();
         const entries = await req(tx.objectStore(LIBRARY).getAll()) as LibraryItem[];
-        if (entries.some(p => p.inLibrary && itemFolders(p).includes(id))) throw new LibraryFault('INVALID_INPUT', '请先移出文件夹内的论文');
-        // Removed memberships must not retain dangling folder references when restored.
-        for (const entry of entries.filter(p => itemFolders(p).includes(id))) { const remaining = itemFolders(entry).filter(folder => folder !== id); await this.changed(tx, LIBRARY, { ...entry, folderId: remaining[0] ?? null, folderIds: remaining.slice(1) }); }
-        item.deletedAt = new Date().toISOString();
+        for (const entry of entries) {
+          const inside = itemFolders(entry).filter(f => tree.has(f));
+          if (!inside.length) continue;
+          const outside = itemFolders(entry).filter(f => !tree.has(f));
+          if (entry.inLibrary && !entry.trashedAt && !outside.length) await this.changed(tx, LIBRARY, { ...entry, inLibrary: false, trashedAt: at, trashBatch: batch });
+          else if (outside.length) await this.changed(tx, LIBRARY, { ...entry, folderId: outside[0]!, folderIds: outside.slice(1), detachedFrom: [...(entry.detachedFrom ?? []), { batch, folders: inside }] });
+        }
+        for (const folder of all.filter(f => tree.has(f.id) && f.id !== id)) await this.changed(tx, FOLDERS, { ...folder, deletedAt: at, trashBatch: batch }, 'delete');
+        item.deletedAt = at;
+        (item as LibraryFolder).trashBatch = batch;
       }
       await this.changed(tx, FOLDERS, item, action === 'delete' ? 'delete' : 'upsert');
     });

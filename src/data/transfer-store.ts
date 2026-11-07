@@ -4,6 +4,12 @@ import { recordPayload as payload } from '@/transfer/records';
 import { stable, sameContent, mergeEntities, contentAt, replaceContent, type MergeVersion } from '@/sync/merge';
 import { savedVersion, type SavedVersion } from '@/sync/versions';
 import type { TransferSnapshot, TransferRecord, TransferResult } from '@/contracts/transfer';
+import { canonical, flatten } from '@/sync/manifest';
+
+/** Days a paper or folder stays in the trash before it is deleted for good. */
+export const TRASH_DAYS=30;
+/** Sync keys of permanently deleted records not yet written to the sync document. */
+export const PURGED_KEY='transfer-sync-purged';
 export const TRANSFER_STORES=['documents','libraryItems','libraryFolders','libraryTags','libraryPreferences','annotations','annotationLayouts','meta'] as const;
 const request=<T>(r:IDBRequest<T>)=>new Promise<T>((ok,no)=>{r.onsuccess=()=>ok(r.result);r.onerror=()=>no(r.error);});
 const done=(tx:IDBTransaction)=>new Promise<void>((ok,no)=>{tx.oncomplete=()=>ok();tx.onabort=()=>no(tx.error??new Error('存储事务失败'));});
@@ -70,7 +76,7 @@ export class TransferStore extends PaperDatabase {
     }catch(error){try{tx.abort();}catch{}await completion.catch(()=>{});throw error;}
   }
   /** `state` meta rows are written in the same transaction, so sync bookkeeping never runs ahead of or behind the data. */
-  async restore(snapshot:TransferSnapshot,expected?:TransferSnapshot,external?:TransferConflict['external'],state?:Record<string,unknown>):Promise<TransferResult>{
+  async restore(snapshot:TransferSnapshot,expected?:TransferSnapshot,external?:TransferConflict['external'],state?:Record<string,unknown>,remove:readonly string[]=[]):Promise<TransferResult>{
     const db=await this.open();
     if(snapshot.databases.length!==1||snapshot.databases[0]?.name!==db.name||snapshot.databases[0].version>db.version)throw new Error('备份数据库版本不兼容');
     const incoming=snapshot.databases[0].stores;
@@ -122,6 +128,16 @@ export class TransferStore extends PaperDatabase {
       }
       if(external)await this.updateExternal(tx,external);
       for(const [key,value] of Object.entries(state??{}))tx.objectStore('meta').put({key,value});
+      // Records another device deleted for good (sync keys, canonical ids), with their stored files.
+      for(const entity of remove){
+        const [database,name,key]=entity.split('/').map(decodeURIComponent);
+        if(database!==db.name||!name||!key||!TRANSFER_STORES.includes(name as any))continue;
+        const local=mapping.get(key)??key;
+        const old=current[name as keyof typeof current]?.find((r:any)=>String(name==='meta'||name==='libraryPreferences'?r.key:r.id)===local);
+        if(!old)continue;
+        tx.objectStore(name).delete(local);
+        if(name==='documents'&&old.file?.assetId&&!current.documents.some(d=>d!==old&&d.file?.assetId===old.file.assetId))tx.objectStore('assets').delete(old.file.assetId);
+      }
       for(const asset of snapshot.assets){if(asset.database!==db.name)throw new Error('文件来源数据库无效');const {database,...data}=asset;tx.objectStore('assets').put(data);}
       if(!snapshot.complete)result.warnings.push('这份备份不含 PDF 和图片');
       if(snapshot.version===1)result.warnings.push('旧版备份，可能缺少部分笔记');
@@ -129,12 +145,63 @@ export class TransferStore extends PaperDatabase {
     }catch(error){try{tx.abort();}catch{}await completion.catch(()=>{});throw error;}
   }
   async trash():Promise<{store:string;key:string;record:TransferRecord}[]>{const db=await this.open(),names=['libraryItems','libraryFolders','libraryTags','annotations'];const tx=db.transaction(names,'readonly');return (await Promise.all(names.map(async name=>(await request(tx.objectStore(name).getAll())).filter(r=>r.deletedAt||(name==='libraryItems'&&r.inLibrary===false)).map(record=>({store:name,key:String(record.id),record}))))).flat();}
-  async restoreTrash(item:{store:string;key:string;record:TransferRecord}){const db=await this.open();if(!['libraryItems','libraryFolders','libraryTags','annotations'].includes(item.store))throw new Error('回收站记录无效');const tx=db.transaction(item.store,'readwrite',{durability:'strict'}),completion=done(tx);try{const current=await request(tx.objectStore(item.store).get(item.key));if(!equal(current,item.record))throw new Error('记录已改变，请重新读取');const value={...current,deletedAt:undefined,...(item.store==='libraryItems'?{inLibrary:true}:{})};tx.objectStore(item.store).put(durable(item.store,value));await completion;this.notify();}catch(e){try{tx.abort();}catch{}await completion.catch(()=>{});throw e;}}
+  async restoreTrash(item:{store:string;key:string;record:TransferRecord}){const db=await this.open();if(!['libraryItems','libraryFolders','libraryTags','annotations'].includes(item.store))throw new Error('回收站记录无效');const tx=db.transaction(item.store,'readwrite',{durability:'strict'}),completion=done(tx);try{const current=await request(tx.objectStore(item.store).get(item.key));if(!equal(current,item.record))throw new Error('记录已改变，请重新读取');const value={...current,deletedAt:undefined,trashBatch:undefined,...(item.store==='libraryItems'?{inLibrary:true,trashedAt:undefined}:{})};tx.objectStore(item.store).put(durable(item.store,value));await completion;this.notify();}catch(e){try{tx.abort();}catch{}await completion.catch(()=>{});throw e;}}
   private async updateExternal(tx:IDBTransaction,info:NonNullable<TransferConflict['external']>){
     const entry=await request(tx.objectStore('meta').get(info.mappingKey));if(!entry)return;
     if(info.slots){entry.value.annotationKeys??={};for(const slot of info.slots){const old=entry.value.annotationKeys[slot.id];if((old?.version??0)<=info.version)entry.value.annotationKeys[slot.id]={...old,key:slot.key,version:info.version};}}
     else if((entry.value.version??0)<=info.version){entry.value.version=info.version;if(info.original)entry.value.original=info.original;}
     tx.objectStore('meta').put(entry);
+  }
+  /**
+   * Permanently deletes papers from the trash, and deleted folders with everything that
+   * went to the trash with them: the library records, PDF record and file stored here,
+   * annotations, notes (and their images), AI conversations and translations. The records'
+   * sync keys are queued so other devices delete them too.
+   */
+  async purge(target:{papers?:readonly string[];folders?:readonly string[]}):Promise<number>{
+    const db=await this.open();
+    const tx=db.transaction([...TRANSFER_STORES,'assets'],'readwrite',{durability:'strict'}),completion=done(tx);void completion.catch(()=>{});
+    try{
+      const rows=Object.fromEntries(await Promise.all(TRANSFER_STORES.map(async name=>[name,await request(tx.objectStore(name).getAll())] as const))) as Record<typeof TRANSFER_STORES[number],any[]>;
+      const doomed:Record<string,any[]>={};
+      const drop=(store:string,row:any)=>{if(!(doomed[store]??=[]).includes(row))doomed[store]!.push(row);};
+      const batches=new Set(rows.libraryFolders.filter(f=>target.folders?.includes(f.id)&&f.deletedAt&&f.trashBatch).map(f=>f.trashBatch));
+      for(const f of rows.libraryFolders)if(f.deletedAt&&batches.has(f.trashBatch))drop('libraryFolders',f);
+      const items=rows.libraryItems.filter(i=>i.trashedAt&&(target.papers?.includes(i.id)||(i.trashBatch&&batches.has(i.trashBatch))));
+      for(const item of items){
+        drop('libraryItems',item);
+        const doc=item.documentId?rows.documents.find(d=>d.id===item.documentId):undefined;
+        if(!doc)continue;
+        drop('documents',doc);
+        for(const a of rows.annotations)if(a.anchor?.documentId===doc.id)drop('annotations',a);
+        for(const l of rows.annotationLayouts)if(l.document?.documentId===doc.id)drop('annotationLayouts',l);
+        const owned=new RegExp(`^(notes:v1|ai-v1|translation|formula-plan:v1|auto-translate-import):${doc.id.replace(/[.*+?^${}()|[\]\\]/g,'\\$&')}:`);
+        for(const m of rows.meta)if(owned.test(String(m.key))||String(m.key).startsWith(`element-copy:v1:${doc.fileVersion}:`))drop('meta',m);
+      }
+      // Saved versions of anything deleted go with it.
+      const gone=new Set(Object.entries(doomed).flatMap(([store,list])=>list.map(r=>store+'\u0000'+String(store==='meta'?r.key:r.id))));
+      for(const m of rows.meta)if(String(m.key).startsWith('transfer-version:')&&gone.has(m.value?.store+'\u0000'+m.value?.key))drop('meta',m);
+      const count=Object.values(doomed).reduce((n,list)=>n+list.length,0);
+      if(!count){await completion;return 0;}
+      // Sync keys use the same canonical identities as the sync document.
+      const keys=Object.keys(flatten(canonical({format:'paperpane-backup',version:3,id:'purge',createdAt:'',complete:false,databases:[{name:db.name,version:db.version,stores:doomed}],assets:[],preferences:{}} as TransferSnapshot)));
+      const remaining=rows.meta.filter(m=>!doomed.meta?.includes(m));
+      const stillUsed=imageReferences(remaining);
+      for(const [store,list] of Object.entries(doomed))for(const r of list)tx.objectStore(store).delete(store==='meta'?r.key:r.id);
+      for(const doc of doomed.documents??[])if(doc.file?.assetId)tx.objectStore('assets').delete(doc.file.assetId);
+      for(const hash of imageReferences(doomed.meta??[]))if(!stillUsed.has(hash))tx.objectStore('assets').delete('note-image:'+hash);
+      const queued=(rows.meta.find(m=>m.key===PURGED_KEY)?.value as string[]|undefined)??[];
+      tx.objectStore('meta').put({key:PURGED_KEY,value:[...new Set([...queued,...keys])]});
+      await completion;this.notify();return count;
+    }catch(error){try{tx.abort();}catch{}await completion.catch(()=>{});throw error;}
+  }
+  /** Everything in the trash longer than TRASH_DAYS, or all of it. */
+  async purgeTrash(olderThanDays?:number):Promise<number>{
+    const db=await this.open(),tx=db.transaction(['libraryItems','libraryFolders'],'readonly');
+    const [items,folders]=await Promise.all([request(tx.objectStore('libraryItems').getAll()),request(tx.objectStore('libraryFolders').getAll())]) as [any[],any[]];
+    const before=olderThanDays===undefined?Infinity:Date.now()-olderThanDays*86400000;
+    const old=(at?:string)=>!!at&&Date.parse(at)<before;
+    return this.purge({papers:items.filter(i=>old(i.trashedAt)).map(i=>i.id),folders:folders.filter(f=>f.trashBatch&&old(f.deletedAt)).map(f=>f.id)});
   }
   private keepVersions(tx:IDBTransaction,store:string,key:string,versions:MergeVersion[],meta:any[],at=new Date().toISOString()){
     let count=0;

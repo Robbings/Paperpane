@@ -1,4 +1,4 @@
-import { TransferStore } from '@/data/transfer-store';
+import { PURGED_KEY, TransferStore } from '@/data/transfer-store';
 import { assetMime, assetPath, imageReferences } from '@/transfer/assets';
 import { sha256 } from '@/transfer/backup';
 import type { TransferAsset } from '@/contracts/transfer';
@@ -11,7 +11,7 @@ import { responseBytes } from '../engine';
 import { loadAutomerge, type AutomergeApi } from './automerge';
 import { migrateFromV1 } from './migrate';
 import { CHANGES, HEADS, ROOT, listed, newWriter, pack, publishPointer, readPointers, register, unpack } from './discovery';
-import { capture, decode, encode, leafOf, overlappingText, read, settleConflicts, stored, type Leaf } from './entries';
+import { capture, decode, encode, leafOf, overlappingText, read, recordPositions, settleConflicts, stored, tombstoneKey, tombstones, type Leaf } from './entries';
 
 // 同步第二版：合并交给 Automerge，云端只放不可变文件。
 //
@@ -71,8 +71,10 @@ export async function synchronizeV2(signal: AbortSignal, options: { store?: Tran
       const report: SyncReport = { uploaded: 0, downloaded: 0, versions: 0, files: 0, docBytes: 0 };
 
       let saved: State | undefined;
+      let purged: string[] = [];
       await store.updateTransferState((_s, meta) => {
         saved = meta.find((r) => r.key === STATE)?.value as State | undefined;
+        purged = (meta.find((r) => r.key === PURGED_KEY)?.value as string[] | undefined) ?? [];
         return {};
       });
       const state: State = saved?.where === where ? saved : { where, doc: new Uint8Array(), seen: [], queue: [] };
@@ -197,9 +199,20 @@ export async function synchronizeV2(signal: AbortSignal, options: { store?: Tran
       const base = read(A, doc as any);
       const versions: MergeVersion[] = [];
       const beforeCapture = doc;
-      doc = A.change(doc as any, (d) => void versions.push(...capture(A, d as any, local, base, joining)));
+      doc = A.change(doc as any, (d: any) => {
+        versions.push(...capture(A, d, local, base, joining));
+        // Records deleted for good here: remove every position and leave a tombstone.
+        for (const record of purged) {
+          for (const key of recordPositions(Object.keys(d), record)) delete d[key];
+          d[tombstoneKey(record)] = new A.ImmutableString('=' + JSON.stringify(new Date().toISOString()));
+        }
+      });
       await enqueue(beforeCapture);
       await persist();
+      if (purged.length) {
+        const done = new Set(purged);
+        await store.updateTransferState((_s, meta) => ({ [PURGED_KEY]: ((meta.find((r) => r.key === PURGED_KEY)?.value as string[] | undefined) ?? []).filter((k) => !done.has(k)) }));
+      }
 
       // 2. Attachments before the changes that refer to them.
       const remoteAssets = new Set(await client.names('paperpane/assets', signal));
@@ -221,6 +234,25 @@ export async function synchronizeV2(signal: AbortSignal, options: { store?: Tran
       // 4. Concurrent values: one shown everywhere, each kept as a version; same-paragraph text edits too.
       const merged = read(A, doc as any);
       versions.push(...overlappingText(base, mine, merged, read(A, theirs as any)));
+      // Tombstones: a record nobody changed meanwhile is deleted here too. A record some
+      // device edited at the same time still has positions; if this device has the record,
+      // it writes it back whole and drops the tombstone, so the edit wins over the deletion.
+      const remove: string[] = [];
+      const revive: string[] = [];
+      for (const record of tombstones(Object.keys(doc))) {
+        if (!recordPositions(Object.keys(doc), record).length) remove.push(record);
+        else if (recordPositions(local.keys(), record).length) revive.push(record);
+      }
+      if (revive.length) {
+        const before = doc;
+        doc = A.change(doc as any, (d: any) => {
+          for (const record of revive) {
+            delete d[tombstoneKey(record)];
+            for (const key of recordPositions(local.keys(), record)) d[key] = stored(A, local.get(key)!);
+          }
+        });
+        await enqueue(before);
+      }
       const settled = settleConflicts(A, doc);
       versions.push(...settled.versions);
       if (settled.keys.length) {
@@ -253,7 +285,7 @@ export async function synchronizeV2(signal: AbortSignal, options: { store?: Tran
       const manifest: SyncManifest = { format: 'paperpane-sync', version: 3, generation: crypto.randomUUID(), createdAt: new Date().toISOString(), records, assets: [] };
       const incoming = inflate(manifest, snapshot);
       incoming.assets = fetched;
-      await store.restore(incoming, snapshot, undefined, save());
+      await store.restore(incoming, snapshot, undefined, save(), remove);
 
       // 6. The settled conflicts are a change of their own.
       await flush();

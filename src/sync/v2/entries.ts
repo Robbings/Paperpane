@@ -130,6 +130,16 @@ export function decode(leaves: Map<string, Leaf>): { records: EntityMap; assets:
   return { records, assets };
 }
 
+/** The tombstone of a permanently deleted record. */
+export const tombstoneKey = (record: string) => 'x' + SEP + esc(record);
+/** Records with a tombstone in the document. */
+export const tombstones = (keys: Iterable<string>) => [...keys].filter((k) => k.startsWith('x' + SEP)).map((k) => unesc(k.slice(2)));
+/** Every position of one record: its marker and everything inside it. */
+export function recordPositions(keys: Iterable<string>, record: string): string[] {
+  const prefix = RECORD + esc(record);
+  return [...keys].filter((k) => k === prefix || k.startsWith(prefix + SEP));
+}
+
 /** Where a position sits inside its record, in the path form saved versions use. */
 export function locate(key: string): { entity: string; path: string[]; field: string } | undefined {
   if (!key.startsWith(RECORD)) return undefined;
