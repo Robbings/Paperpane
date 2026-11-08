@@ -20,6 +20,8 @@ export type ImportKind = 'pdf' | 'csl' | 'bibtex';
 interface LibraryToolbarProps {
   heading: string;
   count: number;
+  /** What is counted; papers unless said otherwise (the trash also holds folders). */
+  countUnit?: string;
   text: string;
   onText: (text: string) => void;
   fields: readonly SearchField[];
@@ -100,7 +102,7 @@ export function LibraryToolbar(props: LibraryToolbarProps) {
       />
       <div className="pp-lib-head__title">
         <h1>{props.heading}</h1>
-        <span className="pp-lib-head__count">{props.count} 篇</span>
+        <span className="pp-lib-head__count">{props.count} {props.countUnit ?? '篇'}</span>
       </div>
 
       <div className="pp-lib-search" role="search">

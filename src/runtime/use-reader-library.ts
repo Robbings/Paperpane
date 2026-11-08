@@ -54,7 +54,7 @@ export function useReaderLibrary(owner: ReaderController | undefined, onOpenFile
     onRemove: () => {
       void library.service.remove([item.id]).then(result => {
         if (!result.ok) { fail(new Error(result.error.message)); return; }
-        toast.show({ message: '已移出文献库，PDF 仍保留', duration: 8000, action: { label: '撤销', onAction: () => { void library.service.restore(result.value); } } });
+        toast.show({ message: '已移到回收站', duration: 8000, action: { label: '撤销', onAction: () => { void library.service.restore(result.value); } } });
       });
     },
     onCreateFolder: (parentId, name) => {

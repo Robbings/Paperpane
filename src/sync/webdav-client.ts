@@ -75,6 +75,26 @@ export class WebDavClient {
   async remove(path:string,signal?:AbortSignal){try{await this.request('DELETE',path,{},undefined,signal);}catch(e){if(!(e instanceof DavError)||e.status!==404)throw e;}}
   /** Depth-0 lookup; 404 means absent. Use '' for the base so collections need no redirect. */
   async exists(path:string,signal?:AbortSignal){try{const r=await this.request('PROPFIND',path,{Depth:'0','Content-Type':'application/xml'},'<?xml version="1.0"?><d:propfind xmlns:d="DAV:"><d:prop><d:resourcetype/></d:prop></d:propfind>',signal);await r.body?.cancel();return true;}catch(e){if(e instanceof DavError&&e.status===404)return false;throw e;}}
+  async download(path:string,signal?:AbortSignal){return this.request('GET',path,{},undefined,signal);}
+  /** Names of the files directly inside a collection; a missing collection is empty. */
+  async names(path:string,signal?:AbortSignal):Promise<string[]>{
+    let xml:string;
+    try{const r=await this.request('PROPFIND',path,{Depth:'1','Content-Type':'application/xml'},'<?xml version="1.0"?><d:propfind xmlns:d="DAV:"><d:prop><d:resourcetype/></d:prop></d:propfind>',signal);xml=await r.text();}
+    catch(e){if(e instanceof DavError&&e.status===404)return [];throw e;}
+    if(xml.length>32*1024*1024||/<!DOCTYPE|<!ENTITY/i.test(xml))throw new Error('WebDAV 目录响应无效');
+    const unescape=(v:string)=>v.replace(/&quot;/g,'"').replace(/&apos;/g,"'").replace(/&lt;/g,'<').replace(/&gt;/g,'>').replace(/&amp;/g,'&');
+    const decoded=(v:string)=>{try{return decodeURIComponent(v);}catch{return undefined;}};
+    const dir=decoded(new URL(path.split('/').map(encodeURIComponent).join('/')+'/',this.base).pathname)!;
+    const out:string[]=[];
+    for(const m of xml.matchAll(/<(?:[\w.-]+:)?response\b[^>]*>([\s\S]*?)<\/(?:[\w.-]+:)?response\s*>/gi)){
+      const block=m[1]!;if(/<(?:[\w.-]+:)?collection\b/i.test(block))continue;
+      const href=block.match(/<(?:[\w.-]+:)?href\b[^>]*>([\s\S]*?)<\/(?:[\w.-]+:)?href\s*>/i)?.[1]?.trim();if(!href)continue;
+      let url:URL;try{url=new URL(unescape(href),this.base);}catch{continue;}
+      const full=decoded(url.pathname.replace(/\/$/,''));if(url.origin!==this.base.origin||!full?.startsWith(dir))continue;
+      const name=full.slice(dir.length);if(name&&!name.includes('/'))out.push(name);
+    }
+    return out;
+  }
   async list(path:string,signal?:AbortSignal){const r=await this.request('PROPFIND',path,{Depth:'1','Content-Type':'application/xml'},'<?xml version="1.0"?><d:propfind xmlns:d="DAV:"><d:prop><d:resourcetype/><d:getcontentlength/></d:prop></d:propfind>',signal);return r.text();}
   async probe(signal?:AbortSignal){
     await this.mkdir('paperpane',signal);const path=`paperpane/probe-${crypto.randomUUID()}.txt`;

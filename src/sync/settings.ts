@@ -29,7 +29,8 @@ export class ConnectionStore extends PaperDatabase {
   async saveDav(connection:DavConnection,conditional:boolean,automatic=false){
     await this.changeConnections(view=>{
       const same=view.dav?.url===connection.url&&view.dav?.username===connection.username;
-      view.dav={url:connection.url,username:connection.username,hasPassword:!!connection.password,automatic:automatic&&conditional,conditional};
+      // Sync no longer needs conditional writes; the probe result is kept for display only.
+      view.dav={url:connection.url,username:connection.username,hasPassword:!!connection.password,automatic,conditional};
       return {'transfer-secret-dav':connection,...(!same?{'transfer-sync-state':{phase:'idle'}}:{})};
     });
   }

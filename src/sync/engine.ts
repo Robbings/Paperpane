@@ -15,7 +15,7 @@ export async function responseBytes(response:Response,max:number,signal?:AbortSi
   catch(e){await reader.cancel().catch(()=>{});throw e;}finally{reader.releaseLock();}
   const bytes=new Uint8Array(size);let offset=0;for(const chunk of chunks){bytes.set(chunk,offset);offset+=chunk.length;}return bytes;
 }
-function validate(m:SyncManifest){
+export function validate(m:SyncManifest){
   if(m.format!=='paperpane-sync'||![1,2,3].includes(m.version)||typeof m.generation!=='string'||!m.records||typeof m.records!=='object'||Array.isArray(m.records)||!Array.isArray(m.assets)||m.assets.length>50000)throw new Error('远程同步清单不兼容');
   for(const a of m.assets)if(!/^[a-f0-9]{64}$/.test(a.sha256)||typeof a.id!=='string'||a.database!=='paperpane'||!['application/pdf','image/png'].includes(assetMime(a))||(assetMime(a)==='image/png'&&a.id!=='note-image:'+a.sha256))throw new Error('远程附件清单无效');
   // Version 1 published local availability/index fields. They are derived again

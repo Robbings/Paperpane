@@ -8,6 +8,8 @@ export interface CollectionCounts {
   recent: number;
   starred: number;
   unfiled: number;
+  /** Papers and deleted folders in the trash. */
+  trash?: number;
   /** Papers in each folder, including its subfolders. */
   folders: Record<string, number>;
 }
@@ -33,11 +35,12 @@ interface LibrarySidebarProps {
   onMovePapers: (paperIds: string[], folderId: string | null) => void;
 }
 
-const fixed: { kind: 'all' | 'recent' | 'starred' | 'unfiled'; label: string; icon: IconName }[] = [
+const fixed: { kind: 'all' | 'recent' | 'starred' | 'unfiled' | 'trash'; label: string; icon: IconName }[] = [
   { kind: 'all', label: '全部论文', icon: 'library' },
   { kind: 'recent', label: '最近阅读', icon: 'clock' },
   { kind: 'starred', label: '已标星', icon: 'star' },
   { kind: 'unfiled', label: '未分类', icon: 'inbox' },
+  { kind: 'trash', label: '回收站', icon: 'trash' },
 ];
 
 export function LibrarySidebar(props: LibrarySidebarProps) {
@@ -91,15 +94,13 @@ export function LibrarySidebar(props: LibrarySidebarProps) {
     }
     return false;
   };
-  const hasChildren = (id: string) => folders.some((f) => f.parentId === id);
 
-  const menuEntries = (id: string): MenuEntry[] => {
-    const empty = (counts.folders[id] ?? 0) === 0 && !hasChildren(id);
+  const menuEntries = (): MenuEntry[] => {
     return [
       { id: 'new-child', label: '新建子文件夹', icon: 'folderPlus' },
       { id: 'rename', label: '重命名' },
       { kind: 'separator', id: 'sep' },
-      { id: 'delete', label: empty ? '删除文件夹' : '删除文件夹（需先清空）', icon: 'trash', disabled: !empty },
+      { id: 'delete', label: '删除文件夹…', icon: 'trash' },
     ];
   };
 
@@ -127,7 +128,7 @@ export function LibrarySidebar(props: LibrarySidebarProps) {
             >
               <Icon name={item.icon} size={16} />
               <span className="pp-lib-nav__label">{item.label}</span>
-              <span className="pp-lib-nav__count">{counts[item.kind]}</span>
+              <span className="pp-lib-nav__count">{item.kind === 'trash' ? counts.trash || '' : counts[item.kind]}</span>
             </button>
           );
         })}
@@ -229,7 +230,7 @@ export function LibrarySidebar(props: LibrarySidebarProps) {
       {menu && (
         <Menu
           label="文件夹操作"
-          entries={menuEntries(menu.id)}
+          entries={menuEntries()}
           anchor={{ x: menu.x, y: menu.y }}
           onSelect={(action) => {
             if (action === 'new-child') {

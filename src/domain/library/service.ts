@@ -19,7 +19,7 @@ function freeze<T>(value: T): T {
 
 export function createLibraryService(database = new LibraryDatabase()) {
   let snapshot: Snapshot<LibraryState> = { mode: 'live', state: 'loading', data: {
-    items: [], total: 0, folders: [], tags: [], counts: { all: 0, recent: 0, starred: 0, unfiled: 0, folders: {} },
+    items: [], total: 0, folders: [], tags: [], counts: { all: 0, recent: 0, starred: 0, unfiled: 0, trash: 0, folders: {} },
     query: structuredClone(queryDefaults), preferences: structuredClone(libraryDefaults), unavailableSearchFields: ['body', 'summary'],
   } };
   let limit = 60, epoch = 0, disposed = false;

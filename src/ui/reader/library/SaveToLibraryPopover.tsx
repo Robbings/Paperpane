@@ -156,7 +156,7 @@ export function SaveToLibraryPopover({ anchorRef, open, onClose, saved, initial,
                 onClose();
               }}
             >
-              移出文献库
+              移到回收站
             </Button>
           )}
           <span className="pp-save__spacer" />

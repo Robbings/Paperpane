@@ -2,6 +2,7 @@ import { useMemo, useState } from 'react';
 import { Toaster, toast } from '@/ui/components';
 import { defaultVisibleColumns } from '../columns';
 import { LibraryView } from '../LibraryView';
+import type { TrashView } from '../TrashList';
 import type { CollectionCounts } from '../LibrarySidebar';
 import type { FolderView, LibraryQuery, LibraryViewPreferences, PaperView, TagView } from '../types';
 import { querySample, sampleFolders, samplePapers, sampleTags } from './libraryData';
@@ -28,6 +29,16 @@ export function SampleLibrary() {
 
   const { items, total } = useMemo(() => querySample(papers, folders, query, limit), [papers, folders, query, limit]);
 
+  // Sample trash: a deleted folder with what went with it, and two papers removed on their own.
+  const [trash, setTrash] = useState<TrashView>(() => ({
+    folders: [{ id: 'trash-f1', name: '旧课题：版面分析', deletedAt: new Date(Date.now() - 3 * 86400000).toISOString(), folders: 2, papers: 7 }],
+    papers: [
+      { id: 'trash-p1', title: 'Attention Is All You Need', trashedAt: new Date(Date.now() - 86400000).toISOString() },
+      { id: 'trash-p2', title: 'A Survey of Document Layout Analysis Methods and Datasets', trashedAt: new Date(Date.now() - 27 * 86400000).toISOString() },
+    ],
+  }));
+  const dropTrash = (kind: string, id: string) =>
+    setTrash((t) => (kind === 'folder' ? { ...t, folders: t.folders.filter((f) => f.id !== id) } : { ...t, papers: t.papers.filter((p) => p.id !== id) }));
   const counts = useMemo<CollectionCounts>(() => {
     const within = (folderId: string): string[] => [folderId, ...folders.filter((f) => f.parentId === folderId).flatMap((f) => within(f.id))];
     return {
@@ -35,9 +46,10 @@ export function SampleLibrary() {
       recent: papers.filter((p) => p.lastReadAt).length,
       starred: papers.filter((p) => p.starred).length,
       unfiled: papers.filter((p) => p.folderId === null).length,
+      trash: trash.folders.length + trash.papers.length,
       folders: Object.fromEntries(folders.map((f) => [f.id, papers.filter((p) => p.folderId !== null && within(f.id).includes(p.folderId)).length])),
     };
-  }, [papers, folders]);
+  }, [papers, folders, trash]);
 
   const patchPapers = (ids: string[], patch: (paper: PaperView) => Partial<PaperView>) =>
     setPapers((current) => current.map((paper) => (ids.includes(paper.id) ? { ...paper, ...patch(paper) } : paper)));
@@ -100,6 +112,12 @@ export function SampleLibrary() {
         onRenameFolder={(id, name) => setFolders((current) => current.map((f) => (f.id === id ? { ...f, name } : f)))}
         onMoveFolder={(id, parentId) => setFolders((current) => current.map((f) => (f.id === id ? { ...f, parentId } : f)))}
         onDeleteFolder={(id) => setFolders((current) => current.filter((f) => f.id !== id))}
+        onPreviewDeleteFolder={async (id) => ({ folders: folders.filter((f) => f.parentId === id).length, papers: counts.folders[id] ?? 0 })}
+        trash={trash}
+        trashDays={30}
+        onRestoreTrash={dropTrash}
+        onPurgeTrash={dropTrash}
+        onEmptyTrash={() => setTrash({ folders: [], papers: [] })}
         onImport={(_kind, files) => {
           if (files.length) imports.addFiles(files);
           else toast.show({ message: '没有可导入的 PDF 文件。', tone: 'warning' });

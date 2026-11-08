@@ -11,6 +11,8 @@ import { createOverviewEnrichment } from '@/domain/library/overview-enrichment';
 import { createLibraryEnrichment } from '@/domain/library/enrichment';
 import type { LibraryImportJob, LibraryPatch, LibraryRow } from '@/contracts/library';
 import type { Result } from '@/contracts/common';
+import type { TrashView } from '@/ui/library/TrashList';
+import { TRASH_DAYS, TransferStore } from '@/data/transfer-store';
 
 export function createLibraryRuntime() {
   const owner = createLibraryService();
@@ -44,6 +46,23 @@ export function LibraryPage({ owner }: { owner: Runtime }) {
   const data = snapshot.data;
   const loadError = 'error' in snapshot ? snapshot.error : undefined;
   const papers = data.items.map(asPaper);
+  // The trash has its own listing, read when it is open and whenever the library changes.
+  const [trash, setTrash] = useState<TrashView | null>(null);
+  const inTrash = data.query.collection.kind === 'trash';
+  useEffect(() => {
+    if (!inTrash) return;
+    let alive = true;
+    owner.database.trash().then(value => { if (alive) setTrash(value); }, errorToast);
+    return () => { alive = false; };
+  }, [inTrash, snapshot, owner]);
+  const purge = async (target: { papers?: string[]; folders?: string[] } | 'all') => {
+    const db = new TransferStore();
+    try {
+      const count = target === 'all' ? await db.purgeTrash() : await db.purge(target);
+      toast.show({ message: count ? '已彻底删除' : '没有可删除的内容' });
+      await owner.invalidate();
+    } catch (error) { errorToast(error); } finally { await db.close(); }
+  };
   useEffect(() => {
     const beforeUnload = (event: BeforeUnloadEvent) => { if (imports.getSnapshot().some(pending)) { event.preventDefault(); event.returnValue = ''; } };
     window.addEventListener('beforeunload', beforeUnload);
@@ -117,12 +136,17 @@ export function LibraryPage({ owner }: { owner: Runtime }) {
         onRemoveTag={(id, tag) => { void report(service.removeTag(id, tag)); }}
         onMovePapers={(ids, folder) => { void report(service.move(ids, folder)); }}
         onRemoveFromLibrary={ids => { void report(service.remove(ids)).then(result => {
-          if (result.ok) toast.show({ message: '已移出文献库，PDF 仍保留', duration: 8000, action: { label: '撤销', onAction: () => { void report(service.restore(result.value)); } } });
+          if (result.ok) toast.show({ message: '已移到回收站', duration: 8000, action: { label: '撤销', onAction: () => { void report(service.restore(result.value)); } } });
         }); }}
         onCreateFolder={parent => { const id = crypto.randomUUID(); void report(service.createFolder(id, parent)); return id; }}
         onRenameFolder={(id, name) => { void report(service.renameFolder(id, name)); }}
         onMoveFolder={(id, parent) => { void report(service.moveFolder(id, parent)); }}
-        onDeleteFolder={id => { void report(service.deleteFolder(id)); }}
+        onDeleteFolder={id => { void report(service.deleteFolder(id)).then(result => { if (result.ok) toast.show({ message: '文件夹已移到回收站' }); }); }}
+        onPreviewDeleteFolder={id => owner.database.folderDeletion(id)}
+        trash={trash} trashDays={TRASH_DAYS}
+        onRestoreTrash={(kind, id) => { void owner.mutate(() => owner.database.restoreFromTrash(kind, id)).then(result => { if (result.ok) toast.show({ message: kind === 'folder' ? '文件夹已恢复' : '论文已恢复' }); else errorToast(new Error(result.error.message)); }); }}
+        onPurgeTrash={(kind, id) => { void purge(kind === 'folder' ? { folders: [id] } : { papers: [id] }); }}
+        onEmptyTrash={() => { void purge('all'); }}
         onImport={(kind, files, folder) => { if (files.length) imports.addFiles(kind, files, folder); }}
         imports={{
           jobs,

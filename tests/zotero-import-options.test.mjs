@@ -49,7 +49,7 @@ test('真实数据库保留目录和多分类；重新打开、重试、备份�
 });
 test('指定目录对重复导入也生效；移动到未分类会清除额外分类，非空分类不可误删',async()=>{
  globalThis.indexedDB=new IDBFactory();const db=new ZoteroMappings(),item=await libraryItem(db);
- await db.fileImported(item.id,'123',['CHILD001','OTHER001'],{kind:'collections',collections});await assert.rejects(()=>db.folder('delete','zotero-folder:123:OTHER001'),/移出/);
+ await db.fileImported(item.id,'123',['CHILD001','OTHER001'],{kind:'collections',collections});await db.folder('delete','zotero-folder:123:OTHER001');{const kept=await db.getItem(item.id);assert.equal(kept.inLibrary,true);assert.ok(!kept.trashedAt);assert.ok(![kept.folderId,...(kept.folderIds??[])].includes('zotero-folder:123:OTHER001'));}
  await db.folder('create','destination');await db.fileImported(item.id,'123',[],{kind:'folder',folderId:'destination'});assert.deepEqual((await db.getItem(item.id)).folderIds,[]);assert.equal((await db.getItem(item.id)).folderId,'destination');
  await db.move([item.id],null);assert.equal((await db.query({...query,collection:{kind:'unfiled'}},100)).total,1);
  await assert.rejects(()=>db.fileImported(item.id,'123',[],{kind:'folder',folderId:'missing'}));assert.equal((await db.getItem(item.id)).folderId,null);await db.close();

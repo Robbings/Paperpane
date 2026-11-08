@@ -157,7 +157,7 @@ export class PaperDatabase {
             const next = { ...enrichItem(original, input.bibliography, previous?.title ?? document.title) };
             // Explicit imports also restore an existing PDF previously removed from the library.
             // Preserve its folders, tags, annotations and manually edited bibliography.
-            if (input.syncScope === 'record-and-file') { next.inLibrary = true; next.deletedAt = undefined; }
+            if (input.syncScope === 'record-and-file') { next.inLibrary = true; next.deletedAt = undefined; next.trashedAt = undefined; next.trashBatch = undefined; }
             if (JSON.stringify(next) !== JSON.stringify(original)) {
               const item = { ...next, updatedAt: at, revision: crypto.randomUUID() }; items.put(item);
               tx.objectStore(CHANGES).add({ entity: LIBRARY, entityId: item.id, revision: item.revision, baseRevision: original.revision, deviceId, operation: 'upsert', at });

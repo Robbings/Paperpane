@@ -34,13 +34,20 @@ export interface LibraryItem extends RecordStamp {
   bibliographyKey?: string;
   editedFields?: string[];
   metadataSources?: PdfBibliography['sources'];
+  /** Moved to the trash at this time; permanently deleted 30 days later. Not the same as
+   *  `inLibrary: false`, which also covers papers only opened in the reader. */
+  trashedAt?: string;
+  /** Set when the paper went to the trash with a deleted folder, to be restored with it. */
+  trashBatch?: Id;
+  /** Folders this paper was taken out of when they were deleted, kept so restoring them puts it back. */
+  detachedFrom?: { batch: Id; folders: Id[] }[];
 }
-export interface LibraryFolder extends RecordStamp { name: string; parentId: Id | null }
+export interface LibraryFolder extends RecordStamp { name: string; parentId: Id | null; /** The deletion that took this folder to the trash, shared by its subfolders and papers. */ trashBatch?: Id }
 export interface LibraryTag extends RecordStamp { label: string; normalized: string }
 export interface LibraryTagInput { id?: Id; label: string }
 export type LibraryField = 'title' | 'authors' | 'abstract' | 'venue' | 'note' | 'body' | 'summary';
 export type LibraryColumn = 'starred' | 'title' | 'authors' | 'year' | 'venue' | 'addedAt' | 'lastReadAt' | 'tags' | 'pages';
-export type LibraryCollection = { kind: 'all' | 'recent' | 'starred' | 'unfiled' } | { kind: 'folder'; folderId: Id };
+export type LibraryCollection = { kind: 'all' | 'recent' | 'starred' | 'unfiled' | 'trash' } | { kind: 'folder'; folderId: Id };
 export interface LibraryQuery {
   collection: LibraryCollection; text: string; fields: LibraryField[]; tagIds: Id[];
   sort: { column: LibraryColumn; direction: 'asc' | 'desc' };
@@ -51,7 +58,7 @@ export interface LibraryPreferences {
   sidebarOpen?: boolean; detailOpen?: boolean;
 }
 export type LibraryPatch = Partial<Pick<LibraryItem, 'title' | 'authors' | 'year' | 'venue' | 'abstract' | 'shortNote'>>;
-export interface LibraryCounts { all: number; recent: number; starred: number; unfiled: number; folders: Record<Id, number> }
+export interface LibraryCounts { all: number; recent: number; starred: number; unfiled: number; trash: number; folders: Record<Id, number> }
 export interface LibraryRow extends LibraryItem {
   lastReadAt?: string; pageCount?: number; progress?: number; hasPdf: boolean;
   /** Library queries count active annotations for the associated PDF version. */

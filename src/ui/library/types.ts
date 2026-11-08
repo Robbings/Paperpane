@@ -44,6 +44,7 @@ export type Collection =
   | { kind: 'recent' }
   | { kind: 'starred' }
   | { kind: 'unfiled' }
+  | { kind: 'trash' }
   | { kind: 'folder'; folderId: string };
 
 export type ColumnId = 'starred' | 'title' | 'authors' | 'year' | 'venue' | 'addedAt' | 'lastReadAt' | 'tags' | 'pages';
