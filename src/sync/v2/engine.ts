@@ -44,6 +44,10 @@ interface State {
   writers?: string[];
   /** The first version's library on this server was merged in (once per device and server). */
   migrated?: boolean;
+  /** Local values already captured, until the merged library is committed. */
+  captured?: [string, Leaf][];
+  /** Versions produced by an unfinished capture must survive a retry. */
+  pendingVersions?: MergeVersion[];
 }
 
 export interface SyncReport {
@@ -88,7 +92,9 @@ export async function synchronizeV2(signal: AbortSignal, options: { store?: Tran
       const writers = new Set(state.writers ?? []);
       let registered = true;
       let migrated = !!state.migrated;
-      const save = () => ({ [STATE]: { where, doc: A.save(doc as any), seen: [...seen], queue, ready, writer, last, published, writers: [...writers], migrated } satisfies State });
+      let captured = state.captured;
+      const versions: MergeVersion[] = [...(state.pendingVersions ?? [])];
+      const save = (applied = false) => ({ [STATE]: { where, doc: A.save(doc as any), seen: [...seen], queue, ready, writer, last, published, writers: [...writers], migrated, captured: applied ? undefined : captured, pendingVersions: applied ? [] : versions } satisfies State });
       const folders = async () => {
         for (const dir of ['paperpane', ROOT, CHANGES, HEADS, 'paperpane/assets']) await client.mkdir(dir, signal);
         ready = true;
@@ -103,7 +109,7 @@ export async function synchronizeV2(signal: AbortSignal, options: { store?: Tran
           await client.put(path, body, undefined, signal);
         }
       };
-      const persist = () => store.updateTransferState(save);
+      const persist = () => store.updateTransferState(() => save());
       const enqueue = async (before: Record<string, unknown>) => {
         const heads = A.getHeads(before as any);
         if (heads.join() === A.getHeads(doc as any).join()) return;
@@ -197,10 +203,11 @@ export async function synchronizeV2(signal: AbortSignal, options: { store?: Tran
         joining = Object.keys(doc).length > 0;
       }
       const base = read(A, doc as any);
-      const versions: MergeVersion[] = [];
       const beforeCapture = doc;
       doc = A.change(doc as any, (d: any) => {
-        versions.push(...capture(A, d, local, base, joining));
+        // A retry compares against what this device already captured, not remote
+        // values that have not reached its library yet.
+        versions.push(...capture(A, d, local, captured ? new Map(captured) : base, joining));
         // Records deleted for good here: remove every position and leave a tombstone.
         for (const record of purged) {
           for (const key of recordPositions(Object.keys(d), record)) delete d[key];
@@ -208,6 +215,7 @@ export async function synchronizeV2(signal: AbortSignal, options: { store?: Tran
         }
       });
       await enqueue(beforeCapture);
+      captured = [...local];
       await persist();
       if (purged.length) {
         const done = new Set(purged);
@@ -285,7 +293,9 @@ export async function synchronizeV2(signal: AbortSignal, options: { store?: Tran
       const manifest: SyncManifest = { format: 'paperpane-sync', version: 3, generation: crypto.randomUUID(), createdAt: new Date().toISOString(), records, assets: [] };
       const incoming = inflate(manifest, snapshot);
       incoming.assets = fetched;
-      await store.restore(incoming, snapshot, undefined, save(), remove);
+      await store.restore(incoming, snapshot, undefined, save(true), remove);
+      captured = undefined;
+      versions.length = 0;
 
       // 6. The settled conflicts are a change of their own.
       await flush();
