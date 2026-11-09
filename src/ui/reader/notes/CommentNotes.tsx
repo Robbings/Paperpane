@@ -3,7 +3,7 @@ import { useEffect, useLayoutEffect, useRef, useState, type CSSProperties, type 
 import { createPortal } from 'react-dom';
 import { Icon, IconButton, Menu, highlightColors, type HighlightColor } from '@/ui/components';
 import type { AnnotationView, NoteLayout, ViewRect } from '../types';
-import { floatingLeft, floatingMargin, floatingPaperBounds, useFloatingCanvas, type PaperBounds } from '../windows/floating-canvas';
+import { floatingLeft, floatingMargin, floatingPaperBounds, floatingPaperOriginX, useFloatingCanvas, type PaperBounds } from '../windows/floating-canvas';
 
 export type { NoteLayout };
 import './notes.css';
@@ -91,19 +91,27 @@ export function CommentNotes(props: CommentNotesProps) {
     const { container: el, notes: list, annotationRects } = latest.current;
     if (!el) return;
     const box = el.getBoundingClientRect();
+    const originX = floatingPaperOriginX(el);
     const next = new Map<string, { x: number; y: number }>();
     for (const note of list) {
       if (!note.open) continue;
       const first = annotationRects(note.id)?.[0];
       const point = first
-        ? { x: first.left - box.left - el.clientLeft + el.scrollLeft - canvas.readInset(), y: first.top - box.top - el.clientTop + el.scrollTop }
+        ? { x: first.left - originX, y: first.top - box.top - el.clientTop + el.scrollTop }
         : known.current.get(note.id);
       if (point) {
         known.current.set(note.id, point);
         next.set(note.id, point);
       }
     }
-    setAnchors(next);
+    setAnchors(current => {
+      if (current.size !== next.size) return next;
+      for (const [id, point] of next) {
+        const previous = current.get(id);
+        if (previous?.x !== point.x || previous.y !== point.y) return next;
+      }
+      return current;
+    });
   };
 
   useLayoutEffect(measure, [openIds, props.layoutKey, props.annotations, container, canvas.inset]);
