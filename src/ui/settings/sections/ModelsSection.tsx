@@ -391,7 +391,7 @@ export function ModelsSection({
             saveBar={page.bar}
           />
           <div className="pp-model-detail-content">
-            <SettingGroup title="连接">
+            <SettingGroup title="连接" description="使用此服务时，相关论文内容、图片和提问会发送给它。打开论文时，概览和提前转写也可能自动发送内容。">
               <SettingRow
                 label="服务名称"
                 hint="用于区分不同供应商、账户或端点，不影响模型请求。"

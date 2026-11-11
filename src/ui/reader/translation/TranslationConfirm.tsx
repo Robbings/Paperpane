@@ -17,7 +17,7 @@ export function TranslationConfirm({ open, detail, onConfirm, onSettings, onClos
       title="开始翻译"
       description={
         <>
-          翻译将调用 API，可能产生费用。若尚未配置，请先在设置中配置 API 后再使用。{detail && <p>{detail}</p>}
+          待翻译的文本会发送给所选服务，可能产生费用。{detail && <p>{detail}</p>}
         </>
       }
       footer={
