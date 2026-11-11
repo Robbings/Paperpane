@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { FloatingCanvas, floatingMargin, floatingInsetLimit, floatingLeft, floatingPaperBounds } from '../src/ui/reader/windows/floating-canvas.ts';
+import { FloatingCanvas, floatingMargin, floatingLeft, floatingPaperBounds, floatingPaperOriginX } from '../src/ui/reader/windows/floating-canvas.ts';
 
 class Style {
   values = new Map();
@@ -12,9 +12,10 @@ class Style {
 class PaperViewport extends EventTarget {
   clientWidth = 800; clientHeight = 600; clientLeft = 0; clientTop = 0;
   scrollLeft = 0; scrollTop = 0; pageWidth = 768;
-  surface = { style: new Style() };
+  surface = { style: new Style(), getBoundingClientRect: () => ({left: this.surfaceLeft()}) };
+  surfaceLeft() { return 16 + Number.parseFloat(this.surface.style.getPropertyValue('margin-left') || '0') - this.scrollLeft; }
   children = [];
-  ownerDocument = {createElement: () => {
+  ownerDocument = {defaultView: {getComputedStyle: () => ({paddingLeft: '16px'})}, createElement: () => {
     const element = {style:{},setAttribute(){},remove:()=>{this.children=this.children.filter(n=>n!==element);}};
     return element;
   }};
@@ -23,7 +24,7 @@ class PaperViewport extends EventTarget {
   querySelector() { return this.surface; }
   querySelectorAll() {
     return [{getBoundingClientRect:() => {
-      const left = Math.max(16,(this.clientWidth-this.pageWidth)/2) + Number.parseFloat(this.surface.style.getPropertyValue('margin-left') || '0') - this.scrollLeft;
+      const left = Math.max(0,(this.clientWidth-this.pageWidth)/2 - 16) + this.surfaceLeft();
       return {left,right:left+this.pageWidth,top:80-this.scrollTop,bottom:1080-this.scrollTop,width:this.pageWidth,height:1000};
     }}];
   }
@@ -32,33 +33,33 @@ class PaperViewport extends EventTarget {
 test('wide PDF leaves room for a complete 360px passage window on either side', () => {
   const el = new PaperViewport();
   el.clientWidth = 600; el.pageWidth = 568;
-  const paper = floatingPaperBounds(el), margin = floatingMargin(el,360);
-  assert.equal(margin,504);
-  const left = floatingLeft(el,-1e6,360,paper.left), right = paper.right+margin-360;
+  const paper = floatingPaperBounds(el), margin = floatingMargin(paper,360);
+  assert.equal(margin,568 * .8);
+  const left = floatingLeft(paper,-1e6,360), right = paper.right+margin-360;
   assert(left+360 < paper.left);
   assert(right > paper.right);
 });
 
-test('side room uses rendered card width, is finite, and keeps a strip of paper visible', () => {
+test('side room stays finite and follows the paper and rendered card width', () => {
   for (const viewport of [152,320,600,960,1600]) for (const width of [180,260,360,520,780]) {
     const el = new PaperViewport(); el.clientWidth=viewport; el.pageWidth=Math.max(100,viewport-32);
-    const paper=floatingPaperBounds(el), left=floatingLeft(el,-1e8,width,paper.left), canvas=new FloatingCanvas(el);
+    const paper=floatingPaperBounds(el), left=floatingLeft(paper,-1e8,width), canvas=new FloatingCanvas(el);
     const id=Symbol();canvas.set(id,left);el.scrollLeft=0;
     const shown=el.querySelectorAll()[0].getBoundingClientRect();
     assert(Number.isFinite(canvas.getSnapshot()));
-    assert(canvas.getSnapshot()<=floatingInsetLimit(el));
-    assert(shown.left<=Math.max(paper.left,viewport-96)+1);
-    assert(Number.isFinite(floatingLeft(el,NaN,width,paper.left)));
+    assert(canvas.getSnapshot()<=Math.ceil(floatingMargin(paper,width)));
+    assert(shown.left>=paper.left);
+    assert(Number.isFinite(floatingLeft(paper,NaN,width)));
     canvas.remove(id);
   }
 });
 
 test('existing page gutters count toward the room rather than becoming extra blank space', () => {
   const el=new PaperViewport();el.clientWidth=1000;el.pageWidth=400;
-  const paper=floatingPaperBounds(el),left=floatingLeft(el,-1e8,360,paper.left),canvas=new FloatingCanvas(el),id=Symbol();
+  const paper=floatingPaperBounds(el),left=floatingLeft(paper,-1e8,360),canvas=new FloatingCanvas(el),id=Symbol();
   assert.equal(paper.left,300);
   canvas.set(id,left);
-  assert.equal(canvas.getSnapshot(),366);
+  assert.equal(canvas.getSnapshot(),108);
   canvas.remove(id);
   assert.equal(el.surface.style.getPropertyValue('margin-left'),'');
   assert.equal(el.surface.style.getPropertyValue('width'),'');
@@ -67,9 +68,9 @@ test('existing page gutters count toward the room rather than becoming extra bla
 test('repeated extreme updates stay bounded and moving back or closing recovers the gutter', () => {
   const el=new PaperViewport(),canvas=new FloatingCanvas(el),a=Symbol(),b=Symbol();
   for(let i=0;i<5000;i++) {
-    const paper=floatingPaperBounds(el,canvas.getSnapshot());
-    canvas.set(a,floatingLeft(el,-1e9,520,paper.left));
-    assert(canvas.getSnapshot()<=floatingInsetLimit(el));
+    const paper=floatingPaperBounds(el);
+    canvas.set(a,floatingLeft(paper,-1e9,520));
+    assert(canvas.getSnapshot()<=Math.ceil(floatingMargin(paper,520)));
   }
   const atEdge=canvas.getSnapshot();assert(atEdge>320);
   canvas.set(b,-40);canvas.set(a,30);
@@ -93,11 +94,11 @@ test('right scroll extent leaves 16px for window controls and disappears on retu
 
 test('multiple windows share bounded extents without using the scroll extent as paper bounds', () => {
   const el=new PaperViewport(),canvas=new FloatingCanvas(el),a=Symbol(),b=Symbol();
-  const paper=floatingPaperBounds(el),left=floatingLeft(el,-1e6,360,paper.left),right=paper.right+24;
+  const paper=floatingPaperBounds(el),left=floatingLeft(paper,-1e6,360),right=paper.right+24;
   for(let i=0;i<1000;i++){canvas.set(a,left,left+360);canvas.set(b,right,right+360);}
   assert.equal(el.children.length,1);
-  assert.equal(canvas.getSnapshot(),517);
-  assert.equal(floatingPaperBounds(el,canvas.getSnapshot()).right,paper.right);
+  assert.equal(canvas.getSnapshot(),599);
+  assert.equal(floatingPaperBounds(el).right,paper.right);
   canvas.remove(b);assert.equal(el.children.length,0);
   canvas.remove(a);assert.equal(canvas.getSnapshot(),0);
 });
@@ -117,8 +118,8 @@ test('fractional page offsets and CSS margin rounding converge instead of recurs
     const canvas=new FloatingCanvas(el),id=Symbol();let publications=0;
     canvas.subscribe(()=>publications++);
     for(let i=0;i<100;i++) {
-      const paper=floatingPaperBounds(el,canvas.getSnapshot());
-      const left=floatingLeft(el,-1e6,520,paper.left);
+      const paper=floatingPaperBounds(el);
+      const left=floatingLeft(paper,-1e6,520);
       canvas.set(id,left,left+520);
       assert(Number.isInteger(canvas.getSnapshot()));
     }
@@ -134,7 +135,7 @@ test('subpixel measurement noise cannot repeatedly resize either outer edge', ()
   for(let i=0;i<100;i++) {
     const noise=i%2?0.000001:-0.000001;
     canvas.set(left,-100+noise,260+noise);
-    canvas.set(right,784+noise,1144+noise);
+    canvas.set(right,785+noise,1145+noise);
   }
   assert.equal(publications,2);
   canvas.remove(left);canvas.remove(right);
@@ -143,9 +144,33 @@ test('subpixel measurement noise cannot repeatedly resize either outer edge', ()
 
 test('collapsed and expanded windows both retain generous side room', () => {
   const el=new PaperViewport();el.clientWidth=1200;
-  assert.equal(floatingMargin(el,132),800);
-  assert.equal(floatingMargin(el,360),800);
-  el.clientWidth=600;
-  assert.equal(floatingMargin(el,132),504);
-  assert.equal(floatingMargin(el,360),504);
+  const wide = floatingPaperBounds(el);
+  assert.equal(floatingMargin(wide,132),768 * .8);
+  assert.equal(floatingMargin(wide,360),floatingMargin(wide,132));
+  el.clientWidth=600; el.pageWidth=568;
+  const narrow = floatingPaperBounds(el);
+  assert.equal(floatingMargin(narrow,132),568 * .8);
+  assert.equal(floatingMargin(narrow,360),floatingMargin(narrow,132));
+});
+
+test('floating anchors and bounds stay stable when Chrome rounds neighboring insets differently', () => {
+  class ZoomedViewport extends PaperViewport {
+    surfaceLeft() {
+      const margin = Number.parseFloat(this.surface.style.getPropertyValue('margin-left') || '0');
+      return super.surfaceLeft() + (margin === 39 ? -0.01953125 : -0.00390625);
+    }
+  }
+  const el = new ZoomedViewport(), canvas = new FloatingCanvas(el), id = Symbol();
+  el.clientWidth = 800; el.pageWidth = 1168;
+  const anchorX = () => el.querySelectorAll()[0].getBoundingClientRect().left + 260 - floatingPaperOriginX(el);
+  const offset = -27 + 0.01 - anchorX(), paper = floatingPaperBounds(el);
+  for (const inset of [39, 40]) {
+    canvas.set(id, 12 - inset);
+    for (let i = 0; i < 4; i++) {
+      el.scrollLeft = canvas.getSnapshot() === 39 ? 40 : 41.25;
+      canvas.set(id, anchorX() + offset);
+      assert.equal(canvas.getSnapshot(), 39);
+    }
+    assert.deepEqual(floatingPaperBounds(el), paper);
+  }
 });

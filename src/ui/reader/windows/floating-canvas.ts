@@ -18,14 +18,25 @@ export const floatingMargin = (paper: Pick<PaperBounds,'left'|'right'>, cardWidt
 export const floatingLeft = (paper: Pick<PaperBounds,'left'|'right'>, left: number, cardWidth = 360) =>
   Math.max(paper.left + 12 - floatingMargin(paper, cardWidth), Number.isFinite(left) ? left : paper.left + 12);
 
+/** Viewport x of the paper's logical origin, including the reader's left padding. */
+export function floatingPaperOriginX(container: HTMLElement) {
+  const surface = container.querySelector<HTMLElement>(':scope > .pdfViewer');
+  if (!surface) return container.getBoundingClientRect().left + container.clientLeft - container.scrollLeft;
+  // Measure from the surface so the browser's fractional margin and scroll rounding
+  // cancels out before the result can feed back into the next inset.
+  const padding = Number.parseFloat(container.ownerDocument.defaultView?.getComputedStyle(container).paddingLeft ?? '') || 0;
+  return surface.getBoundingClientRect().left - padding;
+}
+
 /** PDF bounds only: floating windows and their spacers must never enlarge their own limits. */
-export function floatingPaperBounds(container: HTMLElement, inset = spaces.get(container)?.getSnapshot() ?? 0): PaperBounds {
+export function floatingPaperBounds(container: HTMLElement): PaperBounds {
   const box = container.getBoundingClientRect();
+  const originX = floatingPaperOriginX(container);
   const pages = [...container.querySelectorAll<HTMLElement>('.page, [data-page-index]')]
     .map(page => page.getBoundingClientRect()).filter(page => page.width > 0 && page.height > 0);
   return {
-    left: pages.length ? layoutPixel(Math.min(...pages.map(page => page.left - box.left - container.clientLeft + container.scrollLeft - inset))) : 0,
-    right: pages.length ? layoutPixel(Math.max(...pages.map(page => page.right - box.left - container.clientLeft + container.scrollLeft - inset))) : container.clientWidth,
+    left: pages.length ? layoutPixel(Math.min(...pages.map(page => page.left - originX))) : 0,
+    right: pages.length ? layoutPixel(Math.max(...pages.map(page => page.right - originX))) : container.clientWidth,
     bottom: layoutPixel(Math.max(container.clientHeight, ...pages.map(page => page.bottom - box.top - container.clientTop + container.scrollTop))),
   };
 }
@@ -51,7 +62,7 @@ export class FloatingCanvas {
   remove(id: symbol) { this.extents.delete(id); this.apply(); }
   private apply() {
     const min = Math.min(12, ...[...this.extents.values()].map(card => card.left));
-    const paper = floatingPaperBounds(this.container, this.inset);
+    const paper = floatingPaperBounds(this.container);
     // Cards are already kept within floatingMargin of the paper, so this stays bounded.
     const next = Math.ceil(Math.max(0, 12 - layoutPixel(min)));
     const maxRight = Math.max(0, ...[...this.extents.values()].map(card => card.right));

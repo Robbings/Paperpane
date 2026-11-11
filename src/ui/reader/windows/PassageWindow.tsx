@@ -3,7 +3,7 @@ import { useUiScale } from '@/ui/use-ui-scale';
 import { createPortal } from 'react-dom';
 import { IconButton } from '@/ui/components';
 import type { NoteLayout } from '../types';
-import { floatingLeft, floatingMargin, floatingPaperBounds, useFloatingCanvas } from './floating-canvas';
+import { floatingLeft, floatingMargin, floatingPaperBounds, floatingPaperOriginX, useFloatingCanvas } from './floating-canvas';
 import { keyboardFocus } from '../notes/CommentNotes';
 import '../notes/notes.css';
 import './passage-window.css';
@@ -95,7 +95,7 @@ export function PassageWindow(props:Props){
     const measure=()=>{
       const current=latest.current,box=container.getBoundingClientRect(),point=current.props.anchorPoint();
       if(point){
-        const next={x:point.x-box.left-container.clientLeft+container.scrollLeft-canvas.readInset(),y:point.y-box.top-container.clientTop+container.scrollTop};
+        const next={x:point.x-floatingPaperOriginX(container),y:point.y-box.top-container.clientTop+container.scrollTop};
         setAnchor(old=>same(old,next)?old:next);
         if(!initialized.current){
           initialized.current=true;
@@ -108,7 +108,7 @@ export function PassageWindow(props:Props){
       // A restored card may already be under a stationary pointer: there is no
       // fresh pointerenter event after reload. Recover hover along with geometry.
       setHovered(panel.current?.matches(':hover')??false);
-      const paper=floatingPaperBounds(container,canvas.readInset());
+      const paper=floatingPaperBounds(container);
       const next={left:paper.left,width:paper.right,height:paper.bottom+300};
       setBounds(old=>old.left===next.left&&old.width===next.width&&old.height===next.height?old:next);tick(n=>n+1);
     };
