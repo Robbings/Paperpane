@@ -7,12 +7,10 @@ export const googleFree: Adapter = async (api, _secret, { texts, from, to, signa
     tl: to,
     q: texts.join('\n'),
   });
-  const endpoint = 'https://translate.googleapis.com/translate_a/single';
-  const short = params.toString().length <= 1600;
   const result = await request<unknown[]>(
     api,
-    short ? endpoint + '?' + params : endpoint,
-    short ? {} : form(params),
+    'https://translate.googleapis.com/translate_a/single',
+    form(params),
     signal,
   );
   if (!Array.isArray(result[0])) throw incomplete();

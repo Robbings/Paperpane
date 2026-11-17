@@ -58,8 +58,8 @@ test('invalid endpoint, missing model and unknown protocols fail before dispatch
   }
   const view = settings('openai-chat');
   view.endpoints[0].baseUrl = 'http://remote.example';
-  assert.equal(modelConfigurationStatus(view).state, 'configured');
-  assert.equal(resolveConfiguredModel(view).endpoint.baseUrl, 'http://remote.example');
+  assert.equal(modelConfigurationStatus(view).state, 'unavailable');
+  assert.throws(() => resolveConfiguredModel(view), /HTTPS/);
   view.endpoints[0].baseUrl = 'http://localhost:8080/v1';
   assert.equal(modelConfigurationStatus(view).state, 'configured');
   view.defaultModelId = 'removed';

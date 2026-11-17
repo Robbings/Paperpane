@@ -33,7 +33,7 @@ export class ModelSettingsStore extends PaperDatabase {
         if(old.view.revision!==expected){result={ok:false,reason:'conflict',latest:old.view};return;}
         const keys:Record['keys']={};
         for(const e of draft.endpoints){const prev=old.view.endpoints.find(x=>x.id===e.id);
-          if(e.key.kind==='keep'&&prev&&endpointUrl(prev.baseUrl)!==endpointUrl(e.baseUrl)&&old.keys[e.id]){result={ok:false,reason:'invalid',problems:[{path:'endpoints',message:'接口地址已改变，请重新填写密钥，避免把旧密钥发送到另一个服务。'}]};return;}
+          if(e.key.kind==='keep'&&prev&&old.keys[e.id]&&endpointUrl(prev.baseUrl,{allowLegacyHttp:true})!==endpointUrl(e.baseUrl)){result={ok:false,reason:'invalid',problems:[{path:'endpoints',message:'接口地址已改变，请重新填写密钥，避免把旧密钥发送到另一个服务。'}]};return;}
           keys[e.id]=e.key.kind==='replace'?cleanPasted(e.key.value):e.key.kind==='clear'?'':old.keys[e.id]??'';
         }
         // Machine translation credentials sit beside the endpoint keys, under their own prefix.
@@ -50,7 +50,7 @@ export class ModelSettingsStore extends PaperDatabase {
   /** Used only by discovery/test services; never include credentials in a view. */
   async resolveDraftEndpoint(endpoint:EndpointDraft){
     const baseUrl=endpointUrl(endpoint.baseUrl), record=await this.record(),previous=record.view.endpoints.find(e=>e.id===endpoint.id);
-    if(endpoint.key.kind==='keep'&&previous&&endpointUrl(previous.baseUrl)!==baseUrl&&record.keys[endpoint.id])throw new Error('接口地址已改变，请重新填写密钥。');
+    if(endpoint.key.kind==='keep'&&previous&&record.keys[endpoint.id]&&endpointUrl(previous.baseUrl,{allowLegacyHttp:true})!==baseUrl)throw new Error('接口地址已改变，请重新填写密钥。');
     const key=endpoint.key.kind==='replace'?cleanPasted(endpoint.key.value):endpoint.key.kind==='clear'?'':record.keys[endpoint.id]??'';
     return {endpoint:{...endpoint,baseUrl},key};
   }
