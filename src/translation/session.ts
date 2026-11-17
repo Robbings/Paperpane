@@ -1,3 +1,4 @@
+import { sameSelection } from './selection-cache';
 import { allowTranslation } from './consent';
 import { sentenceFinished } from '@/contracts/translation';
 import type { DocumentRef } from '@/contracts/document';
@@ -65,10 +66,10 @@ export class TranslationSession {
         this.paper = await this.extract(this.abort.signal, n => { this.extractProgress = n; this.update(); });
         this.abort.signal.throwIfAborted(); if (!this.selection) await this.db.saveExtraction(this.paper);
       }
-      this.abort.signal.throwIfAborted(); const latest = await this.db.latest(this.ref, this.selection?.key); this.abort.signal.throwIfAborted();
+      this.abort.signal.throwIfAborted(); const latest = await this.db.latest(this.ref, this.selection?.key, this.selection); this.abort.signal.throwIfAborted();
       this.run = latest; this.persistedRevision = latest?.revision;
       if (this.run) this.run.sessionId ??= this.run.id;
-      if (this.run?.extractionVersion !== this.paper.version) { this.run = undefined; this.persistedRevision = undefined; }
+      if (this.run?.extractionVersion !== this.paper.version && !(this.selection && sameSelection(this.run?.selection, this.selection))) { this.run = undefined; this.persistedRevision = undefined; }
       if (this.run && ['running', 'pausing'].includes(this.run.phase) && !(await navigator.locks.query()).held?.some(lock=>lock.name===this.lockName)) {
         this.run.phase = 'interrupted';
         for (const o of Object.values(this.run.outputs)) if (o.state === 'streaming') o.state = 'partial';
@@ -142,6 +143,12 @@ export class TranslationSession {
     }).finally(() => { this.active = undefined; this.autoTask=false; this.taskAbort = undefined; this.retrying.clear(); this.update(); });
     return this.active;
   }
+  /** Called while holding the document lock, so no request still owns this saved snapshot. */
+  private adoptCachedRun(run: TranslationRun) {
+    if (['running', 'pausing'].includes(run.phase))
+      run.phase = run.requested.every(id => sentenceFinished(run.outputs[id])) ? 'completed' : 'interrupted';
+    this.run = run; this.persistedRevision = run.revision; this.update();
+  }
   private get lockName() { return `paperpane-translation:${this.ref.documentId}:${this.ref.fileVersion}${this.selection ? `:selection:${this.selection.key}` : ''}`; }
   private async execute(language: string, page: number | undefined, retry: boolean, signal: AbortSignal, onlyIds?: string[], replace = false, automatic=false) {
     if (!navigator.locks) throw new Error('当前浏览器不支持任务互斥锁，请使用新版 Chrome 或 Edge。');
@@ -152,18 +159,23 @@ export class TranslationSession {
         signal.throwIfAborted(); this.error = undefined;
         if (this.saveFailed) await this.save(true);
         signal.throwIfAborted();
-        const latest = await this.db.latest(this.ref, this.selection?.key);
+        const latest = await this.db.latest(this.ref, this.selection?.key, this.selection, language);
         signal.throwIfAborted();
         const candidates = this.paper!.sentences.filter(s => s.kind !== 'formula' && (!onlyIds || onlyIds.includes(s.id)) && (page === undefined || s.anchor.pages.some(p => p.pageIndex === page)));
         if (automatic) {
           if (!candidates.length) return;
           if (latest?.extractionVersion===this.paper!.version && latest.profile.language===language &&
               (['paused','failed'].includes(latest.phase) || candidates.every(s=>sentenceFinished(latest.outputs[s.id])))) {
-            this.run=latest; this.persistedRevision=latest.revision; this.update(); return;
+            this.adoptCachedRun(latest); return;
           }
         }
-        const compatible = latest && latest.extractionVersion === this.paper!.version && latest.profile.language === language &&
+        const compatible = latest && (latest.extractionVersion === this.paper!.version || (this.selection && sameSelection(latest.selection, this.selection))) && latest.profile.language === language &&
           (latest.profile.sourceLanguage ?? 'auto') === (this.selection?.sourceLanguage ?? 'auto');
+        // Reading a completed translation must work even when credentials were removed
+        // or the provider is unavailable. Only an explicit retranslation needs a model.
+        if (!replace && compatible && candidates.length && candidates.every(s => sentenceFinished(latest.outputs[s.id]))) {
+          this.adoptCachedRun(latest); return;
+        }
         if (candidates.length && (replace || !compatible || candidates.some(s=>latest.outputs[s.id]?.state!=='done'))) {
           if (!await allowTranslation(signal,undefined,this.engineOverride?.startsWith('mt:')?'translation':'models')) return;
         }

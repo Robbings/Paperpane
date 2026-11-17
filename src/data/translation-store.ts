@@ -1,3 +1,4 @@
+import { sameSelection } from '@/translation/selection-cache';
 import { PaperDatabase, type StoredDocument } from './database';
 import type { ExtractedPaper, TranslationRun } from '@/contracts/translation';
 import type { DocumentRef } from '@/contracts/document';
@@ -12,16 +13,19 @@ export class TranslationStore extends PaperDatabase {
   private key(ref:DocumentRef){return `translation:${ref.documentId}:${ref.fileVersion}`;}
   async extraction(ref:DocumentRef,version:string):Promise<ExtractedPaper|undefined>{return this.transact(false,async tx=>(await request(tx.objectStore('meta').get(`${this.key(ref)}:source:${version}`)))?.value);}
   async saveExtraction(paper:ExtractedPaper){await this.transact(true,async tx=>{tx.objectStore('meta').put({key:`${this.key(paper)}:source:${paper.version}`,value:paper});});}
-  async latest(ref:DocumentRef, selectionKey?:string):Promise<TranslationRun|undefined>{return this.transact(false,async tx=>{
+  async latest(ref:DocumentRef, selectionKey?:string, selection?:NonNullable<TranslationRun['selection']>, language?:string):Promise<TranslationRun|undefined>{return this.transact(false,async tx=>{
     const meta=tx.objectStore('meta'), prefix=this.key(ref);
     const pointer=selectionKey?`${prefix}:selection:${selectionKey}:latest`:`${prefix}:latest`;
     const key=(await request(meta.get(pointer)))?.value;
     const latest:TranslationRun|undefined=key?(await request(meta.get(key)))?.value:undefined;
-    if(selectionKey || latest?.scope?.kind!=='selection')return latest;
-    // Legacy selection tasks could replace the document pointer. Recover the newest
-    // non-selection version, without deleting or modifying any historical records.
+    const matches = (run: TranslationRun) =>
+      (selectionKey ? run.scope?.kind === 'selection' && (run.selection?.key === selectionKey || !!selection && sameSelection(run.selection, selection)) : run.scope?.kind !== 'selection') &&
+      (!language || run.profile.language === language && (run.profile.sourceLanguage ?? 'auto') === (selection?.sourceLanguage ?? 'auto'));
+    if (latest && matches(latest)) return latest;
+    // Recover legacy selection keys, a pointer replaced by an old selection task,
+    // or a previously used language. All historical records remain untouched.
     const records=await request(meta.getAll(IDBKeyRange.bound(`${prefix}:run:`,`${prefix}:run:\uffff`)));
-    return records.map(row=>row.value as TranslationRun).filter(run=>run.scope?.kind!=='selection').sort((a,b)=>b.updatedAt.localeCompare(a.updatedAt))[0];
+    return records.map(row=>row.value as TranslationRun).filter(matches).sort((a,b)=>b.updatedAt.localeCompare(a.updatedAt))[0];
   });}
   async saveRun(run:TranslationRun,expected?:string):Promise<void>{
     await this.transact(true,async tx=>{

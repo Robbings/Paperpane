@@ -1,3 +1,4 @@
+import { OverflowLabel } from './OverflowLabel';
 import { useEffect, useRef, useState, type KeyboardEvent, type MouseEvent, type PointerEvent, type ReactNode } from 'react';
 import { useUiScale } from '@/ui/use-ui-scale';
 import { Badge, Icon, ScrollArea, StarToggle } from '@/ui/components';
@@ -181,11 +182,11 @@ export function LibraryTable(props: LibraryTableProps) {
           </div>
         );
       case 'authors':
-        return authorLine(paper.authors);
+        return <OverflowLabel>{authorLine(paper.authors, Infinity)}</OverflowLabel>;
       case 'year':
         return paper.year ?? '—';
       case 'venue':
-        return paper.venue ?? '—';
+        return <OverflowLabel>{paper.venue ?? '—'}</OverflowLabel>;
       case 'addedAt':
         return formatDate(paper.addedAt);
       case 'lastReadAt':
@@ -326,7 +327,7 @@ export function LibraryTable(props: LibraryTableProps) {
 
 /** A detailed row: title, bibliographic line, the start of the abstract, then tags and reading facts. */
 function DetailedEntry({ paper, tagsById }: { paper: PaperView; tagsById: ReadonlyMap<string, TagView> }) {
-  const meta = [authorLine(paper.authors), paper.venue, paper.year].filter(Boolean).join(' · ');
+  const meta = [authorLine(paper.authors, Infinity), paper.venue, paper.year].filter(Boolean).join(' · ');
   const facts = [
     paper.progress !== undefined && paper.progress > 0 ? `读到 ${Math.round(paper.progress * 100)}%` : null,
     paper.annotationCount > 0 ? `${paper.annotationCount} 条批注` : null,
@@ -335,7 +336,7 @@ function DetailedEntry({ paper, tagsById }: { paper: PaperView; tagsById: Readon
     <div className="pp-lib-entry">
       <span className="pp-lib-entry__title">{paper.title}</span>
       <span className="pp-lib-entry__meta">
-        {meta || '作者未知'}
+        <OverflowLabel>{meta || '作者未知'}</OverflowLabel>
         {!paper.hasPdf && <Badge tone="warn">无 PDF</Badge>}
       </span>
       {paper.abstract && <span className="pp-lib-entry__abstract">{clip(paper.abstract)}</span>}
@@ -355,7 +356,7 @@ function TagChips({ ids, tagsById }: { ids: readonly string[]; tagsById: Readonl
     <span className="pp-lib-chips">
       {ids.map((id) => (
         <span key={id} className="pp-lib-chip">
-          {tagsById.get(id)?.label ?? id}
+          <OverflowLabel>{tagsById.get(id)?.label ?? id}</OverflowLabel>
         </span>
       ))}
     </span>

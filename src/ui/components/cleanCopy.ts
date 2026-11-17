@@ -1,3 +1,4 @@
+import { selectedMathMarkdown, type MathDelimiter } from './mathCopy';
 import type { ClipboardEvent, DragEvent } from 'react';
 
 /** Removes source markers ([^label]) and the space they leave before punctuation. */
@@ -10,6 +11,8 @@ export const stripSourceMarkers = (text: string) => text.replace(/\[\^[^\]]+\]/g
 function selectedText(root: HTMLElement): string | null {
   const selection = window.getSelection();
   if (!selection || selection.isCollapsed || !selection.anchorNode || !root.contains(selection.anchorNode)) return null;
+  const math = selectedMathMarkdown(root, (root.dataset.mathDelimiter as MathDelimiter) ?? 'brackets');
+  if (math !== null) return math;
   // Hide the skipped elements just while the browser serializes the selection.
   root.classList.add('pp-copy-clean');
   const text = selection.toString();

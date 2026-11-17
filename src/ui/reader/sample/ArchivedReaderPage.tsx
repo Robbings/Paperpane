@@ -155,10 +155,13 @@ function SampleReader() {
             setSaved(false);
             toast.show({ message: '已移到回收站', action: { label: '撤销', onAction: () => setSaved(true) } });
           },
-          onCreateFolder: (parentId, name) => {
-            const id = `f-${Date.now()}`;
-            setFolders((all) => [...all, { id, name, parentId }]);
-            return id;
+          folderActions: {
+            create: async parentId => {
+              const id = crypto.randomUUID();
+              setFolders(all => [...all, { id, name: '新建文件夹', parentId }]);
+              return id;
+            },
+            rename: async (id, name) => { setFolders(all => all.map(folder => folder.id === id ? { ...folder, name } : folder)); },
           },
           onOpenPaper: (id, newTab) => toast.show({ message: `示例：${newTab ? '在新标签页' : ''}打开「${papers.find((p) => p.id === id)?.title ?? id}」` }),
           onImport: (files) => toast.show({ message: `示例：收到 ${files.length} 个文件，演示中不会真正导入。` }),

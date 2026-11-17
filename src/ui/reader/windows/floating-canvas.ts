@@ -64,7 +64,11 @@ export class FloatingCanvas {
     const min = Math.min(12, ...[...this.extents.values()].map(card => card.left));
     const paper = floatingPaperBounds(this.container);
     // Cards are already kept within floatingMargin of the paper, so this stays bounded.
-    const next = Math.ceil(Math.max(0, 12 - layoutPixel(min)));
+    const required = Math.ceil(Math.max(0, 12 - layoutPixel(min)));
+    // Shrinking past the available scroll would move the paper origin. During a
+    // drag that movement is fed back into dx on every frame, accelerating the card.
+    // Keep only the gutter we cannot compensate; the last close releases it all.
+    const next = this.extents.size ? Math.max(required, this.inset - Math.max(0, Math.floor(this.container.scrollLeft))) : 0;
     const maxRight = Math.max(0, ...[...this.extents.values()].map(card => card.right));
     const rightExtent = layoutPixel(maxRight) > paper.right ? Math.ceil(layoutPixel(maxRight + next + 16)) : 0;
     if (next === this.inset && rightExtent === this.rightExtent) return;

@@ -266,12 +266,6 @@ function CommentNote({ onDragging, note, anchor, bounds, paper, container, scale
   const finish = (expand = false) => {
     const g=gesture.current; gesture.current=null; if(g)onDragging(false); cancelAnimationFrame(frame.current);
     if(g?.target.hasPointerCapture(g.pointerId))g.target.releasePointerCapture(g.pointerId);
-    if(expand && g?.moved && g.kind==='move') {
-      const {note,anchor,scale,uiScale}=current.current;
-      const left=floatingLeft(current.current.paper,anchor.x+note.dx*scale,g.width)+canvas.readInset(), right=left+(element.current?.getBoundingClientRect().width??note.width*scale*uiScale);
-      if(right>container.scrollLeft+container.clientWidth-16)container.scrollLeft=right-container.clientWidth+16;
-      else if(left<container.scrollLeft+16)container.scrollLeft=Math.max(0,left-16);
-    }
     if(expand && g && !g.moved && g.kind==='move' && current.current.note.collapsed)
       current.current.onChange({...current.current.note,collapsed:false});
   };

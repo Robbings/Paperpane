@@ -27,7 +27,7 @@ export function useReaderLibrary(owner: ReaderController | undefined, onOpenFile
   const data = snapshot.data;
   const tagLabel = new Map(data.tags.map(tag => [tag.id, tag.label]));
   const entry: LibraryEntryDraft = {
-    title: item.title || document.title, authors: item.authors, venue: item.venue, year: item.year,
+    title: item.title || document.title, authors: item.authors, venue: item.venue, year: item.year, shortNote: item.shortNote,
     folderId: item.inLibrary ? item.folderId : null,
     tags: item.inLibrary ? item.tagIds.flatMap(id => tagLabel.has(id) ? [{ id, label: tagLabel.get(id)! }] : []) : [],
   };
@@ -56,15 +56,6 @@ export function useReaderLibrary(owner: ReaderController | undefined, onOpenFile
         if (!result.ok) { fail(new Error(result.error.message)); return; }
         toast.show({ message: '已移到回收站', duration: 8000, action: { label: '撤销', onAction: () => { void library.service.restore(result.value); } } });
       });
-    },
-    onCreateFolder: (parentId, name) => {
-      const id = crypto.randomUUID();
-      void library.service.createFolder(id, parentId).then(async created => {
-        if (!created.ok) { fail(new Error(created.error.message)); return; }
-        const renamed = await library.service.renameFolder(id, name);
-        if (!renamed.ok) fail(new Error(renamed.error.message));
-      });
-      return id;
     },
     onOpenPaper: (id, newTab) => {
       const paper = data.items.find(p => p.id === id);

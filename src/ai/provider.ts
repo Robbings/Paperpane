@@ -1,3 +1,4 @@
+import { fetchModelEndpoint } from './endpoint-fetch';
 import { webSearchOptions, WebSearchCitations } from './web-search';
 import { chatRequestOptions } from './model-providers';
 import { reasoningBody, outputLimit } from './model-capabilities';
@@ -159,14 +160,14 @@ export async function streamModel(
       AbortSignal.timeout(c.view.runtime.timeoutSec * 1000),
     ]);
     input.onDispatch?.();
-    const response = await fetch(url, {
+    const response = await fetchModelEndpoint(url, {
       method: "POST",
       credentials: "omit",
       redirect: "error",
       headers,
       body: JSON.stringify(body),
       signal: requestSignal,
-    }).catch((e) => {
+    }, protocol, base).catch((e) => {
       if (signal.aborted) throw signal.reason;
       throw new TranslationError(
         e?.name === "TimeoutError" ? "模型请求超时" : "网络连接失败",

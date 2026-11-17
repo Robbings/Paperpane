@@ -1192,3 +1192,20 @@ td[data-column='starred'] .pp-lib-cell-center {
 .pp-trash__purge {
   color: var(--pp-danger);
 }
+
+.pp-overflow-label { display: block; min-width: 0; max-width: 100%; overflow: hidden; }
+.pp-overflow-label > span { display: block; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.pp-overflow-label[data-overflow]:is(:hover, :focus-visible) > span {
+  width: max-content;
+  overflow: visible;
+  animation: pp-metadata-scroll var(--overflow-duration) linear 800ms infinite alternate;
+}
+.pp-lib-chip { min-width: 0; max-width: 100%; }
+.pp-lib-chips { min-width: 0; max-width: 100%; }
+@keyframes pp-metadata-scroll {
+  0%, 10% { transform: translateX(0); }
+  90%, 100% { transform: translateX(var(--overflow-distance)); }
+}
+@media (prefers-reduced-motion: reduce) {
+  .pp-overflow-label[data-overflow]:is(:hover, :focus-visible) > span { animation: none; width: auto; overflow: hidden; }
+}
