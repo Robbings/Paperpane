@@ -30,3 +30,12 @@ test('network errors and aborts never dispatch a fallback; fallback failures do 
   assert.equal((await fetchModelEndpoint('https://fixture.test/responses', {}, 'openai-responses', 'https://fixture.test', async () => { calls++; return new Response('', { status: 405 }); })).status, 405);
   assert.equal(calls, 2);
 });
+
+test('JSON missing-route errors mentioning /models still try the versioned list', async () => {
+  const calls=[];
+  await fetchModelEndpoint('https://fixture.test/models', {}, 'openai-chat', 'https://fixture.test', async url => {
+    calls.push(String(url));
+    return new Response(JSON.stringify({error:'Cannot GET /models'}), {status:calls.length===1?404:200,headers:{'content-type':'application/json'}});
+  });
+  assert.deepEqual(calls,['https://fixture.test/models','https://fixture.test/v1/models']);
+});

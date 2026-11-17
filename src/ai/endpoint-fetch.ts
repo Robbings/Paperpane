@@ -15,7 +15,8 @@ export async function fetchModelEndpoint(
     try {
       const error = (await response.clone().json())?.error;
       // A missing model/deployment is not a missing route.
-      if (/model|deployment/i.test(typeof error === 'string' ? error : JSON.stringify(error ?? ''))) return response;
+      const detail = typeof error === 'string' ? error : JSON.stringify(error ?? '');
+      if (/\b(?:model|deployment)[_-](?:not[_-]found|unavailable|invalid)\b|\b(?:unknown|invalid|unavailable)\s+(?:model|deployment)\b|\b(?:model|deployment)\b.{0,200}\b(?:does not exist|not found|not available|not supported)\b/i.test(detail)) return response;
     } catch { return response; }
   }
   init.signal?.throwIfAborted();
