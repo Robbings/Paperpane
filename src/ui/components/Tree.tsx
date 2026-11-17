@@ -251,7 +251,10 @@ function RenameInput({ initial, onDone, onCancel }: { initial: string; onDone: (
     ref.current?.focus();
     ref.current?.select();
   }, []);
+  const finished = useRef(false);
   const commit = () => {
+    if (finished.current) return;
+    finished.current = true;
     const name = value.trim();
     if (name && name !== initial) onDone(name);
     else onCancel();
@@ -266,8 +269,9 @@ function RenameInput({ initial, onDone, onCancel }: { initial: string; onDone: (
       onClick={(event) => event.stopPropagation()}
       onKeyDown={(event) => {
         event.stopPropagation();
-        if (event.key === 'Enter') commit();
-        if (event.key === 'Escape') onCancel();
+        if (event.nativeEvent.isComposing) return;
+        if (event.key === 'Enter') { event.preventDefault(); commit(); }
+        if (event.key === 'Escape') { event.preventDefault(); finished.current = true; onCancel(); }
       }}
       onBlur={commit}
     />

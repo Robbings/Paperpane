@@ -37,6 +37,8 @@ export function Popover({ anchorRef, open, onClose, label, placement = 'bottom',
     };
     const onKey = (event: KeyboardEvent) => {
       if (event.key !== 'Escape') return;
+      // A nested native modal owns Escape (including inline rename cancellation).
+      if ((event.target as Element)?.closest?.('dialog[open]')) return;
       event.stopPropagation();
       if (ref.current?.contains(document.activeElement)) anchorRef.current?.focus();
       onClose();

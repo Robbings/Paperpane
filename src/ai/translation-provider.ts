@@ -1,3 +1,4 @@
+import { fetchModelEndpoint } from './endpoint-fetch';
 import { networkFailure } from '@/translation/problems';
 import { chatRequestOptions } from './model-providers';
 import { supportsModelOperation } from '@/ai/model-configuration';
@@ -65,7 +66,7 @@ async function streamTranslationAttempt(connection: Connection, messages: { role
     input: messages.filter(m => m.role === 'user').map(m => ({ role: 'user', content: [{ type: 'input_text', text: m.content }] })),
     max_output_tokens: limit, ...thinking,
   } : { model: connection.model.modelId, messages, stream: true, ...thinking, ...chatRequestOptions(connection.endpoint.presetId, limit, context.sessionId) };
-  const response = await transport(() => fetch(url, { method: 'POST', credentials: 'omit', redirect: 'error', signal: combined, headers: { 'Content-Type': 'application/json', ...(connection.key ? { Authorization: `Bearer ${connection.key}` } : {}) }, body: JSON.stringify(body) }));
+  const response = await transport(() => fetchModelEndpoint(url, { method: 'POST', credentials: 'omit', redirect: 'error', signal: combined, headers: { 'Content-Type': 'application/json', ...(connection.key ? { Authorization: `Bearer ${connection.key}` } : {}) }, body: JSON.stringify(body) }, connection.endpoint.protocol, endpointUrl(connection.endpoint.baseUrl)));
   const header = response.headers.get('retry-after');
   const retryAfter = header ? (/^\d+(\.\d+)?$/.test(header) ? Number(header) * 1000 : Date.parse(header) - Date.now()) : 0;
   report({ status: response.status, requestId: clean(response.headers.get('x-request-id') ?? response.headers.get('request-id') ?? response.headers.get('cf-ray')), retryAfterMs: Number.isFinite(retryAfter) ? Math.max(0, Math.min(retryAfter, 2147483647)) : 0 });

@@ -35,7 +35,7 @@ test('附件和父论文元数据每批最多 50 个 key，不逐个请求',asyn
 test('分类计划保留祖先、多个归属，稳定标识防止重试重复建目录',()=>{
  const plan=collectionPlan('123',collections,['CHILD001','OTHER001','CHILD001']);assert.equal(plan.folders.length,4);assert.equal(plan.memberships.length,2);assert.equal(plan.folders.find(f=>f.name==='注意力').parentId,'zotero-folder:123:ROOT0001');assert.deepEqual(plan,collectionPlan('123',collections,['CHILD001','OTHER001','CHILD001']));
  assert.deepEqual(collectionLabels(makeItems(1)[0],collections),['机器学习 / 注意力','精读']);
- assert.throws(()=>collectionPlan('123',[{key:'A',data:{name:'a',parentCollection:'B'}},{key:'B',data:{name:'b',parentCollection:'A'}}],['A']),/循环/);assert.throws(()=>collectionPlan('123',collections,['MISSING1']),/重新读取/);
+ assert.throws(()=>collectionPlan('123',[{key:'A',data:{name:'a',parentCollection:'B'}},{key:'B',data:{name:'b',parentCollection:'A'}}],['A']),/循环/);assert.throws(()=>collectionPlan('123',collections,['MISSING1']),/刷新/);
 });
 test('真实数据库保留目录和多分类；重新打开、重试、备份恢复后可查到同一篇论文',async()=>{
  globalThis.indexedDB=new IDBFactory();const db=new ZoteroMappings(),item=await libraryItem(db),destination={kind:'collections',collections};

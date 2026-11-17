@@ -32,3 +32,23 @@ test('library counts existing, active annotations for the current file only', as
     await library.close();
   }
 });
+
+test('saving a reader short note persists it and preserves concurrent library edits', async () => {
+  const { outputFiles } = await build({entryPoints:['src/data/library-database.ts'],alias:{'@':resolve('src')},bundle:true,platform:'node',format:'esm',write:false});
+  const { LibraryDatabase } = await import('data:text/javascript;base64,'+Buffer.from(outputFiles[0].contents).toString('base64'));
+  const db=new LibraryDatabase('reader-short-note');
+  try {
+    const native=await db.open(),tx=native.transaction(['documents','libraryItems'],'readwrite');
+    const ref={documentId:'doc',fileVersion:'v1'};
+    tx.objectStore('documents').put({id:'doc',fileVersion:'v1',syncScope:'record-and-file',file:{availability:'local'}});
+    tx.objectStore('libraryItems').put({id:'paper',documentId:'doc',title:'Paper',authors:[],tagIds:[],folderId:null,inLibrary:false});
+    await new Promise((ok,no)=>{tx.oncomplete=ok;tx.onabort=()=>no(tx.error);});
+    const baseline={title:'Paper',authors:[],folderId:null,tags:[]};
+    const saved=await db.saveDocumentEntry(ref,{...baseline,shortNote:'Read the proof'},baseline);
+    assert.equal((await db.getItemForDocument('doc')).shortNote,'Read the proof');
+    await db.saveDocumentEntry(ref,{...baseline,title:'Renamed'},baseline);
+    assert.equal((await db.getItemForDocument('doc')).shortNote,'Read the proof','an untouched note is not overwritten');
+    await assert.rejects(db.saveDocumentEntry(ref,{...baseline,shortNote:'Conflicting note'},baseline),/别处改过/);
+    assert(saved.item.editedFields.includes('shortNote'));
+  } finally {await db.close();}
+});

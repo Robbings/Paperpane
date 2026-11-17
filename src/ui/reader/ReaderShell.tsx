@@ -1,3 +1,4 @@
+import type { FolderActions } from '@/ui/library/FolderPicker';
 import type { ThumbnailRenderer } from './PageThumbnail';
 import { useEffect, useLayoutEffect, useRef, useState, type CSSProperties, type PointerEvent as ReactPointerEvent, type ReactNode } from 'react';
 import {
@@ -115,8 +116,7 @@ export interface ReaderLibraryProps extends ReaderLibraryData {
   tags: readonly TagView[];
   onSave: (draft: LibraryEntryDraft, baseline: LibraryEntryDraft) => void;
   onRemove: () => void;
-  /** Creates a folder from the save popover and returns its id. */
-  onCreateFolder: (parentId: string | null, name: string) => string;
+  folderActions?: FolderActions;
   onOpenPaper: (id: string, newTab: boolean) => void;
   onImport: (files: File[]) => void;
   onOpenLibrary: () => void;
@@ -841,7 +841,7 @@ export function ReaderShell(props: ReaderShellProps) {
           tags={library.tags}
           onSave={library.onSave}
           onRemove={library.onRemove}
-          onCreateFolder={library.onCreateFolder}
+          folderActions={library.folderActions}
         />
       )}
 

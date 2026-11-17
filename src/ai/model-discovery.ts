@@ -1,3 +1,4 @@
+import { fetchModelEndpoint } from './endpoint-fetch.ts';
 import type { CatalogModel } from "./model-catalog";
 import type { Protocol } from "../ui/settings/types";
 
@@ -76,12 +77,12 @@ export async function discoverModels(
         cursor,
       );
     const data = await readJson(
-      await fetcher(url, {
+      await fetchModelEndpoint(url, {
         headers: apiHeaders(protocol, key),
         credentials: "omit",
         redirect: "error",
         signal,
-      }),
+      }, protocol, base, fetcher),
     );
     const rows = protocol === "gemini" ? data.models : data.data;
     if (!Array.isArray(rows)) throw new Error("模型列表格式不正确。");

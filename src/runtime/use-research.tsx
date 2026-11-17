@@ -55,8 +55,10 @@ function ConversationPanel({
   onLocate,
   onExpand,
   compact = false,
+  mathDelimiter,
 }: {
   compact?: boolean;
+  mathDelimiter: Preferences['mathDelimiter'];
   service: ResearchService;
   sid: string;
   title: "讨论" | "解释";
@@ -199,6 +201,7 @@ function ConversationPanel({
   return (
     <AssistantRuntimeProvider runtime={runtime}>
       <ChatPanel
+        mathDelimiter={mathDelimiter}
         title={title}
         mode={title === "解释" ? "explanation" : "conversation"}
         hideHeader={compact}
@@ -558,6 +561,7 @@ export function useResearch(
   ) =>
     service && sid ? (
       <ConversationPanel
+        mathDelimiter={preferences.mathDelimiter}
         key={sid}
         service={service}
         sid={sid}

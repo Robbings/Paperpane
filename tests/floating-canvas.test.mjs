@@ -174,3 +174,25 @@ test('floating anchors and bounds stay stable when Chrome rounds neighboring ins
     assert.deepEqual(floatingPaperBounds(el), paper);
   }
 });
+
+test('returning a left-clipped card keeps its viewport origin stable at scroll zero', () => {
+  const el = new PaperViewport(), canvas = new FloatingCanvas(el), id = Symbol();
+  canvas.set(id, -200, 160); el.scrollLeft = 0;
+  const origin = floatingPaperOriginX(el);
+  for (let x = -199; x <= 20; x++) {
+    canvas.set(id, x, x + 360);
+    assert.equal(floatingPaperOriginX(el), origin, 'one pixel of drag must not move the paper');
+  }
+  canvas.remove(id);
+  assert.equal(canvas.getSnapshot(), 0);
+});
+test('a partially available scroll only releases the compensatable left gutter', () => {
+  const el = new PaperViewport(), canvas = new FloatingCanvas(el), a = Symbol(), b = Symbol();
+  canvas.set(a, -200, 160); canvas.set(b, -100, 260); el.scrollLeft = 50;
+  const origin = floatingPaperOriginX(el);
+  canvas.set(a, 20, 380);
+  assert.equal(canvas.getSnapshot(), 162);
+  assert.equal(floatingPaperOriginX(el), origin);
+  canvas.remove(a); assert.equal(floatingPaperOriginX(el), origin);
+  canvas.remove(b); assert.equal(canvas.getSnapshot(), 0);
+});

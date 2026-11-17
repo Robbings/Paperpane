@@ -129,21 +129,15 @@ export function PassageWindow(props:Props){
     return()=>observer.disconnect();
   },[]);
 
-  const finish=(reveal=false)=>{
+  const finish=()=>{
     const g=gesture.current;gesture.current=null;if(g)setDragging(false);cancelAnimationFrame(frame.current);
     if(g?.target.hasPointerCapture(g.id))g.target.releasePointerCapture(g.id);
     if(g?.moved)latest.current.props.onLayoutCommit?.();
-    if(reveal&&g?.moved&&g.kind==='move'){
-      const s=latest.current,w=(panel.current?.offsetWidth??360)*s.scale;
-      const l=floatingLeft(s.paper,s.anchor.x+s.offset.x,w)+canvas.readInset(),r=l+w;
-      if(r>container.scrollLeft+container.clientWidth-16)container.scrollLeft=r-container.clientWidth+16;
-      else if(l<container.scrollLeft+16)container.scrollLeft=Math.max(0,l-16);
-    }
     setHovered(panel.current?.matches(':hover')??false);
   };
   useEffect(()=>{
     const stop=()=>finish();
-    const up=(event:PointerEvent)=>{if(event.pointerId===gesture.current?.id)finish(event.type==='pointerup');};
+    const up=(event:PointerEvent)=>{if(event.pointerId===gesture.current?.id)finish();};
     window.addEventListener('pointerup',up);window.addEventListener('pointercancel',up);window.addEventListener('blur',stop);
     return()=>{cancelAnimationFrame(frame.current);gesture.current=null;window.removeEventListener('pointerup',up);window.removeEventListener('pointercancel',up);window.removeEventListener('blur',stop);};
   },[container]);
@@ -180,7 +174,7 @@ export function PassageWindow(props:Props){
   const drag={
     onPointerDown:begin('move'),
     onPointerMove:(event:ReactPointerEvent<HTMLElement>)=>{const g=gesture.current;if(!g||g.id!==event.pointerId)return;if(!(event.buttons&1)){finish();return;}g.px=event.clientX;g.py=event.clientY;update();},
-    onPointerUp:()=>finish(true),onPointerCancel:()=>finish(),onLostPointerCapture:()=>{if(gesture.current)finish();},
+    onPointerUp:()=>finish(),onPointerCancel:()=>finish(),onLostPointerCapture:()=>{if(gesture.current)finish();},
   };
   const box=container.getBoundingClientRect(),note=panel.current?.getBoundingClientRect();
   const rects=active?props.sourceRects().flatMap(r=>{

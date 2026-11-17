@@ -28,7 +28,7 @@ export function useTranslation(owner:ReaderController|undefined,preferences:Pref
     if(!owner||!document)return;
     let alive=true;const s=new TranslationSession(document,(signal,progress)=>owner.reader.extractTranslation(signal,progress),()=>{if(alive)render(n=>n+1);});
     owner.trackTranslation(s);
-    setSession(s);setActive(null);setReveal(null);
+    setSession(s);setOpen(false);setActive(null);setReveal(null);
     return()=>{alive=false;void owner.releaseTranslation(s);};
   },[owner,document?.documentId,document?.fileVersion]);
   // Loading/render phase changes must not dispose a session holding unsaved text.
@@ -43,6 +43,9 @@ export function useTranslation(owner:ReaderController|undefined,preferences:Pref
     void session.load().then(()=>{
       if (!live || !session.paper || attemptedOpen.current===session) return;
       attemptedOpen.current=session;
+      // Reopening a translated paper restores the saved text visibly, without
+      // making the reader start a translation just to find previous results.
+      if (Object.values(session.run?.outputs ?? {}).some(output => !!output.text)) setOpen(true);
       if (preferences.autoTranslate==='on-open') return session.startAutomatic(preferences.translationLanguage);
     });
     return ()=>{live=false;};

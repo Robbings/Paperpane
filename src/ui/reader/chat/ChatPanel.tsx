@@ -1,3 +1,4 @@
+import type { MathDelimiter } from '@/ui/components/mathCopy';
 import type { ResearchTextRenderer } from '@/ai/markdown';
 import { useEffect, useLayoutEffect, useRef, useState, type ReactNode } from 'react';
 import { Button, Dialog, EmptyState, Icon, IconButton, ScrollArea, Skeleton, cleanCopyHandlers } from '@/ui/components';
@@ -9,6 +10,7 @@ import type { ChatSessionView, CitationView, ErrorView, ModelChangeView, ModelVi
 import './chat.css';
 
 export interface ChatPanelProps {
+  mathDelimiter?: MathDelimiter;
   /** Panel name: "讨论", or "解释" for explanation sessions. */
   title: string;
   mode?:'conversation'|'explanation';
@@ -170,7 +172,7 @@ export function ChatPanel(props: ChatPanelProps) {
           viewportRef={scroll.ref}
           onScroll={scroll.onScroll}
           style={{ paddingBottom: 8 }}
-          {...cleanCopyHandlers}
+          {...cleanCopyHandlers} data-math-delimiter={props.mathDelimiter ?? 'brackets'}
         >
           {props.source}
           {messages.length === 0 ? (
@@ -205,6 +207,7 @@ export function ChatPanel(props: ChatPanelProps) {
                     />
                   ) : (
                     <ChatAnswer
+                      mathDelimiter={props.mathDelimiter}
                       renderText={props.renderAnswerText}
                       message={message}
                       latest={message === last}

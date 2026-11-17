@@ -9,7 +9,7 @@ const req = <T>(request: IDBRequest<T>) => new Promise<T>((resolve, reject) => {
   request.onsuccess = () => resolve(request.result); request.onerror = () => reject(request.error);
 });
 /** What the reader's 收藏 popover edits. */
-export interface ReaderEntry { title: string; authors: string[]; venue?: string; year?: number; folderId: string | null; tags: readonly LibraryTagInput[] }
+export interface ReaderEntry { title: string; authors: string[]; venue?: string; year?: number; shortNote?: string; folderId: string | null; tags: readonly LibraryTagInput[] }
 export class LibraryFault extends Error {
   constructor(readonly code: 'NOT_FOUND' | 'CONFLICT' | 'INVALID_INPUT', message: string) { super(message); }
 }
@@ -379,7 +379,7 @@ export class LibraryDatabase extends PaperDatabase {
   async saveDocumentEntry(ref: DocumentRef, entry: ReaderEntry, baseline: ReaderEntry): Promise<{ item: LibraryItem; translationQueued: boolean }> {
     const clean = (value: ReaderEntry) => ({
       title: value.title.trim(), authors: value.authors.map(a => a.trim()).filter(Boolean),
-      venue: value.venue?.trim() || undefined, year: value.year, folderId: value.folderId,
+      venue: value.venue?.trim() || undefined, year: value.year, shortNote: value.shortNote?.trim() || undefined, folderId: value.folderId,
     });
     const next = clean(entry), base = clean(baseline);
     if (!next.title || next.title.length > 100_000) throw new LibraryFault('INVALID_INPUT', '标题不能为空');
@@ -394,7 +394,7 @@ export class LibraryDatabase extends PaperDatabase {
       const adding = !item.inLibrary;
       const patch: Partial<LibraryItem> = {};
       const edited: string[] = [];
-      for (const key of ['title', 'authors', 'venue', 'year'] as const) {
+      for (const key of ['title', 'authors', 'venue', 'year', 'shortNote'] as const) {
         if (same(next[key], base[key])) continue;
         if (!same(item[key], base[key]) && !same(item[key], next[key])) throw new LibraryFault('CONFLICT', '这篇论文的书目信息刚在别处改过，请重新打开收藏窗口核对后再保存');
         Object.assign(patch, { [key]: next[key] });

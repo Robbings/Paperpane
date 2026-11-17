@@ -1,3 +1,4 @@
+import { selectionCacheKey } from '@/translation/selection-cache';
 import { useTranslationProblem } from './translation-notices';
 import { useEffect, useRef, useState } from 'react';
 import type { DocumentAnchor } from '@/contracts/document';
@@ -36,8 +37,7 @@ export function useSelectionTranslation(owner: ReaderController | undefined, pre
       if(old&&!await owner.releaseTranslation(old.session)){owner.report('选区译文尚未保存，请先在悬浮窗中重试保存。');return;}
       if(!alive||ticket!==generation.current||owner.isChangingDocument||owner.reader.getSnapshot().data.document?.documentId!==anchor.documentId||owner.reader.getSnapshot().data.document?.fileVersion!==anchor.fileVersion)return;
       current.current=undefined;setCard(undefined);
-      const bytes=new TextEncoder().encode(JSON.stringify({text,pages:anchor.pages.map(p=>({pageIndex:p.pageIndex,rects:p.rects.map(r=>({x:Math.round(r.x*10)/10,y:Math.round(r.y*10)/10,width:Math.round(r.width*10)/10,height:Math.round(r.height*10)/10}))}))}));
-      const key=[...new Uint8Array(await crypto.subtle.digest('SHA-256',bytes))].map(n=>n.toString(16).padStart(2,'0')).join('');
+      const key=await selectionCacheKey({text,anchor});
       if(!alive||ticket!==generation.current||owner.isChangingDocument||owner.reader.getSnapshot().data.document?.documentId!==anchor.documentId||owner.reader.getSnapshot().data.document?.fileVersion!==anchor.fileVersion)return;
       const sourceLanguage='auto',targetLanguage=defaults.current.translationLanguage;
       const paper:ExtractedPaper={documentId:anchor.documentId,fileVersion:anchor.fileVersion,version:`selection-v1:${key}`,pageCount:owner.reader.getSnapshot().data.pageCount,warnings:[],sentences:[{id:'selection-text',paragraphId:'selection-text',source:text,kind:'text',anchor,approximate:false,warnings:[]}]};
@@ -51,7 +51,7 @@ export function useSelectionTranslation(owner: ReaderController | undefined, pre
       if(!alive||current.current!==next)return;
       // Reuse an exact selection's saved result. A cancelled partial task resumes its own UUID.
       const compatible=session.run && savedEngineKey(session.run.profile)===engine && session.run.profile.language===targetLanguage&&(session.run.profile.sourceLanguage??'auto')===sourceLanguage;
-      if(compatible)await session.resume(targetLanguage);else await session.start(targetLanguage,undefined,false,undefined,true);
+      if(compatible)await session.resume(targetLanguage);else await session.start(targetLanguage);
     })().catch(()=>{if(alive)owner.report('无法打开选区翻译，请重试。');});};
     return()=>{alive=false;++generation.current;owner.translateSelection=undefined;const old=current.current;current.current=undefined;setCard(undefined);if(old)void owner.releaseTranslation(old.session);};
   },[owner,document?.documentId,document?.fileVersion]);
